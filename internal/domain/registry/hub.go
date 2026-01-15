@@ -2,106 +2,64 @@ package registry
 
 import (
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 )
 
-// [HUBBER_INTERFACE] DEFINES CORE LOGIC FOR CONNECTION MANAGEMENT
+// Hubber defines the gateway for user session management and event routing.
 type Hubber interface {
+	Broadcast(ev model.Eventer) bool
 	Register(conn model.Connector)
 	Unregister(userID, connID uuid.UUID)
-	Broadcast(ev model.Eventer) bool
-	IsConnected(userID uuid.UUID) bool // [PERFORMANCE] FAST CHECK FOR ROUTING KEY FILTERING
+	IsConnected(userID uuid.UUID) bool
 }
 
-const shardCount = 256
-
-// [HUB_IMPLEMENTATION] SHARDED STORAGE TO MINIMIZE LOCK CONTENTION
+// Hub implements a [SCALABLE_REGISTRY] using Virtual Cell pattern.
 type Hub struct {
-	shards [shardCount]*shard
-}
-
-type shard struct {
-	sync.RWMutex
-	sessions map[uuid.UUID][]model.Connector
+	// cells stores Map[uuid.UUID]Celler. Optimized for [READ_HEAVY] workloads.
+	cells sync.Map
 }
 
 func NewHub() *Hub {
-	h := &Hub{}
-	for i := range shardCount {
-		h.shards[i] = &shard{sessions: make(map[uuid.UUID][]model.Connector)}
-	}
-	return h
+	return &Hub{}
 }
 
-func (h *Hub) getShard(userID uuid.UUID) *shard {
-	return h.shards[userID[0]]
-}
-
-// [IS_ACTIVE] CHECKS IF USER HAS AT LEAST ONE ACTIVE STREAM ON THIS NODE
 func (h *Hub) IsConnected(userID uuid.UUID) bool {
-	s := h.getShard(userID)
-	s.RLock()
-	defer s.RUnlock()
-	_, ok := s.sessions[userID]
+	_, ok := h.cells.Load(userID)
 	return ok
 }
 
+// Broadcast routes event to the specific [USER_CELL]. Returns false on miss or overflow.
 func (h *Hub) Broadcast(ev model.Eventer) bool {
-	s := h.getShard(ev.GetUserID())
-	s.RLock()
-	connectors, ok := s.sessions[ev.GetUserID()]
-	s.RUnlock()
-
-	if !ok || len(connectors) == 0 {
-		return false
-	}
-
-	// [OPTIMIZATION] Marshall once here. All subsequent calls to
-	// Marshaller inside gRPC streams will use this cached value.
-	_ = marshaller.MarshallDeliveryEvent(ev)
-
-	var delivered bool
-	for _, conn := range connectors {
-		// All connectors get the same pointer to the event with cached data.
-		if conn.Send(ev, time.Second*2) {
-			delivered = true
+	if val, ok := h.cells.Load(ev.GetUserID()); ok {
+		if cell, ok := val.(Celler); ok {
+			return cell.Push(ev)
 		}
 	}
-
-	return delivered
+	return false
 }
 
+// Register ensures [IDEMPOTENT] cell creation and attaches a new transport.
 func (h *Hub) Register(conn model.Connector) {
-	s := h.getShard(conn.GetUserID())
-	s.Lock()
-	defer s.Unlock()
-	s.sessions[conn.GetUserID()] = append(s.sessions[conn.GetUserID()], conn)
+	uID := conn.GetUserID()
+	// [LAZY_INIT] Create cell only when first connection arrives.
+	val, _ := h.cells.LoadOrStore(uID, NewCell(uID))
+
+	if cell, ok := val.(Celler); ok {
+		cell.Attach(conn)
+	}
 }
 
+// Unregister performs [GRACEFUL_RECLAMATION] of resources when sessions end.
 func (h *Hub) Unregister(userID, connID uuid.UUID) {
-	s := h.getShard(userID)
-	s.Lock()
-	defer s.Unlock()
-
-	conns, ok := s.sessions[userID]
-	if !ok {
-		return
-	}
-
-	for i, c := range conns {
-		if c.GetID() == connID {
-			c.Close() // [LIFECYCLE] TRIGGER CLEANUP AND POOL RETURN
-			conns[i] = conns[len(conns)-1]
-			s.sessions[userID] = conns[:len(conns)-1]
-			break
+	if val, ok := h.cells.Load(userID); ok {
+		if cell, ok := val.(Celler); ok {
+			// If no sessions left, purge the cell from memory.
+			if cell.Detach(connID) {
+				cell.Stop()
+				h.cells.Delete(userID)
+			}
 		}
-	}
-
-	if len(s.sessions[userID]) == 0 {
-		delete(s.sessions, userID)
 	}
 }

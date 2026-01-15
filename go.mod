@@ -7,6 +7,8 @@ require (
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/ThreeDotsLabs/watermill-amqp/v3 v3.0.2
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-chi/chi/v5 v5.2.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
@@ -48,7 +50,6 @@ require (
 	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/webitel/webitel-go-kit/pkg/errors v0.0.0-20251222125635-d60448d23a82 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/bridges/otelzap v0.14.0 // indirect
 	go.opentelemetry.io/otel/log v0.15.0 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.12.2 // indirect
@@ -62,7 +63,7 @@ require (
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -73,7 +74,6 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/webitel/webitel-go-kit/infra/discovery v0.0.0-20251222125635-d60448d23a82
-	github.com/webitel/wlog v0.0.0-20250325101442-de4f125c1ec7
 	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -83,5 +83,5 @@ require (
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251213004720-97cd9d5aeac2 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.11
 )

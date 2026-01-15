@@ -18,7 +18,9 @@ const (
 )
 
 var (
-	version        = "0.0.0"
+	version = "1.0.0"
+
+	serverVersion  = "v1"
 	commit         = "hash"
 	commitDate     = time.Now().String()
 	branch         = "branch"

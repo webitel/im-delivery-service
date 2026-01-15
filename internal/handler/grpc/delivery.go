@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	impb "github.com/webitel/im-delivery-service/gen/go/api/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
+	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
@@ -52,7 +52,7 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 
 	d.logger.Info("stream opened", "user_id", userID, "conn_id", conn.GetID())
 
-	if err := stream.Send(marshaller.MarshallDeliveryEvent(model.NewConnectedEvent(userID, conn.GetID().String(), serverVersion))); err != nil {
+	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(model.NewConnectedEvent(userID, conn.GetID().String(), serverVersion))); err != nil {
 		d.logger.Warn("failed to send welcome event", "user_id", userID, "error", err)
 		return err
 	}
@@ -72,7 +72,7 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			}
 
 			// TRANSMIT OVER HTTP/2
-			if err := stream.Send(marshaller.MarshallDeliveryEvent(ev)); err != nil {
+			if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(ev)); err != nil {
 				d.logger.Warn("failed to transmit event", "user_id", userID, "error", err)
 				return err
 			}

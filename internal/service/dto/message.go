@@ -14,6 +14,19 @@ type MessageV1 struct {
 	Documents  []DocumentDTO `json:"documents"`
 }
 
+type MessageV2 struct {
+	MessageID  string            `json:"message_id"`
+	ThreadID   string            `json:"thread_id"`
+	FromID     string            `json:"from_id"`
+	Body       string            `json:"body"`
+	OccurredAt int64             `json:"occurred_at"` // Changed to Unix timestamp
+	EditedAt   int64             `json:"edited_at"`   // New: Track edits
+	IsForward  bool              `json:"is_forward"`  // New: Forwarding flag
+	Metadata   map[string]string `json:"metadata"`    // New: Flexible key-value pairs
+	Images     []ImageDTO        `json:"images"`
+	Documents  []DocumentDTO     `json:"documents"`
+}
+
 type ImageDTO struct {
 	FileID int64  `json:"file_id"`
 	Mime   string `json:"mime"`

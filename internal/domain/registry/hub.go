@@ -11,7 +11,7 @@ import (
 
 // Hubber defines the external API for the registry system.
 type Hubber interface {
-	Broadcast(ev model.Eventer) bool
+	Broadcast(ev model.InboundEventer) bool
 	Register(conn model.Connector)
 	Unregister(userID, connID uuid.UUID)
 	IsConnected(userID uuid.UUID) bool
@@ -47,7 +47,7 @@ func (h *Hub) IsConnected(userID uuid.UUID) bool {
 }
 
 // Broadcast dispatches an event to the specific user's cell mailbox.
-func (h *Hub) Broadcast(ev model.Eventer) bool {
+func (h *Hub) Broadcast(ev model.InboundEventer) bool {
 	if val, ok := h.cells.Load(ev.GetUserID()); ok {
 		if cell, ok := val.(Celler); ok {
 			return cell.Push(ev)

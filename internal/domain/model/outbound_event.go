@@ -16,16 +16,16 @@ type OutboundEventer interface {
 
 // OutboundEvent is a concrete implementation for publishing.
 type OutboundEvent struct {
-	ID        string    `json:"id"`
-	Source    string    `json:"source"` // e.g., "im-delivery-service"
-	UserID    uuid.UUID `json:"user_id"`
-	Kind      EventKind `json:"kind"`
-	Payload   any       `json:"payload"`
-	Timestamp int64     `json:"timestamp"`
+	ID        string           `json:"id"`
+	Source    string           `json:"source"` // e.g., "im-delivery-service"
+	UserID    uuid.UUID        `json:"user_id"`
+	Kind      InboundEventKind `json:"kind"`
+	Payload   any              `json:"payload"`
+	Timestamp int64            `json:"timestamp"`
 }
 
 // NewOutboundEvent creates a fresh event ready for publishing.
-func NewOutboundEvent(userID uuid.UUID, kind EventKind, payload any) *OutboundEvent {
+func NewOutboundEvent(userID uuid.UUID, kind InboundEventKind, payload any) *OutboundEvent {
 	return &OutboundEvent{
 		ID:        uuid.NewString(),
 		Source:    "im-delivery-service",

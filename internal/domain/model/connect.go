@@ -17,8 +17,8 @@ var _ Connector = (*connect)(nil)
 type Connector interface {
 	GetID() uuid.UUID
 	GetUserID() uuid.UUID
-	Send(ev Eventer, timeout time.Duration) bool // Thread-safe send with backpressure handling
-	Recv() <-chan Eventer
+	Send(ev InboundEventer, timeout time.Duration) bool // Thread-safe send with backpressure handling
+	Recv() <-chan InboundEventer
 	Close() // Terminate connection and release resources
 }
 
@@ -40,7 +40,7 @@ type connect struct {
 	ctx      context.Context
 	cancelFn context.CancelFunc
 
-	sendCh chan Eventer
+	sendCh chan InboundEventer
 
 	// [ATOMIC_FIELDS] Optimized for lock-free performance
 	lastActivityAt int64
@@ -67,7 +67,7 @@ func NewConnector(ctx context.Context, userID uuid.UUID, bufferSize int) Connect
 	c.createdAt = time.Now()
 	c.ctx = childCtx
 	c.cancelFn = cancel
-	c.sendCh = make(chan Eventer, bufferSize)
+	c.sendCh = make(chan InboundEventer, bufferSize)
 
 	atomic.StoreInt64(&c.lastActivityAt, time.Now().UnixNano())
 	atomic.StoreUint64(&c.droppedCount, 0)
@@ -82,7 +82,7 @@ func (c *connect) GetUserID() uuid.UUID { return c.userID }
 
 // Send attempts to push an event into the channel.
 // If the channel is full, it tries to evict lower priority events to make room.
-func (c *connect) Send(ev Eventer, timeout time.Duration) bool {
+func (c *connect) Send(ev InboundEventer, timeout time.Duration) bool {
 	select {
 	case <-c.ctx.Done():
 		return false
@@ -95,7 +95,7 @@ func (c *connect) Send(ev Eventer, timeout time.Duration) bool {
 }
 
 // handleBackpressure manages full buffers by dropping low-priority events.
-func (c *connect) handleBackpressure(ev Eventer, timeout time.Duration) bool {
+func (c *connect) handleBackpressure(ev InboundEventer, timeout time.Duration) bool {
 	// If the incoming event is low priority, drop it immediately to save buffer for high priority
 	if ev.GetPriority() <= PriorityLow {
 		atomic.AddUint64(&c.droppedCount, 1)
@@ -125,7 +125,7 @@ func (c *connect) handleBackpressure(ev Eventer, timeout time.Duration) bool {
 	return false
 }
 
-func (c *connect) Recv() <-chan Eventer { return c.sendCh }
+func (c *connect) Recv() <-chan InboundEventer { return c.sendCh }
 
 // [CLOSE] RELEASES THE OBJECT BACK TO THE POOL
 func (c *connect) Close() {

@@ -15,9 +15,9 @@ const _EventKind_name = "Connected"
 
 var _EventKind_index = [...]uint8{0, 9}
 
-func (i EventKind) String() string {
+func (i InboundEventKind) String() string {
 	i -= 1
-	if i < 0 || i >= EventKind(len(_EventKind_index)-1) {
+	if i < 0 || i >= InboundEventKind(len(_EventKind_index)-1) {
 		return "EventKind(" + strconv.FormatInt(int64(i+1), 10) + ")"
 	}
 	return _EventKind_name[_EventKind_index[i]:_EventKind_index[i+1]]

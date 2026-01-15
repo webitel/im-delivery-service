@@ -19,12 +19,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 )
 
 // Celler defines the internal API for user-specific delivery units.
 type Celler interface {
-	Push(ev model.Eventer) bool
+	Push(ev model.InboundEventer) bool
 	Attach(conn model.Connector)
 	Detach(connID uuid.UUID) bool
 	IsIdle(timeout time.Duration) bool
@@ -41,7 +40,7 @@ type Cell struct {
 	// Buffered channel that decouples the global dispatcher from individual delivery.
 	// It acts as a shock absorber, preventing slow consumer latency from
 	// propagating back to the Hub or AMQP consumers (Backpressure).
-	mailbox chan model.Eventer
+	mailbox chan model.InboundEventer
 
 	// [SESSIONS]
 	// Registry of all active transport channels (gRPC streams) for the user.
@@ -66,7 +65,7 @@ type Cell struct {
 func NewCell(userID uuid.UUID) *Cell {
 	c := &Cell{
 		userID:         userID,
-		mailbox:        make(chan model.Eventer, 1024),
+		mailbox:        make(chan model.InboundEventer, 1024),
 		sessions:       make(map[uuid.UUID]model.Connector),
 		doneCh:         make(chan struct{}),
 		lastActivityAt: time.Now(),
@@ -91,7 +90,7 @@ func (c *Cell) touch() {
 	c.mu.Unlock()
 }
 
-func (c *Cell) Push(ev model.Eventer) bool {
+func (c *Cell) Push(ev model.InboundEventer) bool {
 	c.touch() // Keep alive on incoming events
 	select {
 	case c.mailbox <- ev:
@@ -127,7 +126,7 @@ func (c *Cell) loop() {
 	}
 }
 
-func (c *Cell) deliver(ev model.Eventer) {
+func (c *Cell) deliver(ev model.InboundEventer) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -135,7 +134,6 @@ func (c *Cell) deliver(ev model.Eventer) {
 		return
 	}
 
-	_ = marshaller.MarshallDeliveryEvent(ev)
 	for _, conn := range c.sessions {
 		conn.Send(ev, time.Millisecond*500)
 	}

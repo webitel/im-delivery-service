@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/service/dto"
-	"github.com/webitel/im-delivery-service/internal/service/mapper"
 )
 
 const (
@@ -14,7 +14,7 @@ const (
 )
 
 func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUID, raw *dto.MessageV1) error {
-	event := mapper.NewMessageV1Adapter(raw, userID)
+	event := model.NewMessageV1Event(raw, userID)
 	h.hub.Broadcast(event)
 	return nil
 }

@@ -9,12 +9,6 @@ import (
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
 )
 
-const (
-	TopicExchangeType  = "topic"
-	FanoutExchangeType = "fanout"
-	DirectExchangeType = "direct"
-)
-
 type Factory struct {
 	url    string
 	logger watermill.LoggerAdapter
@@ -27,10 +21,14 @@ func NewFactory(url string, logger watermill.LoggerAdapter) (*Factory, error) {
 	}, nil
 }
 
+// BuildSubscriber creates a new AMQP subscriber with specific queue topology
+// infra/pubsub/factory/amqp/factory.go
+
 func (f *Factory) BuildSubscriber(name string, subConfig *factory.SubscriberConfig) (message.Subscriber, error) {
 	if subConfig == nil {
 		return nil, fmt.Errorf("no subscriber configured")
 	}
+
 	conf := amqp.Config{
 		Connection: amqp.ConnectionConfig{
 			AmqpURI: f.url,
@@ -47,7 +45,9 @@ func (f *Factory) BuildSubscriber(name string, subConfig *factory.SubscriberConf
 			GenerateName: func(s string) string {
 				return subConfig.Queue
 			},
-			Durable: true,
+			Durable:    subConfig.DurableQueue,
+			AutoDelete: subConfig.AutoDeleteQueue,
+			Exclusive:  subConfig.ExclusiveQueue,
 		},
 		QueueBind: amqp.QueueBindConfig{
 			GenerateRoutingKey: func(s string) string {
@@ -58,10 +58,18 @@ func (f *Factory) BuildSubscriber(name string, subConfig *factory.SubscriberConf
 			Consumer:  name,
 			Exclusive: subConfig.ExclusiveConsumer,
 		},
+		Publish: amqp.PublishConfig{
+			GenerateRoutingKey: func(s string) string {
+				return s
+			},
+		},
+		TopologyBuilder: &amqp.DefaultTopologyBuilder{},
 	}
+
 	return amqp.NewSubscriber(conf, f.logger)
 }
 
+// BuildPublisher creates a new AMQP publisher
 func (f *Factory) BuildPublisher(pubConfig *factory.PublisherConfig) (message.Publisher, error) {
 	conf := amqp.Config{
 		Connection: amqp.ConnectionConfig{

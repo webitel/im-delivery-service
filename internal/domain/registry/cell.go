@@ -1,3 +1,16 @@
+/*
+Package registry provides a high-performance event distribution system based on the Actor Model.
+
+Key Architectural Concepts:
+  - Virtual Cells: Every active user is represented by an isolated 'Cell' (Actor) that
+    encapsulates all concurrent gRPC streams (sessions) for that specific identity.
+  - Decoupling & Backpressure: Through the use of internal per-user mailboxes, the
+    package ensures that slow network consumers do not block global system throughput.
+  - Computational Efficiency: Events are marshaled into the wire format exactly once
+    per user group, leveraging internal caching to minimize CPU and GC overhead.
+  - Concurrency Management: Utilizes lock-free lookups via sync.Map and fine-grained
+    sharded locking within individual cells to eliminate global mutex contention.
+*/
 package registry
 
 import (
@@ -14,6 +27,7 @@ type Celler interface {
 	Push(ev model.Eventer) bool
 	Attach(conn model.Connector)
 	Detach(connID uuid.UUID) bool
+	IsIdle(timeout time.Duration) bool
 	Stop()
 }
 
@@ -44,21 +58,41 @@ type Cell struct {
 	// Signaling channel used to terminate the background goroutine.
 	// Ensures no goroutine leaks occur after the user goes offline.
 	doneCh chan struct{}
+
+	// lastActivityAt records the last time an event was processed for this cell.
+	lastActivityAt time.Time
 }
 
 func NewCell(userID uuid.UUID) *Cell {
 	c := &Cell{
-		userID:   userID,
-		mailbox:  make(chan model.Eventer, 1024),
-		sessions: make(map[uuid.UUID]model.Connector),
-		doneCh:   make(chan struct{}),
+		userID:         userID,
+		mailbox:        make(chan model.Eventer, 1024),
+		sessions:       make(map[uuid.UUID]model.Connector),
+		doneCh:         make(chan struct{}),
+		lastActivityAt: time.Now(),
 	}
 	go c.loop()
 	return c
 }
 
-// Push adds event to [MAILBOX]. Returns false if buffer is saturated (Backpressure).
+// IsIdle returns true if the user has no active sessions and hasn't received events lately.
+func (c *Cell) IsIdle(timeout time.Duration) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// A cell is considered idle only if it has NO active connections
+	// and the quiet period has exceeded the threshold.
+	return len(c.sessions) == 0 && time.Since(c.lastActivityAt) > timeout
+}
+
+func (c *Cell) touch() {
+	c.mu.Lock()
+	c.lastActivityAt = time.Now()
+	c.mu.Unlock()
+}
+
 func (c *Cell) Push(ev model.Eventer) bool {
+	c.touch() // Keep alive on incoming events
 	select {
 	case c.mailbox <- ev:
 		return true
@@ -67,18 +101,18 @@ func (c *Cell) Push(ev model.Eventer) bool {
 	}
 }
 
-// Attach adds a connection. Logic is [THREAD_SAFE] and scoped to this user only.
 func (c *Cell) Attach(conn model.Connector) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.lastActivityAt = time.Now()
 	c.sessions[conn.GetID()] = conn
 }
 
-// Detach removes a connection. Returns true if the cell has [ZERO_SESSIONS].
 func (c *Cell) Detach(connID uuid.UUID) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.sessions, connID)
+	c.lastActivityAt = time.Now()
 	return len(c.sessions) == 0
 }
 
@@ -101,11 +135,8 @@ func (c *Cell) deliver(ev model.Eventer) {
 		return
 	}
 
-	// [WARM_UP] Marshal once per user cell. Subsequent devices hit the cache.
 	_ = marshaller.MarshallDeliveryEvent(ev)
-
 	for _, conn := range c.sessions {
-		// [NON_BLOCKING] delivery attempt.
 		conn.Send(ev, time.Millisecond*500)
 	}
 }

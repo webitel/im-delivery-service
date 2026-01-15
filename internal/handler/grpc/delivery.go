@@ -10,6 +10,10 @@ import (
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
+const (
+	serverVersion = "v1"
+)
+
 // Interface guard
 var _ impb.DeliveryServer = (*DeliveryService)(nil)
 
@@ -48,7 +52,7 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 
 	d.logger.Info("stream opened", "user_id", userID, "conn_id", conn.GetID())
 
-	if err := stream.Send(marshaller.MarshallDeliveryEvent(model.NewConnectedEvent(userID, conn.GetID().String(), "1.0.0"))); err != nil {
+	if err := stream.Send(marshaller.MarshallDeliveryEvent(model.NewConnectedEvent(userID, conn.GetID().String(), serverVersion))); err != nil {
 		d.logger.Warn("failed to send welcome event", "user_id", userID, "error", err)
 		return err
 	}

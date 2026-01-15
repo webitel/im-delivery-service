@@ -54,8 +54,9 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 func marshalConnectedPayload(p *model.ConnectedPayload) *impb.ServerEvent_ConnectedEvent {
 	return &impb.ServerEvent_ConnectedEvent{
 		ConnectedEvent: &impb.ConnectedEvent{
-			Ok:           p.Ok,
-			ConnectionId: p.ConnectionID,
+			Ok:            p.Ok,
+			ConnectionId:  p.ConnectionID,
+			ServerVersion: p.ServerVersion,
 		},
 	}
 }

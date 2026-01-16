@@ -14,6 +14,7 @@ import (
 	"github.com/webitel/im-delivery-service/infra/pubsub"
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory/amqp"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/webitel-go-kit/infra/discovery"
 	_ "github.com/webitel/webitel-go-kit/infra/discovery/consul"
 	otelsdk "github.com/webitel/webitel-go-kit/infra/otel/sdk"
@@ -75,10 +76,10 @@ func ProvideLogger(cfg *config.Config, lc fx.Lifecycle) (*slog.Logger, error) {
 
 	if logSettings.Otel {
 		service := resource.NewSchemaless(
-			semconv.ServiceName(ServiceName),
-			semconv.ServiceVersion(version),
+			semconv.ServiceName(model.ServiceName),
+			semconv.ServiceVersion(model.Version),
 			semconv.ServiceInstanceID(cfg.Service.ID),
-			semconv.ServiceNamespace(ServiceNamespace),
+			semconv.ServiceNamespace(model.ServiceNamespace),
 		)
 		otelHandler := otelslog.NewHandler("slog")
 
@@ -188,13 +189,13 @@ func ProvideSD(cfg *config.Config, log *slog.Logger, lc fx.Lifecycle) (discovery
 	si := new(discovery.ServiceInstance)
 	{
 		si.Id = cfg.Service.ID
-		si.Name = ServiceName
-		si.Version = version
+		si.Name = model.ServiceName
+		si.Version = model.Version
 		si.Metadata = map[string]string{
-			"commit":         commit,
-			"commitDate":     commitDate,
-			"branch":         branch,
-			"buildTimestamp": buildTimestamp,
+			"commit":         model.Commit,
+			"commitDate":     model.CommitDate,
+			"branch":         model.Branch,
+			"buildTimestamp": model.BuildTimestamp,
 		}
 		si.Endpoints = []string{(&url.URL{Scheme: "grpc", Host: cfg.Service.Address}).String()}
 	}

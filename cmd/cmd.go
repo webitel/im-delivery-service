@@ -6,30 +6,15 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/webitel/im-delivery-service/config"
-)
-
-const (
-	ServiceName      = "im-delivery-service"
-	ServiceNamespace = "webitel"
-)
-
-var (
-	version = "1.0.0"
-
-	serverVersion  = "v1"
-	commit         = "hash"
-	commitDate     = time.Now().String()
-	branch         = "branch"
-	buildTimestamp = ""
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 func Run() error {
 	app := &cli.App{
-		Name:  ServiceName,
+		Name:  model.ServiceName,
 		Usage: "Microservice for Webitel platform",
 		Commands: []*cli.Command{
 			serverCmd(),

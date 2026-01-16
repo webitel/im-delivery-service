@@ -6,9 +6,8 @@ before:
     - go mod tidy
 
 builds:
-  - id: delivery-service
-    main: ./cmd/main.go
-    binary: im-delivery-service
+  - # Оскільки main.go у тебе в корені, ставимо крапку
+    main: .
     env:
       - CGO_ENABLED=0
     goos:
@@ -18,7 +17,6 @@ builds:
     goarch:
       - amd64
       - arm64
-    
     ldflags:
       - -s -w
       - -X github.com/webitel/im-delivery-service/internal/domain/model.Version={{.Version}}
@@ -29,7 +27,8 @@ builds:
       - -X github.com/webitel/im-delivery-service/internal/domain/model.BuiltBy=github-actions
 
 archives:
-  - format: tar.gz
+  - # В v2 використовується formats (список)
+    formats: ["tar.gz"]
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -41,7 +40,3 @@ checksum:
 
 changelog:
   sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'

@@ -6,7 +6,7 @@ before:
     - go mod tidy
 
 builds:
-  - # Оскільки main.go у тебе в корені, ставимо крапку
+  - 
     main: .
     env:
       - CGO_ENABLED=0
@@ -27,7 +27,7 @@ builds:
       - -X github.com/webitel/im-delivery-service/internal/domain/model.BuiltBy=github-actions
 
 archives:
-  - # В v2 використовується formats (список)
+  - 
     formats: ["tar.gz"]
     name_template: >-
       {{ .ProjectName }}_

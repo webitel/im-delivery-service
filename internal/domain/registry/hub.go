@@ -11,7 +11,7 @@ import (
 
 // Hubber defines the external API for the registry system.
 type Hubber interface {
-	Broadcast(ev model.InboundEventer) bool
+	Broadcast(ev model.Eventer) bool
 	Register(conn model.Connector)
 	Unregister(userID, connID uuid.UUID)
 	IsConnected(userID uuid.UUID) bool
@@ -26,16 +26,24 @@ type Hub struct {
 	// [EVICTION_POLICY]
 	evictionInterval time.Duration
 	idleTimeout      time.Duration
+	mailboxSize      int
 	stopCh           chan struct{}
 }
 
-// NewHub initializes the hub and starts the background eviction (Janitor) process.
-func NewHub(evictionInterval, idleTimeout time.Duration) *Hub {
+// NewHub initializes the registry with functional options and starts the janitor process.
+func NewHub(opts ...Option) *Hub {
+	// [DEFAULTS] Production-ready fallback values
 	h := &Hub{
-		evictionInterval: evictionInterval,
-		idleTimeout:      idleTimeout,
+		evictionInterval: 1 * time.Minute,
+		idleTimeout:      5 * time.Minute,
+		mailboxSize:      1024,
 		stopCh:           make(chan struct{}),
 	}
+
+	for _, opt := range opts {
+		opt(h)
+	}
+
 	go h.runEvictor()
 	return h
 }
@@ -47,7 +55,7 @@ func (h *Hub) IsConnected(userID uuid.UUID) bool {
 }
 
 // Broadcast dispatches an event to the specific user's cell mailbox.
-func (h *Hub) Broadcast(ev model.InboundEventer) bool {
+func (h *Hub) Broadcast(ev model.Eventer) bool {
 	if val, ok := h.cells.Load(ev.GetUserID()); ok {
 		if cell, ok := val.(Celler); ok {
 			return cell.Push(ev)
@@ -59,8 +67,8 @@ func (h *Hub) Broadcast(ev model.InboundEventer) bool {
 // Register performs an [IDEMPOTENT] registration of a new connection.
 func (h *Hub) Register(conn model.Connector) {
 	uID := conn.GetUserID()
-	// [LAZY_INIT] Spawns a new cell only if one doesn't already exist for this user.
-	val, _ := h.cells.LoadOrStore(uID, NewCell(uID))
+	// Pass h.mailboxSize to ensure the Actor has the configured capacity
+	val, _ := h.cells.LoadOrStore(uID, NewCell(uID, h.mailboxSize))
 
 	if cell, ok := val.(Celler); ok {
 		cell.Attach(conn)

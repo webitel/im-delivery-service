@@ -9,25 +9,23 @@ import (
 
 var Module = fx.Module("registry",
 	fx.Provide(
-		// Provide the concrete implementation with default settings
+		// [CLEAN_INJECTION] Configure Hub using Functional Options
 		func() *Hub {
 			return NewHub(
-				1*time.Hour,    // evictionInterval: Clean once per hour
-				10*time.Minute, // idleTimeout: Wait 10m after last disconnect
+				WithEvictionInterval(15*time.Minute),
+				WithIdleTimeout(30*time.Minute),
+				WithMailboxSize(2048),
 			)
 		},
-		// Annotate to expose Hub as Hubber interface
 		fx.Annotate(
 			func(h *Hub) Hubber { return h },
 			fx.As(new(Hubber)),
 		),
 	),
-	// [LIFECYCLE_MANAGEMENT]
-	// Ensure the background routines are stopped when the app shuts down.
 	fx.Invoke(func(lc fx.Lifecycle, h Hubber) {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
-				h.Shutdown()
+				h.Shutdown() // [GRACEFUL_SHUTDOWN] Stop all Actor goroutines
 				return nil
 			},
 		})

@@ -23,7 +23,7 @@ import (
 
 // Celler defines the internal API for user-specific delivery units.
 type Celler interface {
-	Push(ev model.InboundEventer) bool
+	Push(ev model.Eventer) bool
 	Attach(conn model.Connector)
 	Detach(connID uuid.UUID) bool
 	IsIdle(timeout time.Duration) bool
@@ -40,7 +40,7 @@ type Cell struct {
 	// Buffered channel that decouples the global dispatcher from individual delivery.
 	// It acts as a shock absorber, preventing slow consumer latency from
 	// propagating back to the Hub or AMQP consumers (Backpressure).
-	mailbox chan model.InboundEventer
+	mailbox chan model.Eventer
 
 	// [SESSIONS]
 	// Registry of all active transport channels (gRPC streams) for the user.
@@ -62,10 +62,12 @@ type Cell struct {
 	lastActivityAt time.Time
 }
 
-func NewCell(userID uuid.UUID) *Cell {
+// internal/domain/registry/cell.go
+
+func NewCell(userID uuid.UUID, bufferSize int) *Cell {
 	c := &Cell{
 		userID:         userID,
-		mailbox:        make(chan model.InboundEventer, 1024),
+		mailbox:        make(chan model.Eventer, bufferSize), // [DYNAMIC_BUFFER]
 		sessions:       make(map[uuid.UUID]model.Connector),
 		doneCh:         make(chan struct{}),
 		lastActivityAt: time.Now(),
@@ -90,7 +92,7 @@ func (c *Cell) touch() {
 	c.mu.Unlock()
 }
 
-func (c *Cell) Push(ev model.InboundEventer) bool {
+func (c *Cell) Push(ev model.Eventer) bool {
 	c.touch() // Keep alive on incoming events
 	select {
 	case c.mailbox <- ev:
@@ -126,7 +128,7 @@ func (c *Cell) loop() {
 	}
 }
 
-func (c *Cell) deliver(ev model.InboundEventer) {
+func (c *Cell) deliver(ev model.Eventer) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

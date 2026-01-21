@@ -1,11 +1,11 @@
 package grpcmarshaller
 
 import (
-	impb "github.com/webitel/im-delivery-service/gen/go/api/v1"
+	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-func mapPriority(p model.InboundEventPriority) impb.EventPriority {
+func mapPriority(p model.EventPriority) impb.EventPriority {
 	switch p {
 	case model.PriorityLow:
 		return impb.EventPriority_LOW

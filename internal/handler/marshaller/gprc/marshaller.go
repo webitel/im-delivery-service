@@ -1,13 +1,13 @@
 package grpcmarshaller
 
 import (
-	impb "github.com/webitel/im-delivery-service/gen/go/api/v1"
+	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 // MarshallDeliveryEvent transforms domain Eventer to Protobuf ServerEvent.
 // It acts as a gateway and uses type-specific marshallers.
-func MarshallDeliveryEvent(ev model.InboundEventer) *impb.ServerEvent {
+func MarshallDeliveryEvent(ev model.Eventer) *impb.ServerEvent {
 	// 1. [PERFORMANCE] Check cache first.
 	if cached := ev.GetCached(); cached != nil {
 		if pb, ok := cached.(*impb.ServerEvent); ok {

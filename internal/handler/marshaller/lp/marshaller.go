@@ -19,7 +19,7 @@ type Response struct {
 }
 
 // MarshallEvents converts a slice of domain events into a single JSON batch.
-func MarshallEvents(events []model.InboundEventer) ([]byte, error) {
+func MarshallEvents(events []model.Eventer) ([]byte, error) {
 	res := Response{
 		Events: make([]LPEvent, 0, len(events)),
 	}

@@ -44,7 +44,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	defer h.deliverer.Unsubscribe(userID, conn.GetID())
 	defer conn.Close()
 
-	var events []model.InboundEventer
+	var events []model.Eventer
 
 	// 3. Wait for data or timeout.
 	select {

@@ -2,19 +2,31 @@ package amqp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/service/dto"
 )
 
-const (
-	MessageTopicV1 = "im_message.#.message.created.v1"
-	MessageQueueV1 = "im_delivery.message_v1"
-)
-
 func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUID, raw *dto.MessageV1) error {
-	event := model.NewMessageV1Event(raw, userID)
-	h.hub.Broadcast(event)
+	// 1. [STRICT_ENRICHMENT] Mandatory peer data resolution.
+	// ResolvePeers now returns (from, to, error).
+	from, to, err := h.enricher.ResolvePeers(ctx, raw.FromID, userID, raw.DomainID)
+	if err != nil {
+		// [ERROR_PROPAGATION] Returning error triggers Middleware logic.
+		// It will be retried by RabbitMQ/Watermill or moved to DLX.
+		return fmt.Errorf("failed to enrich participants: %w", err)
+	}
+
+	// 2. [LOCAL_DISPATCH] Broadcast enriched event to connected gRPC clients
+	ev := model.NewMessageV1Event(raw.ToDomain(), userID, from, to)
+	h.hub.Broadcast(ev)
+
+	// 3. [GLOBAL_DISPATCH] Publish enriched event back to the bus
+	if err := h.publisher.Publish(ctx, ev); err != nil {
+		return fmt.Errorf("failed to publish enriched event: %w", err)
+	}
+
 	return nil
 }

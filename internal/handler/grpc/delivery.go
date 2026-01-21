@@ -2,20 +2,22 @@ package grpc
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
-	impb "github.com/webitel/im-delivery-service/gen/go/api/v1"
+	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
 	serverVersion = "v1"
+	maxBatchSize  = 20
+	batchTimeout  = 30 * time.Millisecond
 )
-
-// Interface guard
-var _ impb.DeliveryServer = (*DeliveryService)(nil)
 
 type DeliveryService struct {
 	logger    *slog.Logger
@@ -30,51 +32,117 @@ func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *Deliv
 	}
 }
 
-// Stream implements [deliveryv1.DeliveryServer].
-// Stream implements [deliveryv1.DeliveryServer] and manages the real-time event lifecycle.
 func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
-	// EXTRACT USER ID (Hardcoded for debugging, should come from auth metadata)
-	userID, err := uuid.Parse("019bb6d7-8bb8-7a5c-b163-8cf8d362a474")
+	ctx := stream.Context()
+	startTime := time.Now()
+
+	// [SECURITY] In production, extract userID from metadata/JWT
+	// For now, keeping your hardcoded ID for consistency
+	userID := uuid.MustParse("019bb6d7-8bb8-7a5c-b163-8cf8d362a474")
+
+	// Create a scoped logger for this specific session
+	l := d.logger.With(
+		slog.String("user_id", userID.String()),
+		slog.String("version", serverVersion),
+	)
+
+	// [SUBSCRIPTION]
+	conn, err := d.deliverer.Subscribe(ctx, userID)
 	if err != nil {
+		l.Error("SUBSCRIPTION_REJECTED", slog.Any("err", err))
+		return status.Error(codes.Internal, "failed to establish connection session")
+	}
+
+	connID := conn.GetID()
+	l = l.With(slog.String("conn_id", connID.String()))
+
+	// [CLEANUP] Ensure resources are released on disconnect
+	defer func() {
+		d.deliverer.Unsubscribe(userID, connID)
+		l.Info("STREAM_TERMINATED", slog.Duration("session_duration", time.Since(startTime)))
+	}()
+
+	l.Info("STREAM_ESTABLISHED")
+
+	// [INITIAL_HANDSHAKE] Send Welcome Event immediately
+	welcome := model.NewConnectedEvent(userID, connID.String(), serverVersion)
+	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcome)); err != nil {
+		l.Warn("HANDSHAKE_FAILED", slog.Any("err", err))
 		return err
 	}
 
-	// SUBSCRIBE VIA SERVICE
-	// Creates a unique connector for this stream and registers it in the Hub.
-	conn, err := d.deliverer.Subscribe(stream.Context(), userID)
-	if err != nil {
-		d.logger.Error("failed to subscribe", "user_id", userID, "error", err)
-		return err
-	}
-
-	// [GRACEFUL_CLEANUP] Ensure the session is removed from Hub when the stream ends.
-	defer d.deliverer.Unsubscribe(userID, conn.GetID())
-
-	d.logger.Info("stream opened", "user_id", userID, "conn_id", conn.GetID())
-
-	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(model.NewConnectedEvent(userID, conn.GetID().String(), serverVersion))); err != nil {
-		d.logger.Warn("failed to send welcome event", "user_id", userID, "error", err)
-		return err
-	}
-
-	// MAIN DELIVERY LOOP
+	// Internal state for batching
 	for {
 		select {
-		// Terminate if the client disconnects or the server context is cancelled.
-		case <-stream.Context().Done():
-			d.logger.Info("stream closed by client", "user_id", userID)
+		case <-ctx.Done():
+			l.Debug("CLIENT_DISCONNECTED_CONTEXT_DONE")
 			return nil
 
-		// Receive events routed to this specific user from the Hub.
 		case ev, ok := <-conn.Recv():
 			if !ok {
-				return nil // Connector channel closed by the service
+				l.Warn("HUB_FORCED_DISCONNECT", slog.String("reason", "inbound_channel_closed"))
+				return status.Error(codes.Unavailable, "session_terminated_by_server")
 			}
 
-			// TRANSMIT OVER HTTP/2
-			if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(ev)); err != nil {
-				d.logger.Warn("failed to transmit event", "user_id", userID, "error", err)
-				return err
+			// [COALESCING_STRATEGY] Start batching upon arrival of the first message
+			batch := make([]*impb.ServerEvent, 0, maxBatchSize)
+			batch = append(batch, grpcmarshaller.MarshallDeliveryEvent(ev))
+
+			// Use a reusable timer logic
+			timer := time.NewTimer(batchTimeout)
+			reason := "capacity_reached"
+
+		collect:
+			for len(batch) < maxBatchSize {
+				select {
+				case ev, ok := <-conn.Recv():
+					if !ok {
+						reason = "upstream_closed"
+						break collect
+					}
+					batch = append(batch, grpcmarshaller.MarshallDeliveryEvent(ev))
+
+				case <-timer.C:
+					reason = "timeout_reached"
+					break collect
+
+				case <-ctx.Done():
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					return nil
+				}
+			}
+
+			// Securely stop timer to prevent memory leaks
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+
+			// [METRICS_LOGGING] Trace batch efficiency
+			if len(batch) > 1 {
+				l.Debug("BATCH_COALESCED",
+					slog.Int("count", len(batch)),
+					slog.String("trigger", reason),
+				)
+			}
+
+			// [TRANSMISSION] Flushing the batch to gRPC stream
+			for i, ev := range batch {
+				if err := stream.Send(ev); err != nil {
+					l.Error("TRANSMISSION_ERROR",
+						slog.Any("err", err),
+						slog.Int("failed_at_index", i),
+						slog.Int("total_batch", len(batch)),
+					)
+					return status.Error(codes.DataLoss, "stream_transmission_failed")
+				}
 			}
 		}
 	}

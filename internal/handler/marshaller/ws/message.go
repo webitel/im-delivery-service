@@ -22,7 +22,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		ThreadID:  m.ThreadID.String(),
 		Text:      m.Text,
 		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
+		UpdatedAt: m.EditedAt,
 		From:      m.From.ID.String(),
 		Metadata:  m.Metadata,
 		Type:      "text",

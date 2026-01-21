@@ -1,97 +1,88 @@
 package amqp
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"os"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	pubsubadapter "github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
-	"go.uber.org/fx"
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 const (
+	// Listening to  (Consumed)
 	WebitelExchange = "im_message.events"
+	MessageTopicV1  = "im_message.#.message.created.v1"
+
+	// Publishing to  (Produced)
+	DeliveryExchange = "im_delivery.events"
+	MessageQueueV1   = "im_delivery.message_v1"
 )
 
 type MessageHandler struct {
-	hub    registry.Hubber
-	logger *slog.Logger
+	hub       registry.Hubber
+	logger    *slog.Logger
+	enricher  service.Enricher
+	publisher pubsubadapter.EventDispatcher
 }
 
-func NewMessageHandler(hub registry.Hubber, logger *slog.Logger) *MessageHandler {
-	return &MessageHandler{hub: hub, logger: logger}
+func NewMessageHandler(
+	hub registry.Hubber,
+	logger *slog.Logger,
+	enricher service.Enricher,
+	publisher pubsubadapter.EventDispatcher,
+) *MessageHandler {
+	return &MessageHandler{
+		hub:       hub,
+		logger:    logger,
+		enricher:  enricher,
+		publisher: publisher,
+	}
 }
 
 // RegisterHandlers configures AMQP subscriptions for the service node.
-func RegisterHandlers(
+// internal/adapter/amqp/handler.go
+
+func (h *MessageHandler) RegisterHandlers(
 	router *message.Router,
 	subProvider *pubsubadapter.SubscriberProvider,
-	h *MessageHandler,
-	hub registry.Hubber,
 ) error {
-	// Identify the node to create a unique temporary queue for fan-out messaging
-	nodeID, err := os.Hostname()
+	nodeID := watermill.NewShortUUID()
+	queueName := fmt.Sprintf("%s.%s", MessageQueueV1, nodeID)
+
+	// [INFRASTRUCTURE] Define poison queue for failed messages
+	poisonTopic := fmt.Sprintf("%s.poison", queueName)
+
+	sub, err := subProvider.Build(queueName, WebitelExchange, MessageTopicV1)
 	if err != nil {
-		nodeID = watermill.NewShortUUID()
+		return fmt.Errorf("failed to build subscriber: %w", err)
 	}
 
-	routes := []struct {
-		topic   string
-		queue   string
-		handler message.NoPublishHandlerFunc
-	}{
-		{
-			topic:   MessageTopicV1,
-			queue:   MessageQueueV1,
-			handler: bind(hub, h.OnMessageCreatedV1), // bind now returns NoPublishHandlerFunc
-		},
+	// [DLX_SETUP] Access the raw message.Publisher via .Publisher() method
+	// This fixes the "does not implement message.Publisher (missing method Close)" error
+	poisonMiddleware, err := middleware.PoisonQueue(h.publisher.Publisher(), poisonTopic)
+	if err != nil {
+		return fmt.Errorf("failed to setup poison middleware: %w", err)
 	}
 
-	for _, r := range routes {
-		// Each node gets its own queue to ensure every instance receives the event
-		uniqueQueue := fmt.Sprintf("%s.%s", r.queue, nodeID)
+	// [ROUTING] Fix AddNoPublisherHandler signature: (handlerName, topic, subscriber, handlerFunc)
+	handler := router.AddConsumerHandler(
+		queueName+"_executor",
+		MessageTopicV1, // This was missing
+		sub,
+		bind(h.hub, h.OnMessageCreatedV1),
+	)
 
-		sub, err := subProvider.Build(uniqueQueue, WebitelExchange, r.topic)
-		if err != nil {
-			return fmt.Errorf("failed to build subscriber for %s: %w", uniqueQueue, err)
-		}
+	// [RESILIENCE_CHAIN] Apply middlewares in correct order
+	handler.AddMiddleware(
+		poisonMiddleware, // Catch errors first
+		middleware.NewThrottle(100, time.Second).Middleware,
+		middleware.Timeout(time.Second*30),
+	)
 
-		// Registering handler without an output topic (pure consumption)
-		router.AddNoPublisherHandler(
-			uniqueQueue+"_executor",
-			r.topic,
-			sub,
-			r.handler,
-		)
-	}
 	return nil
-}
-
-// NewWatermillRouter initializes the router and manages its lifecycle via Uber Fx
-func NewWatermillRouter(lc fx.Lifecycle, logger *slog.Logger) (*message.Router, error) {
-	router, err := message.NewRouter(message.RouterConfig{}, watermill.NewSlogLogger(logger))
-	if err != nil {
-		return nil, err
-	}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go func() {
-				// Running the router in a background goroutine
-				if err := router.Run(context.Background()); err != nil {
-					logger.Error("watermill router run error", "err", err)
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return router.Close()
-		},
-	})
-
-	return router, nil
 }

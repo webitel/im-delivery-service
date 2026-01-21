@@ -15,7 +15,7 @@ type WSEvent struct {
 }
 
 // MarshallDeliveryEvent prepares data for WebSocket transmission.
-func MarshallDeliveryEvent(ev model.InboundEventer) ([]byte, error) {
+func MarshallDeliveryEvent(ev model.Eventer) ([]byte, error) {
 	// We don't use gRPC cache here because WS uses JSON.
 	// Instead, we map domain model to a friendly JSON structure.
 

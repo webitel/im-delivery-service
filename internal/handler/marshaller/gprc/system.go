@@ -1,7 +1,7 @@
 package grpcmarshaller
 
 import (
-	impb "github.com/webitel/im-delivery-service/gen/go/api/v1"
+	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 

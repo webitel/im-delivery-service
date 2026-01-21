@@ -83,6 +83,7 @@ func (f *Factory) BuildPublisher(pubConfig *factory.PublisherConfig) (message.Pu
 			Type:    pubConfig.Exchange.Type,
 			Durable: pubConfig.Exchange.Durable,
 		},
+		TopologyBuilder: &amqp.DefaultTopologyBuilder{},
 		Publish: amqp.PublishConfig{
 			GenerateRoutingKey: func(s string) string {
 				return s

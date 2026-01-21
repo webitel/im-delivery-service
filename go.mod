@@ -1,6 +1,6 @@
 module github.com/webitel/im-delivery-service
 
-go 1.25.3
+go 1.25.6
 
 require (
 	buf.build/go/protovalidate v1.1.0
@@ -10,10 +10,13 @@ require (
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/gorilla/websocket v1.5.3
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
+	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/webitel/webitel-go-kit/infra/otel v0.0.0-20251222125635-d60448d23a82
+	github.com/webitel/webitel-go-kit/infra/transport v0.0.0-20260120140602-6f20efe1524e
 	github.com/webitel/webitel-go-kit/pkg/interceptors v0.0.0-20251224105820-8d9bcb902593
 	go.opentelemetry.io/contrib/bridges/otelslog v0.14.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
@@ -29,6 +32,7 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
+	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -73,13 +77,14 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/webitel/webitel-go-kit/infra/discovery v0.0.0-20251222125635-d60448d23a82
+	github.com/webitel/webitel-go-kit/infra/discovery v0.0.0-20251224105820-8d9bcb902593
 	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251213004720-97cd9d5aeac2 // indirect

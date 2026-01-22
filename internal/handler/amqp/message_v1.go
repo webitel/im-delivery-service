@@ -18,13 +18,13 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUI
 		// It will be retried by RabbitMQ/Watermill or moved to DLX.
 		return fmt.Errorf("failed to enrich participants: %w", err)
 	}
+	ev := event.NewMessageV1Event(raw.ToDomain(), userID, from, to)
 
 	// 2. [LOCAL_DISPATCH] Broadcast enriched event to connected gRPC clients
-
-	h.hub.Broadcast(event.NewMessageV1Event(raw.ToDomain(), userID, from, to))
+	h.hub.Broadcast(ev)
 
 	// 3. [GLOBAL_DISPATCH] Publish enriched event back to the bus
-	if err := h.publisher.Publish(ctx, event.NewMessageV1Event(raw.ToDomain(), userID, from, to)); err != nil {
+	if err := h.publisher.Publish(ctx, ev); err != nil {
 		return fmt.Errorf("failed to publish enriched event: %w", err)
 	}
 

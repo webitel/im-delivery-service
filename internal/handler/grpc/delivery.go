@@ -15,8 +15,6 @@ import (
 
 const (
 	serverVersion = "v1"
-	maxBatchSize  = 20
-	batchTimeout  = 30 * time.Millisecond
 )
 
 type DeliveryService struct {
@@ -32,21 +30,26 @@ func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *Deliv
 	}
 }
 
+// Stream manages the lifecycle of a long-lived HTTP/2 bidirectional/server-streaming session.
 func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
+	// [HTTP2_LIFECYCLE]
+	// The context is tied to the underlying HTTP/2 stream. If the TCP connection drops
+	// or the client sends a RST_STREAM frame, ctx.Done() will trigger.
 	ctx := stream.Context()
 	startTime := time.Now()
 
-	// [SECURITY] In production, extract userID from metadata/JWT
-	// For now, keeping your hardcoded ID for consistency
+	// [IDENTITY_RESOLVER]
+	// In production, this should be extracted from context metadata (JWT/OAuth2).
 	userID := uuid.MustParse("019bb6d7-8bb8-7a5c-b163-8cf8d362a474")
 
-	// Create a scoped logger for this specific session
 	l := d.logger.With(
 		slog.String("user_id", userID.String()),
 		slog.String("version", serverVersion),
 	)
 
-	// [SUBSCRIPTION]
+	// [ACTOR_ATTACHMENT]
+	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).
+	// This ensures all events routed to the Hub for this UserID will reach this stream.
 	conn, err := d.deliverer.Subscribe(ctx, userID)
 	if err != nil {
 		l.Error("SUBSCRIPTION_REJECTED", slog.Any("err", err))
@@ -56,93 +59,51 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	connID := conn.GetID()
 	l = l.With(slog.String("conn_id", connID.String()))
 
-	// [CLEANUP] Ensure resources are released on disconnect
+	// [RESOURCE_RECLAMATION]
+	// Ensure the connector is detached from the Hub when the function returns.
+	// This prevents memory leaks and ensures the Hub doesn't try to send to a dead stream.
 	defer func() {
 		d.deliverer.Unsubscribe(userID, connID)
-		l.Info("STREAM_TERMINATED", slog.Duration("session_duration", time.Since(startTime)))
+		l.Info("STREAM_TERMINATED", slog.Duration("duration", time.Since(startTime)))
 	}()
 
 	l.Info("STREAM_ESTABLISHED")
 
-	// [INITIAL_HANDSHAKE] Send Welcome Event immediately
+	// [PROTOCOL_HANDSHAKE]
+	// Send the initial 'connected' event to confirm the session is active.
+	// This frame is transmitted as an HTTP/2 DATA frame.
 	welcome := model.NewConnectedEvent(userID, connID.String(), serverVersion)
 	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcome)); err != nil {
 		l.Warn("HANDSHAKE_FAILED", slog.Any("err", err))
 		return err
 	}
 
-	// Internal state for batching
+	// [EVENT_LOOP]
+	// Main delivery loop that bridges the internal Actor mailbox with the gRPC stream.
 	for {
 		select {
 		case <-ctx.Done():
-			l.Debug("CLIENT_DISCONNECTED_CONTEXT_DONE")
+			// [GHOST_CLEANUP]
+			// Triggers on client disconnect, timeout, or KeepAlive failure.
+			l.Debug("CLIENT_DISCONNECTED_SIGTERM")
 			return nil
 
 		case ev, ok := <-conn.Recv():
 			if !ok {
-				l.Warn("HUB_FORCED_DISCONNECT", slog.String("reason", "inbound_channel_closed"))
+				// [BACKPRESSURE_SIGNAL]
+				// Internal channel closed by the Hub (e.g., during forceful eviction).
+				l.Warn("HUB_FORCED_DISCONNECT")
 				return status.Error(codes.Unavailable, "session_terminated_by_server")
 			}
 
-			// [COALESCING_STRATEGY] Start batching upon arrival of the first message
-			batch := make([]*impb.ServerEvent, 0, maxBatchSize)
-			batch = append(batch, grpcmarshaller.MarshallDeliveryEvent(ev))
-
-			// Use a reusable timer logic
-			timer := time.NewTimer(batchTimeout)
-			reason := "capacity_reached"
-
-		collect:
-			for len(batch) < maxBatchSize {
-				select {
-				case ev, ok := <-conn.Recv():
-					if !ok {
-						reason = "upstream_closed"
-						break collect
-					}
-					batch = append(batch, grpcmarshaller.MarshallDeliveryEvent(ev))
-
-				case <-timer.C:
-					reason = "timeout_reached"
-					break collect
-
-				case <-ctx.Done():
-					if !timer.Stop() {
-						select {
-						case <-timer.C:
-						default:
-						}
-					}
-					return nil
-				}
-			}
-
-			// Securely stop timer to prevent memory leaks
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
-
-			// [METRICS_LOGGING] Trace batch efficiency
-			if len(batch) > 1 {
-				l.Debug("BATCH_COALESCED",
-					slog.Int("count", len(batch)),
-					slog.String("trigger", reason),
-				)
-			}
-
-			// [TRANSMISSION] Flushing the batch to gRPC stream
-			for i, ev := range batch {
-				if err := stream.Send(ev); err != nil {
-					l.Error("TRANSMISSION_ERROR",
-						slog.Any("err", err),
-						slog.Int("failed_at_index", i),
-						slog.Int("total_batch", len(batch)),
-					)
-					return status.Error(codes.DataLoss, "stream_transmission_failed")
-				}
+			// [TRANSMIT_OVER_HTTP2]
+			// Serialize and push the event into the gRPC transmit buffer.
+			// gRPC handles internal flow control and HTTP/2 framing.
+			pbEv := grpcmarshaller.MarshallDeliveryEvent(ev)
+			if err := stream.Send(pbEv); err != nil {
+				l.Error("TRANSMISSION_ERROR", slog.Any("err", err))
+				// Returning error here triggers a gRPC status code (DataLoss) to the client.
+				return status.Error(codes.DataLoss, "stream_transmission_failed")
 			}
 		}
 	}

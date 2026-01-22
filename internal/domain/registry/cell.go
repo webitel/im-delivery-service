@@ -15,6 +15,7 @@ package registry
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,63 +59,66 @@ type Cell struct {
 	// Ensures no goroutine leaks occur after the user goes offline.
 	doneCh chan struct{}
 
-	// lastActivityAt records the last time an event was processed for this cell.
-	lastActivityAt time.Time
+	// [OPTIMIZATION] Atomic timestamp to avoid mutex contention during activity checks
+	lastActivityUnix int64
 }
-
-// internal/domain/registry/cell.go
 
 func NewCell(userID uuid.UUID, bufferSize int) *Cell {
 	c := &Cell{
-		userID:         userID,
-		mailbox:        make(chan model.Eventer, bufferSize), // [DYNAMIC_BUFFER]
-		sessions:       make(map[uuid.UUID]model.Connector),
-		doneCh:         make(chan struct{}),
-		lastActivityAt: time.Now(),
+		userID:           userID,
+		mailbox:          make(chan model.Eventer, bufferSize),
+		sessions:         make(map[uuid.UUID]model.Connector),
+		doneCh:           make(chan struct{}),
+		lastActivityUnix: time.Now().Unix(),
 	}
 	go c.loop()
 	return c
 }
 
-// IsIdle returns true if the user has no active sessions and hasn't received events lately.
-func (c *Cell) IsIdle(timeout time.Duration) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// A cell is considered idle only if it has NO active connections
-	// and the quiet period has exceeded the threshold.
-	return len(c.sessions) == 0 && time.Since(c.lastActivityAt) > timeout
+// touch updates the last activity timestamp using atomic store
+func (c *Cell) touch() {
+	atomic.StoreInt64(&c.lastActivityUnix, time.Now().Unix())
 }
 
-func (c *Cell) touch() {
-	c.mu.Lock()
-	c.lastActivityAt = time.Now()
-	c.mu.Unlock()
+// IsIdle checks if the cell can be reclaimed based on session count and inactivity
+func (c *Cell) IsIdle(timeout time.Duration) bool {
+	c.mu.RLock()
+	hasSessions := len(c.sessions) > 0
+	c.mu.RUnlock()
+
+	if hasSessions {
+		return false
+	}
+
+	lastActivity := time.Unix(atomic.LoadInt64(&c.lastActivityUnix), 0)
+	return time.Since(lastActivity) > timeout
 }
 
 func (c *Cell) Push(ev model.Eventer) bool {
-	c.touch() // Keep alive on incoming events
+	c.touch()
 	select {
 	case c.mailbox <- ev:
 		return true
 	default:
+		// [BACKPRESSURE] Drop event if mailbox is full to protect system stability
 		return false
 	}
 }
 
 func (c *Cell) Attach(conn model.Connector) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.lastActivityAt = time.Now()
 	c.sessions[conn.GetID()] = conn
+	c.mu.Unlock()
+	c.touch()
 }
 
 func (c *Cell) Detach(connID uuid.UUID) bool {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	delete(c.sessions, connID)
-	c.lastActivityAt = time.Now()
-	return len(c.sessions) == 0
+	isEmpty := len(c.sessions) == 0
+	c.mu.Unlock()
+	c.touch()
+	return isEmpty
 }
 
 func (c *Cell) loop() {
@@ -128,16 +132,24 @@ func (c *Cell) loop() {
 	}
 }
 
+// deliver broadcasts events to all active sessions of the user
 func (c *Cell) deliver(ev model.Eventer) {
+	// [STRATEGY] Snapshot sessions under RLock to minimize lock holding time
+	// during potentially slow network I/O
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if len(c.sessions) == 0 {
+		c.mu.RUnlock()
 		return
 	}
-
+	conns := make([]model.Connector, 0, len(c.sessions))
 	for _, conn := range c.sessions {
-		conn.Send(ev, time.Millisecond*500)
+		conns = append(conns, conn)
+	}
+	c.mu.RUnlock()
+
+	for _, conn := range conns {
+		// [RELIABILITY] Use a strict timeout to prevent slow streams from hanging the Actor
+		conn.Send(ev, time.Millisecond*250)
 	}
 }
 

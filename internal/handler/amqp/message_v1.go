@@ -12,7 +12,7 @@ import (
 func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUID, raw *dto.MessageV1) error {
 	// 1. [STRICT_ENRICHMENT] Mandatory peer data resolution.
 	// ResolvePeers now returns (from, to, error).
-	from, to, err := h.enricher.ResolvePeers(ctx, raw.FromID, userID, raw.DomainID)
+	from, to, err := h.enricher.ResolvePeers(ctx, raw.From.ToDomain(), raw.To.ToDomain(), raw.DomainID)
 	if err != nil {
 		// [ERROR_PROPAGATION] Returning error triggers Middleware logic.
 		// It will be retried by RabbitMQ/Watermill or moved to DLX.

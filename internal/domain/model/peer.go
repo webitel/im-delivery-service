@@ -11,8 +11,7 @@ type PeerType int16
 
 const (
 	PeerUser PeerType = iota + 1
-	PeerBot
-	PeerChat
+	PeerGroup
 	PeerChannel
 )
 

@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -9,7 +9,9 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// Hubber defines the external API for the registry system.
+// Hubber defines the external API for the high-concurrency registry.
+// It acts as the entry point for both incoming events (Broadcast) and
+// transport lifecycle management (Register/Unregister).
 type Hubber interface {
 	Broadcast(ev model.Eventer) bool
 	Register(conn model.Connector)
@@ -18,75 +20,123 @@ type Hubber interface {
 	Shutdown()
 }
 
-// Hub implements [Hubber] using a Virtual Cell (Actor) architecture.
-type Hub struct {
-	// cells maintains an active registry of UserID -> Celler.
-	cells sync.Map
+const shardCount = 256
 
-	// [EVICTION_POLICY]
+// Hub implements [Hubber] using a SHARDED_ACTOR architecture.
+// This design eliminates global lock contention by partitioning the workload.
+type Hub struct {
+	// [CONCURRENCY_STRATEGY] Array of independent shards.
+	// Each shard handles a subset of users based on their UUID.
+	shards []*shard
+	config hubConfig
+	// [LIFECYCLE] Channel to signal the background janitor to stop.
+	stopCh chan struct{}
+}
+
+type hubConfig struct {
 	evictionInterval time.Duration
 	idleTimeout      time.Duration
 	mailboxSize      int
-	stopCh           chan struct{}
 }
 
-// NewHub initializes the registry with functional options and starts the janitor process.
+// shard represents a logical partition of the user registry.
+type shard struct {
+	sync.RWMutex
+	// [REGISTRY] Map of UserID to their dedicated delivery Cell (Actor).
+	cells map[uuid.UUID]*Cell
+}
+
+// NewHub initializes the registry with [SHARDED_LOCKING] and starts the evictor.
 func NewHub(opts ...Option) *Hub {
-	// [DEFAULTS] Production-ready fallback values
 	h := &Hub{
-		evictionInterval: 1 * time.Minute,
-		idleTimeout:      5 * time.Minute,
-		mailboxSize:      1024,
-		stopCh:           make(chan struct{}),
+		shards: make([]*shard, shardCount),
+		config: hubConfig{
+			evictionInterval: 1 * time.Minute,
+			idleTimeout:      10 * time.Minute,
+			mailboxSize:      1024,
+		},
+		stopCh: make(chan struct{}),
+	}
+
+	// [MEMORY_ALLOCATION] Pre-allocate all shards to prevent runtime pointer nil-checks.
+	for i := range shardCount {
+		h.shards[i] = &shard{cells: make(map[uuid.UUID]*Cell)}
 	}
 
 	for _, opt := range opts {
 		opt(h)
 	}
 
+	// [BACKGROUND_PROCESS] Start the resource reclamation routine.
 	go h.runEvictor()
 	return h
 }
 
-// IsConnected checks if a user cell exists in the registry.
+// getShard maps a UserID to a specific shard using the first byte of the UUID.
+// [LOCK_FREE_ROUTING] This operation requires no locks.
+func (h *Hub) getShard(userID uuid.UUID) *shard {
+	return h.shards[userID[0]]
+}
+
+// IsConnected checks if a user has an active [CELL] in the registry.
 func (h *Hub) IsConnected(userID uuid.UUID) bool {
-	_, ok := h.cells.Load(userID)
+	s := h.getShard(userID)
+	s.RLock()
+	defer s.RUnlock()
+	_, ok := s.cells[userID]
 	return ok
 }
 
-// Broadcast dispatches an event to the specific user's cell mailbox.
+// Broadcast dispatches an event to the specific user's [MAILBOX].
 func (h *Hub) Broadcast(ev model.Eventer) bool {
-	if val, ok := h.cells.Load(ev.GetUserID()); ok {
-		if cell, ok := val.(Celler); ok {
-			return cell.Push(ev)
-		}
+	userID := ev.GetUserID()
+	s := h.getShard(userID)
+
+	// [READ_OPTIMIZATION] Use RLock for fast path event distribution.
+	s.RLock()
+	cell, ok := s.cells[userID]
+	s.RUnlock()
+
+	if ok {
+		return cell.Push(ev)
 	}
 	return false
 }
 
 // Register performs an [IDEMPOTENT] registration of a new connection.
+// It creates a new Cell (Actor) if the user is connecting for the first time.
 func (h *Hub) Register(conn model.Connector) {
-	uID := conn.GetUserID()
-	// Pass h.mailboxSize to ensure the Actor has the configured capacity
-	val, _ := h.cells.LoadOrStore(uID, NewCell(uID, h.mailboxSize))
+	userID := conn.GetUserID()
+	s := h.getShard(userID)
 
-	if cell, ok := val.(Celler); ok {
-		cell.Attach(conn)
+	s.Lock()
+	cell, ok := s.cells[userID]
+	if !ok {
+		// [ACTOR_CREATION] Initialize a new isolated delivery unit for the user.
+		cell = NewCell(userID, h.config.mailboxSize)
+		s.cells[userID] = cell
 	}
+	s.Unlock()
+
+	// [SESSION_ATTACH] Delegate session management to the Cell.
+	cell.Attach(conn)
 }
 
-// Unregister removes a connection from a cell.
-// Reclamation of the cell itself is handled asynchronously by the Evictor.
+// Unregister removes a specific connection from the user's [CELL].
 func (h *Hub) Unregister(userID, connID uuid.UUID) {
-	if val, ok := h.cells.Load(userID); ok {
-		if cell, ok := val.(Celler); ok {
-			cell.Detach(connID)
-		}
+	s := h.getShard(userID)
+	s.RLock()
+	cell, ok := s.cells[userID]
+	s.RUnlock()
+
+	if ok {
+		cell.Detach(connID)
 	}
 }
 
+// runEvictor is a long-running routine that triggers [CLEANUP] cycles.
 func (h *Hub) runEvictor() {
-	ticker := time.NewTicker(h.evictionInterval)
+	ticker := time.NewTicker(h.config.evictionInterval)
 	defer ticker.Stop()
 
 	for {
@@ -99,32 +149,39 @@ func (h *Hub) runEvictor() {
 	}
 }
 
-// performEviction executes the [RESOURCE_RECLAMATION] cycle.
+// performEviction executes the [RECLAMATION] logic shard-by-shard.
 func (h *Hub) performEviction() {
-	reapedCount := 0
-	h.cells.Range(func(key, value any) bool {
-		if cell, ok := value.(Celler); ok {
-			if cell.IsIdle(h.idleTimeout) {
-				cell.Stop()
-				h.cells.Delete(key)
-				reapedCount++
+	reaped := 0
+	for i := range shardCount {
+		s := h.shards[i]
+
+		// [GRANULAR_LOCKING] Lock only one shard at a time to keep others responsive.
+		s.Lock()
+		for id, cell := range s.cells {
+			if cell.IsIdle(h.config.idleTimeout) {
+				cell.Stop() // Terminate Actor goroutine
+				delete(s.cells, id)
+				reaped++
 			}
 		}
-		return true
-	})
+		s.Unlock()
+	}
 
-	if reapedCount > 0 {
-		log.Printf("[Hub] Eviction complete. Reclaimed %d idle user cells.", reapedCount)
+	if reaped > 0 {
+		slog.Info("RESOURCE_RECLAIMED", "count", reaped, "shard_total", shardCount)
 	}
 }
 
-// Shutdown gracefully stops the hub and all managed cells.
+// Shutdown ensures a [GRACEFUL_EXIT] by stopping all background actors.
 func (h *Hub) Shutdown() {
 	close(h.stopCh)
-	h.cells.Range(func(key, value any) bool {
-		if cell, ok := value.(Celler); ok {
+	for i := range shardCount {
+		s := h.shards[i]
+		s.Lock()
+		for _, cell := range s.cells {
 			cell.Stop()
 		}
-		return true
-	})
+		s.cells = nil // Clear references for GC
+		s.Unlock()
+	}
 }

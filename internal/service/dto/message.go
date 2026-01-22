@@ -8,14 +8,17 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/util"
 )
 
+type PeerDTO struct {
+	ID   string `json:"id"`
+	Type int    `json:"type"`
+}
+
 type MessageV1 struct {
 	MessageID  string        `json:"message_id"`
 	ThreadID   string        `json:"thread_id"`
 	DomainID   int32         `json:"domain_id"`
-	FromID     string        `json:"from_id"`
-	FromType   int           `json:"from_type"`
-	ToID       string        `json:"to_id"`
-	ToType     int           `json:"to_type"`
+	From       PeerDTO       `json:"from"`
+	To         PeerDTO       `json:"to"`
 	Body       string        `json:"body"`
 	OccurredAt string        `json:"occurred_at"`
 	Images     []ImageDTO    `json:"images"`
@@ -32,6 +35,13 @@ func (d *MessageV1) ToDomain() *model.Message {
 		Documents: d.mapDocs(),
 		Metadata:  make(map[string]any),
 	}
+}
+
+func (d PeerDTO) ToDomain() model.Peer {
+	return model.NewPeer(
+		util.SafeParseUUID(d.ID),
+		model.PeerType(d.Type),
+	)
 }
 
 func (d *MessageV1) mapImages() []*model.Image {

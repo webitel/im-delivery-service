@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -11,10 +12,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Enricher defines the contract for peer data augmentation
+// Enricher defines the high-level contract for participant data augmentation.
 type Enricher interface {
-	ResolvePeers(ctx context.Context, fromID string, toID uuid.UUID, domainID int32) (from, to model.Peer, err error)
-	ResolvePeer(ctx context.Context, id string, domainID int32) (model.Peer, error)
+	// ResolvePeers performs concurrent enrichment for multiple participants.
+	ResolvePeers(ctx context.Context, from, to model.Peer, domainID int32) (model.Peer, model.Peer, error)
+	// ResolvePeer handles the logic for a single participant based on their type.
+	ResolvePeer(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error)
 }
 
 type PeerEnricher struct {
@@ -22,10 +25,9 @@ type PeerEnricher struct {
 	cache    *lru.Cache[string, model.Peer]
 }
 
-// NewPeerEnricherService initializes a thread-safe enricher with LRU cache.
-// Note: Circuit Breaker and Retries are now handled by the gRPC client interceptors.
+// NewPeerEnricherService provides a thread-safe service with an internal LRU cache.
 func NewPeerEnricherService(contacts *imcontact.Client) *PeerEnricher {
-	// [MEMORY_MANAGEMENT] Bounded LRU cache to prevent OOM while maintaining hot data
+	// [MEMORY_MANAGEMENT] Pre-allocated LRU cache to minimize GC pressure and store "hot" identities.
 	cache, _ := lru.New[string, model.Peer](10000)
 
 	return &PeerEnricher{
@@ -34,78 +36,112 @@ func NewPeerEnricherService(contacts *imcontact.Client) *PeerEnricher {
 	}
 }
 
-// ResolvePeers orchestrates concurrent enrichment for message participants
-// [CONCURRENCY_CONTROL] Executes parallel lookups via errgroup with context propagation
-func (e *PeerEnricher) ResolvePeers(ctx context.Context, fromID string, toID uuid.UUID, domainID int32) (from, to model.Peer, err error) {
+// ResolvePeers executes parallel enrichment flows for 'from' and 'to' peers.
+// [CONCURRENCY_OPTIMIZATION] Uses errgroup to ensure both lookups complete or fail together.
+func (e *PeerEnricher) ResolvePeers(ctx context.Context, from, to model.Peer, domainID int32) (model.Peer, model.Peer, error) {
 	g, gCtx := errgroup.WithContext(ctx)
 
+	// Clone peers to avoid side effects during concurrent execution
+	resFrom := from
+	resTo := to
+
 	g.Go(func() error {
-		var errFrom error
-		from, errFrom = e.ResolvePeer(gCtx, fromID, domainID)
-		return errFrom
+		var err error
+		resFrom, err = e.ResolvePeer(gCtx, from, domainID)
+		return err
 	})
 
 	g.Go(func() error {
-		var errTo error
-		to, errTo = e.ResolvePeer(gCtx, toID.String(), domainID)
-		return errTo
+		var err error
+		resTo, err = e.ResolvePeer(gCtx, to, domainID)
+		return err
 	})
 
-	err = g.Wait()
-	return
-}
-
-// ResolvePeer executes a cache-aside enrichment flow.
-func (e *PeerEnricher) ResolvePeer(ctx context.Context, id string, domainID int32) (model.Peer, error) {
-	uid, err := uuid.Parse(id)
-	if err != nil {
-		// [DATA_INTEGRITY] Fallback for invalid UUIDs
-		return model.NewPeer(uuid.Nil, model.PeerUser), nil
+	if err := g.Wait(); err != nil {
+		return from, to, fmt.Errorf("parallel enrichment failed: %w", err)
 	}
 
-	// [HOT_PATH] LRU Cache lookup (O(1))
-	if peer, ok := e.cache.Get(id); ok {
+	return resFrom, resTo, nil
+}
+
+// ResolvePeer orchestrates the cache-aside strategy and polymorphic dispatching.
+func (e *PeerEnricher) ResolvePeer(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error) {
+	// [IDENTITY_GUARD] Ensure we have a valid ID before proceeding
+	if peer.ID == uuid.Nil {
 		return peer, nil
 	}
 
-	// [NETWORK_CALL] Execution via gRPC client with built-in CB and Retry policy
-	res, err := e.contacts.SearchContact(ctx, &contactv1.SearchContactRequest{
-		Ids:      []string{id},
-		DomainId: domainID,
-		Size:     1,
-		Page:     1,
-	})
-	if err != nil {
-		// [GRACEFUL_FALLBACK] If the gRPC call fails (or CB is OPEN),
-		// return a basic peer to prevent blocking the delivery flow.
-		return model.NewPeer(uid, model.PeerUser), nil
+	// [HOT_PATH] Check LRU cache first to avoid unnecessary network/logic overhead
+	cacheKey := peer.ID.String()
+	if cached, ok := e.cache.Get(cacheKey); ok {
+		return cached, nil
 	}
 
-	// [NOT_FOUND_CHECK] Handle empty results as a successful but non-enriched peer
+	var enriched model.Peer
+	var err error
+
+	// [POLYMORPHIC_DISPATCH] Route enrichment logic based on PeerType
+	switch peer.Type {
+	case model.PeerUser:
+		// [EXTERNAL_GRPC_CALL] Fetch data from Contact Service
+		enriched, err = e.enrichFromContacts(ctx, peer, domainID)
+
+	case model.PeerGroup:
+		// [STUB] Future logic for Chat Groups/Rooms metadata
+		enriched = e.mockEnrich(peer, "Peer Group")
+
+	case model.PeerChannel:
+		// [STUB] Future logic for Broadcast Channels
+		enriched = e.mockEnrich(peer, "Peer Channel")
+
+	default:
+		// [FALLBACK] Return original peer if type is unknown or doesn't require enrichment
+		enriched = peer
+	}
+
+	// [CACHE_POPULATION] Save successful result (even if it's a fallback)
+	if err == nil {
+		e.cache.Add(cacheKey, enriched)
+	}
+
+	return enriched, err
+}
+
+// enrichFromContacts communicates with the gRPC Contact service.
+func (e *PeerEnricher) enrichFromContacts(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error) {
+	res, err := e.contacts.SearchContact(ctx, &contactv1.SearchContactRequest{
+		Ids:      []string{peer.ID.String()},
+		DomainId: domainID,
+		Size:     1,
+	})
+	if err != nil {
+		// [RESILIENCE] Graceful fallback: return original peer to keep the message moving
+		return peer, nil
+	}
+
 	contacts := res.GetContacts()
 	if len(contacts) == 0 {
-		peer := model.NewPeer(uid, model.PeerUser)
-		e.cache.Add(id, peer)
 		return peer, nil
 	}
 
 	contact := contacts[0]
-	var name string
-	if contact.GetName() != "" {
-		name = contact.GetName()
-	} else {
+	name := contact.GetName()
+	if name == "" {
 		name = contact.GetUsername()
 	}
 
-	// [SUCCESS] Build enriched domain entity and populate cache
-	peer := model.NewPeer(uid, model.PeerUser,
-		model.WithIdentity(
-			contact.GetSubject(),
-			contact.GetIssId(),
-			name,
-		),
-	)
+	// [SUCCESS] Populate peer with identity data
+	peer.Name = name
+	peer.Sub = contact.GetSubject()
+	peer.Issuer = contact.GetIssId()
 
-	e.cache.Add(id, peer)
 	return peer, nil
+}
+
+// mockEnrich is a helper for types not yet fully implemented.
+func (e *PeerEnricher) mockEnrich(peer model.Peer, placeholder string) model.Peer {
+	if peer.Name == "" {
+		peer.Name = fmt.Sprintf("%s (%s)", placeholder, peer.ID.String()[:8])
+	}
+	return peer
 }

@@ -7,12 +7,14 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"buf.build/go/protovalidate"
 	validatemiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 
 	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
 
@@ -30,21 +32,22 @@ var Module = fx.Module("grpc_server",
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				go func() {
+					// [LIFECYCLE] NON-BLOCKING START
+					// Run the server in a separate goroutine to allow FX to finish initialization.
 					logger.Info(fmt.Sprintf("listen grpc %s:%d", srv.Host(), srv.Port()))
 					if err := srv.Listen(); err != nil {
 						logger.Error("grpc server error", "err", err)
 					}
 				}()
-
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
+				// [GRACEFUL_EXIT] DRAIN SESSIONS
+				// Stop accepting new connections and wait for active streams to flush.
 				if err := srv.Shutdown(); err != nil {
 					logger.Error("error stopping grpc server", "err", err.Error())
-
 					return err
 				}
-
 				return nil
 			},
 		})
@@ -55,7 +58,6 @@ var Module = fx.Module("grpc_server",
 
 type Server struct {
 	*grpc.Server
-
 	Addr     string
 	host     string
 	port     int
@@ -63,23 +65,72 @@ type Server struct {
 	listener net.Listener
 }
 
-// New provides a new gRPC server.
 func New(addr string, log *slog.Logger) (*Server, error) {
 	validator, err := protovalidate.New()
 	if err != nil {
 		return nil, err
 	}
 
+	// [KEEPALIVE_ENFORCEMENT_POLICY] ANTI-DOS PROTECTION
+	// Defines strict rules for client-side pings to prevent resource exhaustion.
+	kaep := keepalive.EnforcementPolicy{
+		// [MIN_PING_INTERVAL] Rate limit for incoming pings. If clients ping faster,
+		// the connection will be terminated to prevent CPU spam.
+		MinTime: 5 * time.Second,
+		// [PERMIT_IDLE_PINGS] Allow pings even if no active RPCs exist.
+		// Critical for long-lived streams that might stay idle but must remain alive.
+		PermitWithoutStream: true,
+	}
+
+	// [KEEPALIVE_SERVER_PARAMETERS] INFRASTRUCTURE_ADAPTABILITY
+	// These settings ensure the service remains stable behind L4/L7 proxies (Nginx, HAProxy, AWS ELB).
+	kasp := keepalive.ServerParameters{
+		// [MAX_CONNECTION_IDLE] ZOMBIE_RECLAMATION
+		// If a client (e.g. Flutter app) stays connected but sends no data for 15m,
+		// we close the connection to free up file descriptors and memory.
+		MaxConnectionIdle: 15 * time.Minute,
+
+		// [MAX_CONNECTION_AGE] LOAD_BALANCER_FRIENDLY_SHAKEOUT
+		// Critical for Docker Swarm/Kubernetes/Nginx. By forcing a reconnect every 30m,
+		// we ensure that traffic is re-balanced across all horizontal replicas.
+		// This prevents "Sticky Sessions" where one container is overloaded while others are idle.
+		MaxConnectionAge: 30 * time.Minute,
+
+		// [MAX_CONNECTION_AGE_GRACE] DRAIN_PERIOD
+		// When MaxConnectionAge is reached, we send a GOAWAY frame but allow 10s
+		// for active delivery streams to finish their current work gracefully.
+		MaxConnectionAgeGrace: 10 * time.Second,
+
+		// [TIME_LIVENESS_CHECK] NETWORK_SENSING
+		// Server sends an HTTP/2 PING every 20s. This is vital to detect "Half-Open"
+		// connections (e.g. user enters a tunnel or loses 4G/5G signal).
+		Time: 20 * time.Second,
+
+		// [TIMEOUT_RESPONSE_WINDOW] AGGRESSIVE_CLEANUP
+		// If the client doesn't ACK the server's PING within 5s, the TCP connection
+		// is terminated. This triggers the Hub's Unsubscribe logic immediately.
+		Timeout: 5 * time.Second,
+	}
+
 	s := grpc.NewServer(
+		// [OBSERVABILITY] TRACING_HANDLER
+		// Injects OpenTelemetry hooks for tracing and metrics.
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+
+		// [PROTOCOL_STABILITY] APPLY_KEEPALIVE
+		grpc.KeepaliveEnforcementPolicy(kaep),
+		grpc.KeepaliveParams(kasp),
+
+		// [PIPELINE] UNARY_INTERCEPTORS
+		// Sequence: Error Handling -> Authentication -> Validation.
 		grpc.ChainUnaryInterceptor(
 			intrcp.UnaryServerErrorInterceptor(),
 			interceptors.NewUnaryAuthInterceptor(),
-			// intrcp.RecoveryUnaryServerInterceptor(log),
 			validatemiddleware.UnaryServerInterceptor(validator),
 		),
 	)
 
+	// [TRANSPORT_BINDING] TCP_SOCKET_INITIALIZATION
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -106,12 +157,19 @@ func New(addr string, log *slog.Logger) (*Server, error) {
 }
 
 func (s *Server) Listen() error {
+	// [ACCEPT_LOOP] BLOCKING_SERVE
+	// Starts the main loop for accepting incoming TCP/HTTP2 connections.
 	return s.Serve(s.listener)
 }
 
 func (s *Server) Shutdown() error {
-	s.log.Debug("receive shutdown grpc")
+	s.log.Debug("initiating graceful shutdown of grpc server")
+
+	// [SHUTDOWN_ORDER]
+	// 1. Close listener: Stop accepting new TCP connections immediately.
 	err := s.listener.Close()
+	// 2. GracefulStop: Sends 'GOAWAY' frame to all HTTP/2 clients,
+	// allowing them to migrate to other server instances without error.
 	s.Server.GracefulStop()
 
 	return err

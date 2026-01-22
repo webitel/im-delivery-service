@@ -5,31 +5,64 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
+// enricherMiddleware implements [DECORATOR_PATTERN] to add observability
+// to the enrichment process without touching business logic.
 type enricherMiddleware struct {
 	next   Enricher
 	logger *slog.Logger
 }
 
-func (m *enricherMiddleware) ResolvePeers(ctx context.Context, fromID string, toID uuid.UUID, domainID int32) (model.Peer, model.Peer, error) {
-	start := time.Now()
-
-	// Call the original implementation
-	from, to, err := m.next.ResolvePeers(ctx, fromID, toID, domainID)
-
-	// [OBSERVABILITY] Log the outcome without polluting the main service
-	if err != nil {
-		m.logger.Error("PEER_ENRICHMENT_FAILED", "err", err, "duration", time.Since(start))
-	} else {
-		m.logger.Debug("PEER_ENRICHMENT_SUCCESS", "duration", time.Since(start))
+// NewEnricherMiddleware creates a new logging decorator for the Enricher.
+func NewEnricherMiddleware(next Enricher, logger *slog.Logger) Enricher {
+	return &enricherMiddleware{
+		next:   next,
+		logger: logger,
 	}
-
-	return from, to, err
 }
 
-func (m *enricherMiddleware) ResolvePeer(ctx context.Context, id string, domainID int32) (model.Peer, error) {
-	return m.next.ResolvePeer(ctx, id, domainID)
+// ResolvePeers wraps the concurrent enrichment with execution timing and outcome logging.
+func (m *enricherMiddleware) ResolvePeers(ctx context.Context, from, to model.Peer, domainID int32) (model.Peer, model.Peer, error) {
+	start := time.Now()
+
+	// [EXECUTION] Pass enriched objects to the core service
+	f, t, err := m.next.ResolvePeers(ctx, from, to, domainID)
+
+	// [OBSERVABILITY] Scoped logging for performance auditing
+	duration := time.Since(start)
+
+	if err != nil {
+		m.logger.Error("PEER_ENRICHMENT_BATCH_FAILED",
+			"err", err,
+			"from_id", from.ID,
+			"to_id", to.ID,
+			"duration_ms", duration.Milliseconds(),
+		)
+	} else {
+		m.logger.Debug("PEER_ENRICHMENT_BATCH_COMPLETED",
+			"duration_ms", duration.Milliseconds(),
+			"domain_id", domainID,
+		)
+	}
+
+	return f, t, err
+}
+
+// ResolvePeer wraps a single peer enrichment lookup.
+func (m *enricherMiddleware) ResolvePeer(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error) {
+	start := time.Now()
+
+	res, err := m.next.ResolvePeer(ctx, peer, domainID)
+	if err != nil {
+		m.logger.Warn("SINGLE_PEER_ENRICHMENT_FAILED",
+			"peer_id", peer.ID,
+			"peer_type", peer.Type,
+			"err", err,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+	}
+
+	return res, err
 }

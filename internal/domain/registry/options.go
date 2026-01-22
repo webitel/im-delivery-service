@@ -2,19 +2,29 @@ package registry
 
 import "time"
 
+// Option defines a functional configuration type for the Hub.
 type Option func(*Hub)
 
-// WithEvictionInterval configures the frequency of the janitor (reclamation) cycle.
+// WithEvictionInterval configures how often the [JANITOR] process runs
+// to reclaim memory from inactive users.
 func WithEvictionInterval(d time.Duration) Option {
-	return func(h *Hub) { h.evictionInterval = d }
+	return func(h *Hub) {
+		h.config.evictionInterval = d
+	}
 }
 
-// WithIdleTimeout defines the duration after which an inactive cell is reclaimed.
+// WithIdleTimeout defines the [QUIET_PERIOD] after which a user cell
+// without active sessions is considered eligible for eviction.
 func WithIdleTimeout(d time.Duration) Option {
-	return func(h *Hub) { h.idleTimeout = d }
+	return func(h *Hub) {
+		h.config.idleTimeout = d
+	}
 }
 
-// WithMailboxSize sets the buffer capacity for individual user actors.
+// WithMailboxSize sets the [BACKPRESSURE] threshold.
+// It defines the buffer capacity for each individual user's actor mailbox.
 func WithMailboxSize(size int) Option {
-	return func(h *Hub) { h.mailboxSize = size }
+	return func(h *Hub) {
+		h.config.mailboxSize = size
+	}
 }

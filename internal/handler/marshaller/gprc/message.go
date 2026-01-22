@@ -68,9 +68,7 @@ func marshalPeer(p model.Peer) *impb.Peer {
 	switch p.Type {
 	case model.PeerUser:
 		res.Kind = &impb.Peer_UserId{UserId: p.Sub}
-	case model.PeerBot:
-		res.Kind = &impb.Peer_BotId{BotId: p.Sub}
-	case model.PeerChat:
+	case model.PeerGroup:
 		res.Kind = &impb.Peer_ChatId{ChatId: p.Sub}
 	case model.PeerChannel:
 		res.Kind = &impb.Peer_ChannelId{ChannelId: p.Sub}

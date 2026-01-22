@@ -1,10 +1,11 @@
 // internal/domain/model/message_v2_event.go
-package model
+package event
 
 import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 // Interface guard
@@ -12,13 +13,13 @@ var _ Eventer = (*MessageV2Event)(nil)
 
 // MessageV2Event represents the enhanced V2 domain event
 type MessageV2Event struct {
-	message *Message
+	message *model.Message
 	userID  uuid.UUID
 	cached  any
 }
 
 // NewMessageV2Event initializes the event with pre-resolved peers and domain entity
-func NewMessageV2Event(msg *Message, userID uuid.UUID, from, to Peer) *MessageV2Event {
+func NewMessageV2Event(msg *model.Message, userID uuid.UUID, from, to model.Peer) *MessageV2Event {
 	msg.From = from
 	msg.To = to
 	return &MessageV2Event{

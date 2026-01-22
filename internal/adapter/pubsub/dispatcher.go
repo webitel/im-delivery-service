@@ -9,13 +9,13 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
 // EventDispatcher defines the high-level contract for outgoing events.
 // This allows the handler to stay agnostic of the transport implementation.
 type EventDispatcher interface {
-	Publish(ctx context.Context, ev model.Eventer) error
+	Publish(ctx context.Context, ev event.Eventer) error
 	Publisher() message.Publisher
 }
 
@@ -31,7 +31,7 @@ func NewEventDispatcher(pub message.Publisher) EventDispatcher {
 	}
 }
 
-func (d *eventDispatcher) Publish(ctx context.Context, ev model.Eventer) error {
+func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	if ev == nil {
 		return fmt.Errorf("event dispatcher: cannot publish nil event")
 	}

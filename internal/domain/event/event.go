@@ -1,9 +1,10 @@
-package model
+package event
 
 import "github.com/google/uuid"
 
 type EventKind int16
 
+//go:generate stringer -type=EventKind
 const (
 	Connected      EventKind = iota + 1 // [SYSTEM]
 	MessageCreated                      // [BUSINESS]

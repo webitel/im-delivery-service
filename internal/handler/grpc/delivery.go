@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
@@ -69,12 +70,14 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 
 	l.Info("STREAM_ESTABLISHED")
 
-	// [PROTOCOL_HANDSHAKE]
-	// Send the initial 'connected' event to confirm the session is active.
-	// This frame is transmitted as an HTTP/2 DATA frame.
-	welcome := model.NewConnectedEvent(userID, connID.String(), serverVersion)
-	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcome)); err != nil {
-		l.Warn("HANDSHAKE_FAILED", slog.Any("err", err))
+	// [HANDSHAKE_LOGIC]
+	// Create the payload from model package.
+	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
+		Ok:            true,
+		ConnectionID:  connID.String(),
+		ServerVersion: serverVersion,
+	})
+	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcomeEv)); err != nil {
 		return err
 	}
 

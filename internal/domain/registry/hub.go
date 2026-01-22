@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
 // Hubber defines the external API for the high-concurrency registry.
 // It acts as the entry point for both incoming events (Broadcast) and
 // transport lifecycle management (Register/Unregister).
 type Hubber interface {
-	Broadcast(ev model.Eventer) bool
-	Register(conn model.Connector)
+	Broadcast(ev event.Eventer) bool
+	Register(conn Connector)
 	Unregister(userID, connID uuid.UUID)
 	IsConnected(userID uuid.UUID) bool
 	Shutdown()
@@ -88,7 +88,7 @@ func (h *Hub) IsConnected(userID uuid.UUID) bool {
 }
 
 // Broadcast dispatches an event to the specific user's [MAILBOX].
-func (h *Hub) Broadcast(ev model.Eventer) bool {
+func (h *Hub) Broadcast(ev event.Eventer) bool {
 	userID := ev.GetUserID()
 	s := h.getShard(userID)
 
@@ -105,7 +105,7 @@ func (h *Hub) Broadcast(ev model.Eventer) bool {
 
 // Register performs an [IDEMPOTENT] registration of a new connection.
 // It creates a new Cell (Actor) if the user is connecting for the first time.
-func (h *Hub) Register(conn model.Connector) {
+func (h *Hub) Register(conn Connector) {
 	userID := conn.GetUserID()
 	s := h.getShard(userID)
 

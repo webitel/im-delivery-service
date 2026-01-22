@@ -3,6 +3,7 @@ package wsmarshaller
 import (
 	"encoding/json"
 
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
@@ -15,7 +16,7 @@ type WSEvent struct {
 }
 
 // MarshallDeliveryEvent prepares data for WebSocket transmission.
-func MarshallDeliveryEvent(ev model.Eventer) ([]byte, error) {
+func MarshallDeliveryEvent(ev event.Eventer) ([]byte, error) {
 	// We don't use gRPC cache here because WS uses JSON.
 	// Instead, we map domain model to a friendly JSON structure.
 

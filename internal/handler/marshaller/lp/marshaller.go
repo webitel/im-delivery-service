@@ -3,6 +3,7 @@ package lpmarshaller
 import (
 	"encoding/json"
 
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
@@ -19,7 +20,7 @@ type Response struct {
 }
 
 // MarshallEvents converts a slice of domain events into a single JSON batch.
-func MarshallEvents(events []model.Eventer) ([]byte, error) {
+func MarshallEvents(events []event.Eventer) ([]byte, error) {
 	res := Response{
 		Events: make([]LPEvent, 0, len(events)),
 	}

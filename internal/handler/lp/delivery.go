@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
@@ -44,7 +44,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	defer h.deliverer.Unsubscribe(userID, conn.GetID())
 	defer conn.Close()
 
-	var events []model.Eventer
+	var events []event.Eventer
 
 	// 3. Wait for data or timeout.
 	select {

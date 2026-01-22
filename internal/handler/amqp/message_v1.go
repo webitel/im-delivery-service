@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/service/dto"
 )
 
@@ -20,7 +20,7 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUI
 	}
 
 	// 2. [LOCAL_DISPATCH] Broadcast enriched event to connected gRPC clients
-	ev := model.NewMessageV1Event(raw.ToDomain(), userID, from, to)
+	ev := event.NewMessageV1Event(raw.ToDomain(), userID, from, to)
 	h.hub.Broadcast(ev)
 
 	// 3. [GLOBAL_DISPATCH] Publish enriched event back to the bus

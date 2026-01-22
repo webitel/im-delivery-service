@@ -1,10 +1,11 @@
 // internal/domain/model/message_event.go
-package model
+package event
 
 import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 // Interface guard
@@ -20,7 +21,7 @@ var _ Eventer = (*MessageV1Event)(nil)
 // This allows "Stateless Horizontal Scaling" where every node can check
 // hub.IsConnected(userID) to decide if it should handle the delivery.
 type MessageV1Event struct {
-	message *Message
+	message *model.Message
 	userID  uuid.UUID // [PHYSICAL_RECIPIENT] Target user ID for infrastructure routing
 	cached  any
 }
@@ -29,7 +30,7 @@ type MessageV1Event struct {
 //
 // [NOTE] Even if the message is sent to a Group (message.To),
 // the 'userID' must be the ID of the individual subscriber.
-func NewMessageV1Event(msg *Message, userID uuid.UUID, from, to Peer) *MessageV1Event {
+func NewMessageV1Event(msg *model.Message, userID uuid.UUID, from, to model.Peer) *MessageV1Event {
 	// Enrich the message entity with full Peer profiles (Name, Avatar, etc.)
 	msg.From = from
 	msg.To = to

@@ -19,13 +19,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
 // Celler defines the internal API for user-specific delivery units.
 type Celler interface {
-	Push(ev model.Eventer) bool
-	Attach(conn model.Connector)
+	Push(ev event.Eventer) bool
+	Attach(conn Connector)
 	Detach(connID uuid.UUID) bool
 	IsIdle(timeout time.Duration) bool
 	Stop()
@@ -41,12 +41,12 @@ type Cell struct {
 	// Buffered channel that decouples the global dispatcher from individual delivery.
 	// It acts as a shock absorber, preventing slow consumer latency from
 	// propagating back to the Hub or AMQP consumers (Backpressure).
-	mailbox chan model.Eventer
+	mailbox chan event.Eventer
 
 	// [SESSIONS]
 	// Registry of all active transport channels (gRPC streams) for the user.
 	// Allows multiplexing a single event to multiple devices (mobile, web, desktop).
-	sessions map[uuid.UUID]model.Connector
+	sessions map[uuid.UUID]Connector
 
 	// [CONCURRENCY_CONTROL]
 	// Fine-grained lock for managing the sessions map.
@@ -66,8 +66,8 @@ type Cell struct {
 func NewCell(userID uuid.UUID, bufferSize int) *Cell {
 	c := &Cell{
 		userID:           userID,
-		mailbox:          make(chan model.Eventer, bufferSize),
-		sessions:         make(map[uuid.UUID]model.Connector),
+		mailbox:          make(chan event.Eventer, bufferSize),
+		sessions:         make(map[uuid.UUID]Connector),
 		doneCh:           make(chan struct{}),
 		lastActivityUnix: time.Now().Unix(),
 	}
@@ -94,7 +94,7 @@ func (c *Cell) IsIdle(timeout time.Duration) bool {
 	return time.Since(lastActivity) > timeout
 }
 
-func (c *Cell) Push(ev model.Eventer) bool {
+func (c *Cell) Push(ev event.Eventer) bool {
 	c.touch()
 	select {
 	case c.mailbox <- ev:
@@ -105,7 +105,7 @@ func (c *Cell) Push(ev model.Eventer) bool {
 	}
 }
 
-func (c *Cell) Attach(conn model.Connector) {
+func (c *Cell) Attach(conn Connector) {
 	c.mu.Lock()
 	c.sessions[conn.GetID()] = conn
 	c.mu.Unlock()
@@ -133,7 +133,7 @@ func (c *Cell) loop() {
 }
 
 // deliver broadcasts events to all active sessions of the user
-func (c *Cell) deliver(ev model.Eventer) {
+func (c *Cell) deliver(ev event.Eventer) {
 	// [STRATEGY] Snapshot sessions under RLock to minimize lock holding time
 	// during potentially slow network I/O
 	c.mu.RLock()
@@ -141,7 +141,7 @@ func (c *Cell) deliver(ev model.Eventer) {
 		c.mu.RUnlock()
 		return
 	}
-	conns := make([]model.Connector, 0, len(c.sessions))
+	conns := make([]Connector, 0, len(c.sessions))
 	for _, conn := range c.sessions {
 		conns = append(conns, conn)
 	}

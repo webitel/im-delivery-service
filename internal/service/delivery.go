@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 )
 
 // [DELIVERY_SERVICE] PRIMARY INTERFACE FOR TRANSPORT HANDLERS (gRPC/Websocket)
 type Deliverer interface {
-	Subscribe(ctx context.Context, userID uuid.UUID) (model.Connector, error)
+	Subscribe(ctx context.Context, userID uuid.UUID) (registry.Connector, error)
 	Unsubscribe(userID, connID uuid.UUID)
 }
 
@@ -27,13 +26,13 @@ func NewDeliveryService(hub registry.Hubber) *DeliveryService {
 }
 
 // [SUBSCRIBE] HANDLES CONNECTION LIFECYCLE INITIATION
-func (s *DeliveryService) Subscribe(ctx context.Context, userID uuid.UUID) (model.Connector, error) {
+func (s *DeliveryService) Subscribe(ctx context.Context, userID uuid.UUID) (registry.Connector, error) {
 	// [STRATEGY] We can adjust buffer size based on Platform or User Priority from meta
 	// In the future, StreamRequest settings can be passed here as well.
 	const defaultBufferSize = 1024
 
 	// 1. Create a connector (Internal logic uses sync.Pool for zero-allocation)
-	conn := model.NewConnector(ctx, userID, defaultBufferSize)
+	conn := registry.NewConnector(ctx, userID, defaultBufferSize)
 
 	// 2. Attach to the sharded dispatcher
 	s.hub.Register(conn)

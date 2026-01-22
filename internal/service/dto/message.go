@@ -29,6 +29,7 @@ func (d *MessageV1) ToDomain() *model.Message {
 	return &model.Message{
 		ID:        util.SafeParseUUID(d.MessageID),
 		ThreadID:  util.SafeParseUUID(d.ThreadID),
+		DomainID:  int64(d.DomainID),
 		Text:      d.Body,
 		CreatedAt: util.SafeParseRFC3339(d.OccurredAt),
 		Images:    d.mapImages(),

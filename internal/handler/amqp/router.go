@@ -5,84 +5,84 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	pubsubadapter "github.com/webitel/im-delivery-service/internal/adapter/pubsub"
+	"github.com/google/uuid"
+	"github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 const (
-	// Listening to  (Consumed)
-	WebitelExchange = "im_message.events"
-	MessageTopicV1  = "im_message.#.message.created.v1"
+	// ------------------- EXCHANGES (SOURCES) -------------------
+	MessageEventsExchange = "im_message.events"
+	SystemEventsExchange  = "im_system.events"
 
-	// Publishing to  (Produced)
-	DeliveryExchange = "im_delivery.events"
-	MessageQueueV1   = "im_delivery.message_v1"
+	// ------------------- TOPICS (ROUTING KEYS) -----------------
+	TopicMessageCreated = "im_message.#.message.created.v1"
+	TopicMessageDeleted = "im_message.#.message.deleted.v1"
+	TopicUserStatus     = "im_system.#.user.status.v1"
+
+	// ------------------- QUEUES (CONSUMERS) --------------------
+	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
+	DeliveryPoisonTopic    = "im-delivery.incoming-processor.v1.poison"
 )
 
 type MessageHandler struct {
-	hub       registry.Hubber
-	logger    *slog.Logger
-	enricher  service.Enricher
-	publisher pubsubadapter.EventDispatcher
+	hub        registry.Hubber
+	logger     *slog.Logger
+	enricher   service.Enricher
+	dispatcher pubsub.EventDispatcher
 }
 
-func NewMessageHandler(
-	hub registry.Hubber,
-	logger *slog.Logger,
-	enricher service.Enricher,
-	publisher pubsubadapter.EventDispatcher,
-) *MessageHandler {
-	return &MessageHandler{
-		hub:       hub,
-		logger:    logger,
-		enricher:  enricher,
-		publisher: publisher,
-	}
+func NewMessageHandler(hub registry.Hubber, logger *slog.Logger, enricher service.Enricher, dispatcher pubsub.EventDispatcher) *MessageHandler {
+	return &MessageHandler{hub, logger, enricher, dispatcher}
 }
 
-// RegisterHandlers configures AMQP subscriptions for the service node.
-// internal/adapter/amqp/handler.go
-
-func (h *MessageHandler) RegisterHandlers(
-	router *message.Router,
-	subProvider *pubsubadapter.SubscriberProvider,
-) error {
-	nodeID := watermill.NewShortUUID()
-	queueName := fmt.Sprintf("%s.%s", MessageQueueV1, nodeID)
-
-	// [INFRASTRUCTURE] Define poison queue for failed messages
-	poisonTopic := fmt.Sprintf("%s.poison", queueName)
-
-	sub, err := subProvider.Build(queueName, WebitelExchange, MessageTopicV1)
+// [REGISTRATION_PIPELINE]
+func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *pubsub.SubscriberProvider) error {
+	poison, err := middleware.PoisonQueue(h.dispatcher.Publisher(), DeliveryPoisonTopic)
 	if err != nil {
-		return fmt.Errorf("failed to build subscriber: %w", err)
+		return fmt.Errorf("POISON_SETUP_FAILED: %w", err)
 	}
 
-	// [DLX_SETUP] Access the raw message.Publisher via .Publisher() method
-	// This fixes the "does not implement message.Publisher (missing method Close)" error
-	poisonMiddleware, err := middleware.PoisonQueue(h.publisher.Publisher(), poisonTopic)
-	if err != nil {
-		return fmt.Errorf("failed to setup poison middleware: %w", err)
+	configs := []struct {
+		name     string
+		exchange string
+		topic    string
+		handler  message.NoPublishHandlerFunc
+	}{
+		{"ON_MSG_CREATED", MessageEventsExchange, TopicMessageCreated, Bind(h, h.OnMessageCreatedV1)},
+
+		// [ARCHITECTURAL_PLACEHOLDERS]
+		// The following handlers serve as blueprints for scaling the system.
+		// Add new domain listeners here by following this table-driven pattern.
+		{"ON_MSG_DELETED", MessageEventsExchange, TopicMessageDeleted, Bind(h, h.OnMessageDeletedV1)},
+		{"ON_USR_STATUS", SystemEventsExchange, TopicUserStatus, Bind(h, h.OnStatusChangedV1)},
 	}
 
-	// [ROUTING] Fix AddNoPublisherHandler signature: (handlerName, topic, subscriber, handlerFunc)
-	handler := router.AddConsumerHandler(
-		queueName+"_executor",
-		MessageTopicV1, // This was missing
-		sub,
-		bind(h.hub, h.OnMessageCreatedV1),
-	)
+	for _, c := range configs {
+		instanceID := uuid.NewString()[:8]
+		// [UNIQUE_HANDLER_QUEUE]
+		// We create a unique queue for EACH handler on THIS node.
+		// Format: im-delivery.node.b23a8f12.ON_MSG_CREATED
+		handlerQueue := fmt.Sprintf("%s.%s.%s", DeliveryProcessorQueue, instanceID, c.name)
 
-	// [RESILIENCE_CHAIN] Apply middlewares in correct order
-	handler.AddMiddleware(
-		poisonMiddleware, // Catch errors first
-		middleware.NewThrottle(100, time.Second).Middleware,
-		middleware.Timeout(time.Second*30),
-	)
+		sub, err := subProvider.Build(handlerQueue, c.exchange, c.topic)
+		if err != nil {
+			return err
+		}
 
+		router.AddConsumerHandler(c.name, c.topic, sub, c.handler).AddMiddleware(
+			TraceIDMiddleware,
+			LoggingMiddleware(h.logger),
+			NewRetryMiddleware().Middleware,
+			poison,
+			middleware.NewThrottle(100, time.Second).Middleware,
+			middleware.Timeout(time.Second*30),
+		)
+	}
+
+	h.logger.Info("AMQP_PIPELINE_READY", "queue", DeliveryProcessorQueue)
 	return nil
 }

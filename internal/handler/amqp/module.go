@@ -10,45 +10,48 @@ import (
 	"go.uber.org/fx"
 )
 
+const DeliveryExchange = "im_delivery.broadcast"
+
 var Module = fx.Module("amqp-handler",
 	fx.Provide(
-		pubsubadapter.NewPublisherProvider,
 		pubsubadapter.NewSubscriberProvider,
-		func(pp *pubsubadapter.PublisherProvider) (pubsubadapter.EventDispatcher, error) {
-			pub, err := pp.Build("im.delivery.events")
-			if err != nil {
-				return nil, err
-			}
+		pubsubadapter.NewPublisherProvider,
 
-			return pubsubadapter.NewEventDispatcher(pub), nil
+		// [FIX] Building the publisher.
+		// If your pp.Build only takes a string, we pass the Exchange name.
+		func(pp *pubsubadapter.PublisherProvider) (message.Publisher, error) {
+			return pp.Build(DeliveryExchange)
 		},
+
+		// [DISPATCHER] Domain-aware wrapper for the publisher
+		func(pub message.Publisher) pubsubadapter.EventDispatcher {
+			return pubsubadapter.NewEventDispatcher(pub)
+		},
+
 		NewMessageHandler,
 
-		// [INFRASTRUCTURE] Simple factory for the router
 		func(logger *slog.Logger) (*message.Router, error) {
 			return message.NewRouter(message.RouterConfig{}, watermill.NewSlogLogger(logger))
 		},
 	),
 
-	// [LIFECYCLE] Centralized management of router and handlers
 	fx.Invoke(func(
 		lc fx.Lifecycle,
 		h *MessageHandler,
 		router *message.Router,
-		sub *pubsubadapter.SubscriberProvider,
+		subProvider *pubsubadapter.SubscriberProvider,
 		logger *slog.Logger,
 	) error {
-		// 1. Register domain handlers
-		if err := h.RegisterHandlers(router, sub); err != nil {
+		// [WIRING] Register all defined consumers
+		if err := h.RegisterHandlers(router, subProvider); err != nil {
 			return err
 		}
 
-		// 2. Manage router lifecycle
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				go func() {
 					if err := router.Run(context.Background()); err != nil {
-						logger.Error("watermill router run error", "err", err)
+						logger.Error("router runtime error", "err", err)
 					}
 				}()
 				return nil
@@ -57,7 +60,6 @@ var Module = fx.Module("amqp-handler",
 				return router.Close()
 			},
 		})
-
 		return nil
 	}),
 )

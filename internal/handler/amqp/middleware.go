@@ -2,58 +2,56 @@ package amqp
 
 import (
 	"context"
-	"encoding/json"
-	"strings"
+	"log/slog"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/registry"
 )
 
-// bind wraps the domain handler to provide routing key extraction and node-local filtering.
-func bind[T any](hub registry.Hubber, fn func(context.Context, uuid.UUID, *T) error) message.NoPublishHandlerFunc {
-	return func(msg *message.Message) error {
-		// 1. Try to extract the routing key to identify the recipient
-		rk := msg.Metadata.Get("x-routing-key")
-		if rk == "" {
-			rk = msg.Metadata.Get("routing_key")
+// [TRACE_ID_MIDDLEWARE]
+// Ensures TraceID persistence through the call chain.
+func TraceIDMiddleware(h message.HandlerFunc) message.HandlerFunc {
+	return func(msg *message.Message) ([]*message.Message, error) {
+		traceID := msg.Metadata.Get("trace_id")
+		if traceID == "" {
+			traceID = uuid.NewString()
+			msg.Metadata.Set("trace_id", traceID)
 		}
 
-		// If no routing key is present, we cannot route the message
-		if rk == "" {
-			return nil // Ack: ignore messages without routing info
-		}
+		ctx := context.WithValue(msg.Context(), "trace_id", traceID)
+		msg.SetContext(ctx)
 
-		// Expecting routing key format: im_message.{user_id}.message.created.v1
-		parts := strings.Split(rk, ".")
-		if len(parts) < 2 {
-			return nil // Ack: invalid topic structure
-		}
+		return h(msg)
+	}
+}
 
-		userID, err := uuid.Parse(parts[1])
-		if err != nil {
-			return nil // Ack: malformed UUID
-		}
+// [LOGGING_MIDDLEWARE]
+// Structured logging with latency and TraceID.
+func LoggingMiddleware(logger *slog.Logger) message.HandlerMiddleware {
+	return func(h message.HandlerFunc) message.HandlerFunc {
+		return func(msg *message.Message) ([]*message.Message, error) {
+			start := time.Now()
+			msgs, err := h(msg)
 
-		// 2. [LOCALITY_CHECK] Only process the message if the user is connected to THIS node.
-		// Since we use fan-out, every node gets the message, but only the owner node handles it.
-		if !hub.IsConnected(userID) {
-			return nil // Ack: user not on this node
+			logger.Debug("MESSAGE_HANDLED",
+				"msg_id", msg.UUID,
+				"trace_id", msg.Metadata.Get("trace_id"),
+				"duration_ms", time.Since(start).Milliseconds(),
+				"success", err == nil,
+			)
+			return msgs, err
 		}
+	}
+}
 
-		// 3. Decode the message payload
-		payload := new(T)
-		if err := json.Unmarshal(msg.Payload, payload); err != nil {
-			// Nack/Retry could be used here, but for now we just log and Ack to avoid poison pills
-			return nil
-		}
-
-		// 4. Pass the data to the service handler
-		if err := fn(msg.Context(), userID, payload); err != nil {
-			// If service logic fails, return the error to trigger Watermill's retry/nack mechanism
-			return err
-		}
-
-		return nil // Success: Automatic Ack
+// [RETRY_MIDDLEWARE]
+func NewRetryMiddleware() middleware.Retry {
+	return middleware.Retry{
+		MaxRetries:      3,
+		InitialInterval: time.Second * 2,
+		MaxInterval:     time.Second * 15,
+		Multiplier:      2.0,
 	}
 }

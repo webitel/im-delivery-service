@@ -1,5 +1,3 @@
-// internal/adapter/pubsub/event_dispatcher.go
-
 package pubsub
 
 import (
@@ -12,46 +10,47 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
-// EventDispatcher defines the high-level contract for outgoing events.
-// This allows the handler to stay agnostic of the transport implementation.
 type EventDispatcher interface {
 	Publish(ctx context.Context, ev event.Eventer) error
 	Publisher() message.Publisher
 }
 
-// eventDispatcher is the concrete implementation (private).
 type eventDispatcher struct {
 	publisher message.Publisher
 }
 
-// NewEventDispatcher returns the interface instead of the pointer to the struct.
 func NewEventDispatcher(pub message.Publisher) EventDispatcher {
-	return &eventDispatcher{
-		publisher: pub,
-	}
+	return &eventDispatcher{publisher: pub}
 }
 
 func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	if ev == nil {
-		return fmt.Errorf("event dispatcher: cannot publish nil event")
+		return nil
+	}
+
+	// [CONTRACT] Check if the event is meant for external AMQP delivery
+	exportable, ok := ev.(event.Exportable)
+	if !ok {
+		return nil
 	}
 
 	payload, err := json.Marshal(ev)
 	if err != nil {
-		return fmt.Errorf("event dispatcher: marshal failure: %w", err)
+		return fmt.Errorf("dispatcher: marshal error: %w", err)
 	}
 
+	// [ENVELOPE] Create a clean message without Watermill infrastructure noise
 	msg := message.NewMessage(watermill.NewUUID(), payload)
 	msg.SetContext(ctx)
 
-	fmt.Printf("Publishing event to topic: %s\n", ev.GetRoutingKey())
-	if err := d.publisher.Publish(ev.GetRoutingKey(), msg); err != nil {
-		return fmt.Errorf("event dispatcher: failed to publish to topic %s: %w", ev.GetRoutingKey(), err)
+	// [ROUTING] The first argument is the Routing Key.
+	// In your Factory, GenerateRoutingKey: func(s string) string { return s }
+	// so the routing key will be exactly what 'exportable.GetRoutingKey()' returns.
+	if err := d.publisher.Publish(exportable.GetRoutingKey(), msg); err != nil {
+		return fmt.Errorf("dispatcher: publish failed: %w", err)
 	}
 
 	return nil
 }
 
-func (d *eventDispatcher) Publisher() message.Publisher {
-	return d.publisher
-}
+func (d *eventDispatcher) Publisher() message.Publisher { return d.publisher }

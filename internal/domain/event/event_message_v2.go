@@ -9,7 +9,10 @@ import (
 )
 
 // Interface guard
-var _ Eventer = (*MessageV2Event)(nil)
+var (
+	_ Eventer    = (*MessageV2Event)(nil)
+	_ Exportable = (*MessageV1Event)(nil)
+)
 
 // MessageV2Event represents the enhanced V2 domain event
 type MessageV2Event struct {

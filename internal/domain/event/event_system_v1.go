@@ -32,11 +32,6 @@ func (e *SystemEvent) GetPayload() any            { return e.payload }
 func (e *SystemEvent) GetCached() any             { return e.cached }
 func (e *SystemEvent) SetCached(v any)            { e.cached = v }
 
-// GetRoutingKey is used for message broker exchange logic.
-func (e *SystemEvent) GetRoutingKey() string {
-	return ""
-}
-
 // NewSystemEvent is a universal factory for creating any signal.
 func NewSystemEvent(userID uuid.UUID, kind EventKind, priority EventPriority, payload any) *SystemEvent {
 	return &SystemEvent{

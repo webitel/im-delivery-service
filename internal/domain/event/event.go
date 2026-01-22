@@ -21,7 +21,6 @@ const (
 // Eventer defines the contract for all data packets flowing through the Hub.
 type Eventer interface {
 	GetID() string
-	GetRoutingKey() string
 	GetKind() EventKind
 	GetUserID() uuid.UUID
 	GetPriority() EventPriority
@@ -29,4 +28,11 @@ type Eventer interface {
 	GetPayload() any
 	GetCached() any
 	SetCached(any)
+}
+
+// Exportable defines an event that should be re-published to the message bus.
+type Exportable interface {
+	// We return the key only if the event is ready to be exported.
+	// If it returns an empty string, the binder will skip publishing.
+	GetRoutingKey() string
 }

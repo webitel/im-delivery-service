@@ -8,6 +8,7 @@ type (
 	Message struct {
 		ID        uuid.UUID      `json:"id"`
 		ThreadID  uuid.UUID      `json:"thread_id"`
+		DomainID  int64          `json:"domain_id"`
 		From      Peer           `json:"from"`
 		To        Peer           `json:"to"`
 		Text      string         `json:"text"`

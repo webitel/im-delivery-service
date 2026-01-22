@@ -20,11 +20,11 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUI
 	}
 
 	// 2. [LOCAL_DISPATCH] Broadcast enriched event to connected gRPC clients
-	ev := event.NewMessageV1Event(raw.ToDomain(), userID, from, to)
-	h.hub.Broadcast(ev)
+
+	h.hub.Broadcast(event.NewMessageV1Event(raw.ToDomain(), userID, from, to))
 
 	// 3. [GLOBAL_DISPATCH] Publish enriched event back to the bus
-	if err := h.publisher.Publish(ctx, ev); err != nil {
+	if err := h.publisher.Publish(ctx, event.NewMessageV1Event(raw.ToDomain(), userID, from, to)); err != nil {
 		return fmt.Errorf("failed to publish enriched event: %w", err)
 	}
 

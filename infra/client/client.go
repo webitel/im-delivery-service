@@ -1,4 +1,4 @@
-package webitel
+package client
 
 import (
 	"context"

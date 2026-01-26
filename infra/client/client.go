@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/webitel/im-delivery-service/infra/webitel/interceptors"
+	"github.com/webitel/im-delivery-service/infra/client/interceptors"
 	ds "github.com/webitel/webitel-go-kit/infra/discovery"
 	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
 	"github.com/webitel/webitel-go-kit/infra/transport/gRPC/resolver/discovery"

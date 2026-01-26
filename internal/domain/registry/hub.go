@@ -9,6 +9,9 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
+// Interface guard
+var _ Hubber = (*Hub)(nil)
+
 // Hubber defines the external API for the high-concurrency registry.
 // It acts as the entry point for both incoming events (Broadcast) and
 // transport lifecycle management (Register/Unregister).

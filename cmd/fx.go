@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/webitel/im-delivery-service/config"
 	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
-	webiteldi "github.com/webitel/im-delivery-service/infra/webitel/di"
+	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	amqpdi "github.com/webitel/im-delivery-service/internal/handler/amqp"
 	grpchandler "github.com/webitel/im-delivery-service/internal/handler/grpc"

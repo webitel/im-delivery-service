@@ -3,7 +3,7 @@ package webiteldi
 import (
 	"context"
 
-	imcontact "github.com/webitel/im-delivery-service/infra/webitel/im-contact"
+	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
 	"go.uber.org/fx"
 )
 

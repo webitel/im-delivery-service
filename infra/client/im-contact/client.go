@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	contactv1 "github.com/webitel/im-delivery-service/gen/go/contact/v1"
-	"github.com/webitel/im-delivery-service/infra/webitel"
+	webitel "github.com/webitel/im-delivery-service/infra/client"
 	"github.com/webitel/webitel-go-kit/infra/discovery"
 	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
 	"google.golang.org/grpc"

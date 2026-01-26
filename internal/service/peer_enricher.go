@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru/v2"
 	contactv1 "github.com/webitel/im-delivery-service/gen/go/contact/v1"
-	imcontact "github.com/webitel/im-delivery-service/infra/webitel/im-contact"
+	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"golang.org/x/sync/errgroup"
 )

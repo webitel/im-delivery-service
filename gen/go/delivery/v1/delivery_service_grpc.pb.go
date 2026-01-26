@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: internal/delivery/v1/delivery_service.proto
+// source: gateway/v1/delivery/v1/delivery_service.proto
 
 package deliveryv1
 
@@ -134,5 +134,5 @@ var Delivery_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "internal/delivery/v1/delivery_service.proto",
+	Metadata: "gateway/v1/delivery/v1/delivery_service.proto",
 }

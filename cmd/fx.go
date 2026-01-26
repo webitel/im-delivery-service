@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"github.com/webitel/im-delivery-service/config"
-	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
+	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	amqpdi "github.com/webitel/im-delivery-service/internal/handler/amqp"
 	grpchandler "github.com/webitel/im-delivery-service/internal/handler/grpc"
-	"github.com/webitel/im-delivery-service/internal/service"
+	servicedi "github.com/webitel/im-delivery-service/internal/service/di"
 	"github.com/webitel/webitel-go-kit/infra/discovery"
 	"go.uber.org/fx"
 )
@@ -23,7 +23,7 @@ func NewApp(cfg *config.Config) *fx.App {
 		),
 		fx.Invoke(func(discovery discovery.DiscoveryProvider) error { return nil }),
 		webiteldi.Module,
-		service.Module,
+		servicedi.Module,
 		registry.Module,
 		grpchandler.Module,
 		grpcsrv.Module,

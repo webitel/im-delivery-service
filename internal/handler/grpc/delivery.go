@@ -20,24 +20,32 @@ const (
 type DeliveryService struct {
 	logger    *slog.Logger
 	deliverer service.Deliverer
+	auther    service.Auther
 	impb.UnimplementedDeliveryServer
 }
 
-func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *DeliveryService {
+func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer, auther service.Auther) *DeliveryService {
 	return &DeliveryService{
 		logger:    logger,
 		deliverer: deliverer,
+		auther:    auther,
 	}
 }
 
 // Stream manages the lifecycle of a long-lived HTTP/2 bidirectional/server-streaming session.
 func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
-	// [IDENTITY_RESOLVER]
-	// In production, this should be extracted from context metadata (JWT/OAuth2).
-	userID := uuid.MustParse("019bb6d7-8bb8-7a5c-b163-8cf8d362a474")
+	auth, err := d.auther.Inspect(stream.Context())
+	if err != nil {
+		return err
+	}
+
+	userID, err := uuid.Parse(auth.GetContact().GetId())
+	if err != nil {
+		return status.Error(codes.InvalidArgument, "invalid user id format")
+	}
 
 	l := d.logger.With(
-		slog.String("user_id", userID.String()),
+		slog.String("user_id", auth.GetContact().GetId()),
 		slog.String("version", serverVersion),
 	)
 

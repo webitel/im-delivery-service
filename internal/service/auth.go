@@ -14,7 +14,7 @@ var _ Auther = (*AuthService)(nil)
 
 // Auther defines the behavior for session validation.
 type Auther interface {
-	Inspect(ctx context.Context) (*model.AuthSession, error)
+	Inspect(ctx context.Context) (*model.AuthContact, error)
 }
 
 type AuthService struct {
@@ -26,7 +26,7 @@ func NewAuthService(client *imauth.Client) *AuthService {
 }
 
 // Inspect transparently redirects all incoming metadata to the auth service.
-func (s *AuthService) Inspect(ctx context.Context) (*model.AuthSession, error) {
+func (s *AuthService) Inspect(ctx context.Context) (*model.AuthContact, error) {
 	// [METADATA_EXTRACTION] Capture all incoming headers
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -44,7 +44,7 @@ func (s *AuthService) Inspect(ctx context.Context) (*model.AuthSession, error) {
 		return nil, fmt.Errorf("identity inspection failed: %w", err)
 	}
 
-	return &model.AuthSession{
+	return &model.AuthContact{
 		DC:        auth.Dc,
 		ContactID: auth.Contact.Id,
 		Sub:       auth.Contact.Sub,

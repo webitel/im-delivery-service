@@ -1,6 +1,6 @@
 package model
 
-type AuthSession struct {
+type AuthContact struct {
 	DC        int64
 	ContactID string
 	Sub       string

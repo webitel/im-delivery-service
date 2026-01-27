@@ -4,6 +4,7 @@ import (
 	"github.com/webitel/im-delivery-service/config"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
 	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
+	"github.com/webitel/im-delivery-service/infra/tls"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	amqpdi "github.com/webitel/im-delivery-service/internal/handler/amqp"
 	grpchandler "github.com/webitel/im-delivery-service/internal/handler/grpc"
@@ -22,6 +23,7 @@ func NewApp(cfg *config.Config) *fx.App {
 			ProvidePubSub,
 		),
 		fx.Invoke(func(discovery discovery.DiscoveryProvider) error { return nil }),
+		tls.Module,
 		webiteldi.Module,
 		servicedi.Module,
 		registry.Module,

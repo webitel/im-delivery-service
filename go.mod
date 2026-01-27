@@ -1,6 +1,6 @@
 module github.com/webitel/im-delivery-service
 
-go 1.25.6
+go 1.25.3
 
 require (
 	buf.build/go/protovalidate v1.1.0

@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Delivery_Stream_FullMethodName = "/webitel.im.internal.delivery.v1.Delivery/Stream"
+	Delivery_Stream_FullMethodName = "/webitel.im.gateway.delivery.v1.Delivery/Stream"
 )
 
 // DeliveryClient is the client API for Delivery service.
@@ -124,7 +124,7 @@ type Delivery_StreamServer = grpc.ServerStreamingServer[ServerEvent]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Delivery_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "webitel.im.internal.delivery.v1.Delivery",
+	ServiceName: "webitel.im.gateway.delivery.v1.Delivery",
 	HandlerType: (*DeliveryServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

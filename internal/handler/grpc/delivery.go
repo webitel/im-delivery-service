@@ -17,6 +17,8 @@ const (
 	serverVersion = "v1"
 )
 
+var _ impb.DeliveryServer = (*DeliveryService)(nil)
+
 type DeliveryService struct {
 	logger    *slog.Logger
 	deliverer service.Deliverer
@@ -39,13 +41,13 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		return err
 	}
 
-	userID, err := uuid.Parse(auth.GetContact().GetId())
+	userID, err := uuid.Parse(auth.ContactID)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, "invalid user id format")
 	}
 
 	l := d.logger.With(
-		slog.String("user_id", auth.GetContact().GetId()),
+		slog.String("user_id", auth.ContactID),
 		slog.String("version", serverVersion),
 	)
 

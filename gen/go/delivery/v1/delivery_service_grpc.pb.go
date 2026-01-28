@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: gateway/v1/delivery/v1/delivery_service.proto
+// source: api/delivery/v1/delivery_service.proto
 
 package deliveryv1
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Delivery_Stream_FullMethodName = "/webitel.im.gateway.delivery.v1.Delivery/Stream"
+	Delivery_Stream_FullMethodName = "/webitel.im.api.delivery.v1.Delivery/Stream"
 )
 
 // DeliveryClient is the client API for Delivery service.
@@ -124,7 +124,7 @@ type Delivery_StreamServer = grpc.ServerStreamingServer[ServerEvent]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Delivery_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "webitel.im.gateway.delivery.v1.Delivery",
+	ServiceName: "webitel.im.api.delivery.v1.Delivery",
 	HandlerType: (*DeliveryServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -134,5 +134,5 @@ var Delivery_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "gateway/v1/delivery/v1/delivery_service.proto",
+	Metadata: "api/delivery/v1/delivery_service.proto",
 }

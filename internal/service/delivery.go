@@ -11,6 +11,8 @@ import (
 type Deliverer interface {
 	Subscribe(ctx context.Context, userID uuid.UUID) (registry.Connector, error)
 	Unsubscribe(userID, connID uuid.UUID)
+	// [GRACEFUL_HUB_SHUTDOWN]
+	Close()
 }
 
 // [IMPLEMENTATION] PRIVATE TO ENFORCE INTERFACE USAGE
@@ -46,4 +48,8 @@ func (s *DeliveryService) Unsubscribe(userID, connID uuid.UUID) {
 	// Hub.Unregister will call conn.Close(), which resets the object
 	// and puts it back into model.connectPool.
 	s.hub.Unregister(userID, connID)
+}
+
+func (s *DeliveryService) Close() {
+	s.hub.Shutdown()
 }

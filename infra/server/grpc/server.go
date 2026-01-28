@@ -20,11 +20,18 @@ import (
 
 	"github.com/webitel/im-delivery-service/config"
 	"github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 var Module = fx.Module("grpc_server",
-	fx.Provide(func(conf *config.Config, logger *slog.Logger, lc fx.Lifecycle) (*Server, error) {
-		srv, err := New(conf.Service.Address, logger)
+	fx.Provide(func(
+		conf *config.Config,
+		logger *slog.Logger,
+		lc fx.Lifecycle,
+		auther service.Auther,
+		deliverer service.Deliverer,
+	) (*Server, error) {
+		srv, err := New(conf.Service.Address, logger, auther, deliverer)
 		if err != nil {
 			return nil, err
 		}
@@ -58,14 +65,16 @@ var Module = fx.Module("grpc_server",
 
 type Server struct {
 	*grpc.Server
-	Addr     string
-	host     string
-	port     int
-	log      *slog.Logger
-	listener net.Listener
+	Addr      string
+	host      string
+	port      int
+	log       *slog.Logger
+	listener  net.Listener
+	auther    service.Auther
+	deliverer service.Deliverer
 }
 
-func New(addr string, log *slog.Logger) (*Server, error) {
+func New(addr string, log *slog.Logger, auther service.Auther, deliverer service.Deliverer) (*Server, error) {
 	validator, err := protovalidate.New()
 	if err != nil {
 		return nil, err
@@ -128,6 +137,10 @@ func New(addr string, log *slog.Logger) (*Server, error) {
 			interceptors.NewUnaryAuthInterceptor(),
 			validatemiddleware.UnaryServerInterceptor(validator),
 		),
+
+		grpc.ChainStreamInterceptor(
+			interceptors.NewStreamAuthInterceptor(auther),
+		),
 	)
 
 	// [TRANSPORT_BINDING] TCP_SOCKET_INITIALIZATION
@@ -147,12 +160,14 @@ func New(addr string, log *slog.Logger) (*Server, error) {
 	}
 
 	return &Server{
-		Addr:     addr,
-		Server:   s,
-		log:      log,
-		host:     h,
-		port:     port,
-		listener: l,
+		Addr:      addr,
+		Server:    s,
+		log:       log,
+		host:      h,
+		port:      port,
+		listener:  l,
+		auther:    auther,
+		deliverer: deliverer,
 	}, nil
 }
 
@@ -165,12 +180,25 @@ func (s *Server) Listen() error {
 func (s *Server) Shutdown() error {
 	s.log.Debug("initiating graceful shutdown of grpc server")
 
-	// [SHUTDOWN_ORDER]
-	// 1. Close listener: Stop accepting new TCP connections immediately.
+	// [PHASE 1] APPLICATION-LEVEL DRAIN
+	// Signal the delivery hub to terminate all active sessions.
+	// This triggers a cascade: Hub -> Cell -> Connector.Close(), which closes the
+	// internal receive channels. Handlers detect the closed channel, send a final
+	// 'DisconnectedEvent' to the client, and exit the event loop gracefully.
+	if s.deliverer != nil {
+		s.deliverer.Close()
+	}
+
+	// [PHASE 2] TRANSPORT-LEVEL TERMINATION
+	// Stop accepting new TCP connections immediately by closing the listener.
 	err := s.listener.Close()
-	// 2. GracefulStop: Sends 'GOAWAY' frame to all HTTP/2 clients,
-	// allowing them to migrate to other server instances without error.
-	s.Server.GracefulStop()
+
+	// [PHASE 3] GRACEFUL PROTOCOL EXIT
+	// Send HTTP/2 'GOAWAY' frames to all connected clients. This informs them
+	// that the server is shutting down, allowing them to reconnect to another
+	// replica. It waits for all active RPC handlers to finish their cleanup
+	// (including the 'DisconnectedEvent' transmission) before stopping completely.
+	s.GracefulStop()
 
 	return err
 }

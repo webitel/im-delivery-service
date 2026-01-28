@@ -22,6 +22,7 @@ var (
 // This allows "Stateless Horizontal Scaling" where every node can check
 // hub.IsConnected(UserID) to decide if it should handle the delivery.
 type MessageV1Event struct {
+	ID       uuid.UUID
 	Message  *model.Message `json:"message"`
 	UserID   uuid.UUID      `json:"user_id"` // [PHYSICAL_RECIPIENT] Target user ID
 	DomainID int64          `json:"domain_id"`
@@ -38,13 +39,14 @@ func NewMessageV1Event(msg *model.Message, userID uuid.UUID, from, to model.Peer
 	msg.To = to
 
 	return &MessageV1Event{
+		ID:       uuid.New(),
 		Message:  msg,
 		UserID:   userID, // Used by the Hub to find the local WebSocket connection
 		DomainID: msg.DomainID,
 	}
 }
 
-func (e *MessageV1Event) GetID() string              { return e.Message.ID.String() }
+func (e *MessageV1Event) GetID() string              { return e.ID.String() }
 func (e *MessageV1Event) GetPayload() any            { return e.Message }
 func (e *MessageV1Event) GetUserID() uuid.UUID       { return e.UserID }
 func (e *MessageV1Event) GetOccurredAt() int64       { return e.Message.CreatedAt }

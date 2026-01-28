@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"golang.org/x/sys/cpu"
 )
 
 // Interface guard
@@ -30,10 +31,10 @@ const shardCount = 256
 type Hub struct {
 	// [CONCURRENCY_STRATEGY] Array of independent shards.
 	// Each shard handles a subset of users based on their UUID.
-	shards []*shard
-	config hubConfig
-	// [LIFECYCLE] Channel to signal the background janitor to stop.
-	stopCh chan struct{}
+	shards    []*shard
+	config    hubConfig
+	stopCh    chan struct{}
+	closeOnce sync.Once
 }
 
 type hubConfig struct {
@@ -47,6 +48,19 @@ type shard struct {
 	sync.RWMutex
 	// [REGISTRY] Map of UserID to their dedicated delivery Cell (Actor).
 	cells map[uuid.UUID]*Cell
+	// Modern CPUs load data into L1/L2 caches in fixed-size blocks (Cache Lines),
+	// typically 64 bytes. Without padding, multiple 'shard' instances would
+	// sit on the same line.
+	//
+	// When Core-1 acquires a Mutex on Shard-A, it marks the entire Cache Line
+	// as "modified". If Core-2 attempts to access Shard-B (even though it's
+	// a different object), its cache is invalidated, forcing a slow reload
+	// from L3 or RAM. This "False Sharing" can degrade performance by 10-50x
+	// on high-core systems.
+	//
+	// cpu.CacheLinePad ensures each shard has its own exclusive line, enabling
+	// true parallel execution without cross-core cache contention.
+	_ cpu.CacheLinePad
 }
 
 // NewHub initializes the registry with [SHARDED_LOCKING] and starts the evictor.
@@ -175,16 +189,39 @@ func (h *Hub) performEviction() {
 	}
 }
 
-// Shutdown ensures a [GRACEFUL_EXIT] by stopping all background actors.
+// Shutdown ensures a [GRACEFUL_EXIT] by stopping all background actors exactly once.
 func (h *Hub) Shutdown() {
-	close(h.stopCh)
-	for i := range shardCount {
-		s := h.shards[i]
-		s.Lock()
-		for _, cell := range s.cells {
-			cell.Stop()
+	// [IDEMPOTENCY_GUARANTEE]
+	// Use sync.Once to prevent 'panic: close of closed channel' if Shutdown is
+	// triggered multiple times (e.g., by both SIGTERM and Uber Fx lifecycle).
+	h.closeOnce.Do(func() {
+		// 1. [SIGNAL_TERMINATION]
+		// Broadcast closure to the background evictor goroutine.
+		close(h.stopCh)
+
+		// 2. [SHARD_DRAINING]
+		// Iterate through all shards to stop individual User Cells.
+		for i := range shardCount {
+			s := h.shards[i]
+
+			s.Lock()
+			for _, cell := range s.cells {
+				// [CASCADE_STOP]
+				// Each Cell will stop its event loop and close its connectors,
+				// triggering final delivery events to the clients.
+				cell.Stop()
+			}
+
+			// 3. [MEMORY_MANAGEMENT]
+			// Explicitly clear the map to release references and assist the
+			// Garbage Collector in reclaiming memory for high-density sessions.
+			s.cells = nil
+			s.Unlock()
 		}
-		s.cells = nil // Clear references for GC
-		s.Unlock()
-	}
+
+		slog.Info("HUB_SHUTDOWN_COMPLETE",
+			slog.Int("shards_processed", shardCount),
+			slog.String("status", "graceful_drain_finished"),
+		)
+	})
 }

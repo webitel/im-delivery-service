@@ -16,6 +16,7 @@ var (
 
 // MessageV2Event represents the enhanced V2 domain event
 type MessageV2Event struct {
+	ID      uuid.UUID
 	message *model.Message
 	userID  uuid.UUID
 	cached  any
@@ -26,12 +27,13 @@ func NewMessageV2Event(msg *model.Message, userID uuid.UUID, from, to model.Peer
 	msg.From = from
 	msg.To = to
 	return &MessageV2Event{
+		ID:      uuid.New(),
 		message: msg,
 		userID:  userID,
 	}
 }
 
-func (e *MessageV2Event) GetID() string              { return e.message.ID.String() }
+func (e *MessageV2Event) GetID() string              { return e.ID.String() }
 func (e *MessageV2Event) GetPayload() any            { return e.message }
 func (e *MessageV2Event) GetUserID() uuid.UUID       { return e.userID }
 func (e *MessageV2Event) GetOccurredAt() int64       { return e.message.CreatedAt }

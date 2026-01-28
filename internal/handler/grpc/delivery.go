@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
+	server "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
@@ -13,36 +14,27 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	serverVersion = "v1"
-)
-
 var _ impb.DeliveryServer = (*DeliveryService)(nil)
 
 type DeliveryService struct {
 	logger    *slog.Logger
 	deliverer service.Deliverer
-	auther    service.Auther
 	impb.UnimplementedDeliveryServer
 }
 
-func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer, auther service.Auther) *DeliveryService {
+func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *DeliveryService {
 	return &DeliveryService{
 		logger:    logger,
 		deliverer: deliverer,
-		auther:    auther,
 	}
 }
 
 // Stream manages the lifecycle of a long-lived HTTP/2 bidirectional/server-streaming session.
 func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
-	ctx := stream.Context()
-
-	// [AUTH_CHECK]
-	auth, err := d.auther.Inspect(ctx)
-	if err != nil {
-		d.logger.Warn("[AUTH] access denied", slog.Any("err", err))
-		return err
+	// [IDENTITY_EXTRACTION] Retrieve pre-validated contact from interceptor context
+	auth, ok := server.GetAuthContact(stream.Context())
+	if !ok {
+		return status.Error(codes.Unauthenticated, "authentication context missing")
 	}
 
 	userID, err := uuid.Parse(auth.ContactID)
@@ -60,12 +52,12 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		slog.String("session_id", uuid.NewString()),
 	)
 
-	l.Info("[STREAM] incoming connection request", slog.String("version", serverVersion))
+	l.Info("[STREAM] incoming connection request", slog.String("version", model.ServerVersion))
 
 	// [ACTOR_ATTACHMENT]
 	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).
 	// This ensures all events routed to the Hub for this UserID will reach this stream.
-	conn, err := d.deliverer.Subscribe(ctx, userID)
+	conn, err := d.deliverer.Subscribe(stream.Context(), userID)
 	if err != nil {
 		l.Error("[HUB] subscription rejected", slog.Any("err", err))
 		return status.Error(codes.Internal, "failed to establish connection session")
@@ -88,7 +80,7 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
 		Ok:            true,
 		ConnectionID:  conn.GetID().String(),
-		ServerVersion: serverVersion,
+		ServerVersion: model.ServerVersion,
 	})
 
 	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcomeEv)); err != nil {
@@ -100,17 +92,26 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	// Main delivery loop that bridges the internal Actor mailbox with the gRPC stream.
 	for {
 		select {
-		case <-ctx.Done():
+		case <-stream.Context().Done():
 			// [GHOST_CLEANUP]
 			// Triggers on client disconnect, timeout, or KeepAlive failure.
-			l.Info("[STREAM] client terminated connection", slog.Any("reason", ctx.Err()))
+			l.Info("[STREAM] client terminated connection", slog.Any("reason", stream.Context().Err()))
 			return nil
 
 		case ev, ok := <-conn.Recv():
 			if !ok {
-				// [BACKPRESSURE_SIGNAL]
-				// Internal channel closed by the Hub (e.g., during forceful eviction).
-				l.Warn("[HUB] mailbox closed, forcing disconnect")
+				// [TERMINATION_SENTINEL]
+				// Before returning the gRPC error, we push a final System Event to the wire.
+				l.Warn("[HUB] mailbox closed, sending termination event")
+
+				terminationEv := event.NewSystemEvent(userID, event.Disconnected, event.PriorityHigh, &model.DisconnectedPayload{
+					Reason: "session_closed_by_server",
+				})
+
+				// Send the "goodbye" message. We ignore the error here because if the
+				// transport is already failing, we just proceed to return the status.
+				_ = stream.Send(grpcmarshaller.MarshallDeliveryEvent(terminationEv))
+
 				return status.Error(codes.Unavailable, "session_terminated_by_server")
 			}
 

@@ -13,7 +13,6 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 
 	return &impb.ServerEvent_MessageEvent{
 		MessageEvent: &impb.NewMessageEvent{
-			Id:      m.ID.String(),
 			Message: mapThreadMessage(m),
 		},
 	}

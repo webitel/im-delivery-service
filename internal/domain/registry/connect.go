@@ -33,19 +33,16 @@ type ConnectMetadata struct {
 
 // [CONNECT] CONCRETE IMPLEMENTATION (UNEXPORTED TO FORCE INTERFACE USAGE)
 type connect struct {
-	id        uuid.UUID
-	userID    uuid.UUID
-	metadata  ConnectMetadata
-	createdAt time.Time
-
-	ctx      context.Context
-	cancelFn context.CancelFunc
-
-	sendCh chan event.Eventer
-
-	// [ATOMIC_FIELDS] Optimized for lock-free performance
-	lastActivityAt int64
-	droppedCount   uint64
+	id             uuid.UUID
+	userID         uuid.UUID
+	metadata       ConnectMetadata
+	createdAt      time.Time
+	ctx            context.Context
+	cancelFn       context.CancelFunc
+	sendCh         chan event.Eventer
+	closeOnce      sync.Once // [PROTECTION]
+	lastActivityAt int64     // [ATOMIC_FIELD]
+	droppedCount   uint64    // [ATOMIC_FIELD]
 }
 
 // [POOL] SYNC.POOL FOR OBJECT REUSE (REDUCES GC PRESSURE)
@@ -57,23 +54,32 @@ var connectPool = sync.Pool{
 
 // [NEW_CONNECTOR] FACTORY FUNCTION USING POOLING
 func NewConnector(ctx context.Context, userID uuid.UUID, bufferSize int) Connector {
-	// Acquire from pool
 	c := connectPool.Get().(*connect)
 
-	childCtx, cancel := context.WithCancel(ctx)
-
-	// Re-initialize fields
-	c.id = uuid.New()
-	c.userID = userID
-	c.createdAt = time.Now()
-	c.ctx = childCtx
-	c.cancelFn = cancel
-	c.sendCh = make(chan event.Eventer, bufferSize)
-
-	atomic.StoreInt64(&c.lastActivityAt, time.Now().UnixNano())
-	atomic.StoreUint64(&c.droppedCount, 0)
+	// [INITIALIZATION]
+	// Delegate state setup to the reset method to ensure a clean slate.
+	c.reset(ctx, userID, bufferSize)
 
 	return c
+}
+
+// reset re-initializes the connector's internal state using a struct literal.
+// This is the cleanest way to wipe 'stale' data from pooled objects and reset the sync.Once guard.
+func (c *connect) reset(ctx context.Context, userID uuid.UUID, bufferSize int) {
+	childCtx, cancel := context.WithCancel(ctx)
+
+	// [BLANK_SLATE_ASSIGNMENT]
+	// By reassigning the pointer's value to a new literal, we ensure all fields,
+	// including metadata and counters, are reset to their zero-values or defaults.
+	*c = connect{
+		id:             uuid.New(),
+		userID:         userID,
+		createdAt:      time.Now(),
+		ctx:            childCtx,
+		cancelFn:       cancel,
+		sendCh:         make(chan event.Eventer, bufferSize),
+		lastActivityAt: time.Now().UnixNano(),
+	}
 }
 
 // --- IMPLEMENTATION OF CONNECTOR INTERFACE ---
@@ -84,13 +90,26 @@ func (c *connect) GetUserID() uuid.UUID { return c.userID }
 // Send attempts to push an event into the channel.
 // If the channel is full, it tries to evict lower priority events to make room.
 func (c *connect) Send(ev event.Eventer, timeout time.Duration) bool {
+	// [RESOURCE_MANAGEMENT] Create a localized context to enforce a strict delivery window.
+	// This ensures that the User Cell is not held hostage by a single stalled session.
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	select {
+	// 1. [LIFECYCLE_GATE] Immediately abort if the underlying transport is already dead.
 	case <-c.ctx.Done():
 		return false
+
+	// 2. [PRIMARY_DELIVERY] Attempt to enqueue the event into the session's mailbox.
+	// Unlike a 'default' block, this will wait up to 'timeout' for space to become available,
+	// which smooths out transient network jitter.
 	case c.sendCh <- ev:
 		return true
-	default:
-		// Channel is full, initiate smart eviction strategy
+
+	// 3. [BACKPRESSURE_THRESHOLD] Triggered if the buffer remains saturated for the entire duration.
+	// This indicates a persistent slow consumer or network congestion.
+	case <-ctx.Done():
+		// Initiate smart eviction or shedding logic to preserve system throughput.
 		return c.handleBackpressure(ev, timeout)
 	}
 }
@@ -128,13 +147,29 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 
 func (c *connect) Recv() <-chan event.Eventer { return c.sendCh }
 
-// [CLOSE] RELEASES THE OBJECT BACK TO THE POOL
+// Close terminates the session, triggers cleanup, and recycles the object.
 func (c *connect) Close() {
-	c.cancelFn()
+	// [IDEMPOTENCY_SHIELD]
+	// Ensures the teardown logic runs exactly once. This prevents "panic: close of closed channel"
+	// and double-entry corruption of the sync.Pool when called concurrently
+	// by the Hub (shutdown), Cell (eviction), or gRPC handler (defer).
+	c.closeOnce.Do(func() {
+		// 1. [SIGNAL_ABORT] Immediately cancel the context to stop any pending Send operations.
+		c.cancelFn()
 
-	// Reset pointers to prevent memory leaks while in pool
-	c.sendCh = nil
-	c.metadata = ConnectMetadata{}
+		// 2. [UPSTREAM_NOTIFY] Closing the channel signals the gRPC stream handler (via !ok)
+		// to send a final 'Disconnected' event and exit the loop gracefully.
+		if c.sendCh != nil {
+			close(c.sendCh)
+		}
 
-	connectPool.Put(c)
+		// 3. [MEMORY_SANITIZATION]
+		// Zero out references to prevent memory leaks while the object is idle in the pool.
+		// This ensures the next user of this pooled object starts with a clean slate.
+		c.sendCh = nil
+		c.metadata = ConnectMetadata{}
+
+		// 4. [RESOURCE_RECYCLING] Return the sanitized structure to reduce GC allocation pressure.
+		connectPool.Put(c)
+	})
 }

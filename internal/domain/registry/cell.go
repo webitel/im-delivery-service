@@ -127,32 +127,49 @@ func (c *Cell) loop() {
 		case <-c.doneCh:
 			return
 		case ev := <-c.mailbox:
+			// [STRATEGY: BATCH_DRAINING]
+			// Once awakened, don't return to the expensive 'select' immediately.
+			// Tight loop to drain pending events reduces scheduler overhead.
 			c.deliver(ev)
+
+			// Attempt to drain up to 64 events in one go to smooth out bursts.
+			// This number is a sweet spot between latency and CPU fairness.
+			for range 64 {
+				select {
+				case nextEv := <-c.mailbox:
+					c.deliver(nextEv)
+				default:
+					// Mailbox empty, go back to wait
+					goto wait
+				}
+			}
+		wait:
 		}
 	}
 }
 
-// deliver broadcasts events to all active sessions of the user
+// deliver broadcasts events to all active sessions of the user.
 func (c *Cell) deliver(ev event.Eventer) {
-	// [STRATEGY] Snapshot sessions under RLock to minimize lock holding time
-	// during potentially slow network I/O
 	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if len(c.sessions) == 0 {
-		c.mu.RUnlock()
 		return
 	}
-	conns := make([]Connector, 0, len(c.sessions))
-	for _, conn := range c.sessions {
-		conns = append(conns, conn)
-	}
-	c.mu.RUnlock()
 
-	for _, conn := range conns {
-		// [RELIABILITY] Use a strict timeout to prevent slow streams from hanging the Actor
+	for _, conn := range c.sessions {
+		// Strict 250ms window. If a connection is slow, it won't kill the Actor loop.
 		conn.Send(ev, time.Millisecond*250)
 	}
 }
 
 func (c *Cell) Stop() {
 	close(c.doneCh)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for id, conn := range c.sessions {
+		conn.Close()
+		delete(c.sessions, id)
+	}
 }

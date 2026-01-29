@@ -6,7 +6,10 @@ managed:
     # merging 'internal' and 'shared' protos into one directory.
     - file_option: go_package
       value: github.com/webitel/protos/gen/go/im/contact/v1;contact
-
+  disable:
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/bufbuild/protovalidate
+    - module: buf.build/grpc-ecosystem/grpc-gateway
 plugins:
   # Standard Go Protobuf generator
   - remote: buf.build/protocolbuffers/go:v1.34.1

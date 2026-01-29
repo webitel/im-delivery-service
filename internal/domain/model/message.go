@@ -30,5 +30,6 @@ type (
 		ID       string `json:"id"`
 		FileName string `json:"file_name"`
 		MimeType string `json:"mime_type"`
+		URL      string `json:"url"`
 	}
 )

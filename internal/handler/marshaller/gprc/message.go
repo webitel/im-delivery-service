@@ -40,6 +40,7 @@ func mapThreadMessage(m *model.Message) *impb.ThreadMessage {
 				Id:       img.ID,
 				FileName: img.FileName,
 				MimeType: img.MimeType,
+				Url:      img.URL,
 			},
 		}
 	case len(m.Documents) > 0:

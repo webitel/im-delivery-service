@@ -52,6 +52,7 @@ func (d *MessageV1) mapImages() []*model.Image {
 			ID:       strconv.FormatInt(img.FileID, 10),
 			FileName: img.Name,
 			MimeType: img.Mime,
+			URL:      img.URL,
 		})
 	}
 	return res
@@ -74,6 +75,7 @@ type ImageDTO struct {
 	FileID int64  `json:"file_id"`
 	Mime   string `json:"mime"`
 	Name   string `json:"name"`
+	URL    string `json:"url"`
 }
 
 type DocumentDTO struct {

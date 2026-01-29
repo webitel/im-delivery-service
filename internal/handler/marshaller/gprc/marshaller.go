@@ -29,6 +29,8 @@ func MarshallDeliveryEvent(ev event.Eventer) *impb.ServerEvent {
 		res.Payload = marshalMessagePayload(p)
 	case *model.ConnectedPayload:
 		res.Payload = marshalConnectedPayload(p)
+	case *model.DisconnectedPayload:
+		res.Payload = marshalDisconnectedPayload(p)
 	}
 
 	// 4. [CACHE] Save the result back.

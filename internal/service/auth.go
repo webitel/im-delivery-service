@@ -6,6 +6,7 @@ import (
 
 	authv1 "github.com/webitel/im-delivery-service/gen/go/auth/v1"
 	imauth "github.com/webitel/im-delivery-service/infra/client/im-auth"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -13,7 +14,7 @@ var _ Auther = (*AuthService)(nil)
 
 // Auther defines the behavior for session validation.
 type Auther interface {
-	Inspect(ctx context.Context) (*authv1.Authorization, error)
+	Inspect(ctx context.Context) (*model.AuthContact, error)
 }
 
 type AuthService struct {
@@ -25,7 +26,7 @@ func NewAuthService(client *imauth.Client) *AuthService {
 }
 
 // Inspect transparently redirects all incoming metadata to the auth service.
-func (s *AuthService) Inspect(ctx context.Context) (*authv1.Authorization, error) {
+func (s *AuthService) Inspect(ctx context.Context) (*model.AuthContact, error) {
 	// [METADATA_EXTRACTION] Capture all incoming headers
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -43,5 +44,11 @@ func (s *AuthService) Inspect(ctx context.Context) (*authv1.Authorization, error
 		return nil, fmt.Errorf("identity inspection failed: %w", err)
 	}
 
-	return auth, nil
+	return &model.AuthContact{
+		DC:        auth.Dc,
+		ContactID: auth.Contact.Id,
+		Sub:       auth.Contact.Sub,
+		Iss:       auth.Contact.Iss,
+		Name:      auth.Contact.Name,
+	}, nil
 }

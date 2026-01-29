@@ -18,3 +18,16 @@ func marshalConnectedPayload(p *model.ConnectedPayload) *impb.ServerEvent_Connec
 		},
 	}
 }
+
+// marshalDisconnectedPayload maps system closure notification to PB.
+func marshalDisconnectedPayload(p *model.DisconnectedPayload) *impb.ServerEvent_DisconnectedEvent {
+	if p == nil {
+		return nil
+	}
+	return &impb.ServerEvent_DisconnectedEvent{
+		DisconnectedEvent: &impb.DisconnectedEvent{
+			Reason: p.Reason,
+			Code:   p.Code, // ensure 'code' field exists in your .proto file
+		},
+	}
+}

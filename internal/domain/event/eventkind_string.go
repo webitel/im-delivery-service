@@ -9,12 +9,13 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[Connected-1]
-	_ = x[MessageCreated-2]
+	_ = x[Disconnected-2]
+	_ = x[MessageCreated-3]
 }
 
-const _EventKind_name = "ConnectedMessageCreated"
+const _EventKind_name = "ConnectedDisconnectedMessageCreated"
 
-var _EventKind_index = [...]uint8{0, 9, 23}
+var _EventKind_index = [...]uint8{0, 9, 21, 35}
 
 func (i EventKind) String() string {
 	i -= 1

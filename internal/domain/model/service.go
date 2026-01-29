@@ -5,6 +5,12 @@ import (
 	"runtime"
 )
 
+// Server Identity constants
+
+const (
+	ServerVersion = "v1"
+)
+
 // Service identity constants
 const (
 	ServiceName      = "im-delivery-service"

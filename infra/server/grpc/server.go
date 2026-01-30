@@ -1,4 +1,4 @@
-package server
+package grpcsrv
 
 import (
 	"context"
@@ -11,16 +11,14 @@ import (
 
 	"buf.build/go/protovalidate"
 	validatemiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
+	"github.com/webitel/im-delivery-service/config"
+	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
+	"github.com/webitel/im-delivery-service/internal/service"
+	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-
-	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
-
-	"github.com/webitel/im-delivery-service/config"
-	"github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
-	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 var Module = fx.Module("grpc_server",
@@ -134,12 +132,12 @@ func New(addr string, log *slog.Logger, auther service.Auther, deliverer service
 		// Sequence: Error Handling -> Authentication -> Validation.
 		grpc.ChainUnaryInterceptor(
 			intrcp.UnaryServerErrorInterceptor(),
-			interceptors.NewUnaryAuthInterceptor(),
+			grpcinterceptors.NewUnaryAuthInterceptor(),
 			validatemiddleware.UnaryServerInterceptor(validator),
 		),
 
 		grpc.ChainStreamInterceptor(
-			interceptors.NewStreamAuthInterceptor(auther),
+			grpcinterceptors.NewStreamAuthInterceptor(auther),
 		),
 	)
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
-	server "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
+	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
@@ -32,7 +32,7 @@ func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *Deliv
 // Stream manages the lifecycle of a long-lived HTTP/2 bidirectional/server-streaming session.
 func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
 	// [IDENTITY_EXTRACTION] Retrieve pre-validated contact from interceptor context
-	auth, ok := server.GetAuthContact(stream.Context())
+	auth, ok := grpcinterceptors.GetAuthContact(stream.Context())
 	if !ok {
 		return status.Error(codes.Unauthenticated, "authentication context missing")
 	}

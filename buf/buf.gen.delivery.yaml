@@ -5,7 +5,7 @@ managed:
     # Forces all generated files into a single Go package, 
     # merging 'internal' and 'shared' protos into one directory.
     - file_option: go_package
-      value: github.com/webitel/protos/gen/go/im/delivery/v1;deliveryv1
+      value: github.com/webitel/im-delivery-service/gen/go/delivery/v1;deliveryv1
   disable:
     - module: buf.build/googleapis/googleapis
     - module: buf.build/bufbuild/protovalidate
@@ -18,13 +18,13 @@ plugins:
     opt:
       # 'module' tells Buf to strip this prefix from the output path,
       # ensuring files land in delivery/v1/ instead of a deep nested path.
-      - module=github.com/webitel/protos/gen/go/im
+      - module=github.com/webitel/im-delivery-service/gen/go
   
   # gRPC Go generator
   - remote: buf.build/grpc/go:v1.5.1
     out: ../gen/go
     opt:
-      - module=github.com/webitel/protos/gen/go/im
+      - module=github.com/webitel/im-delivery-service/gen/go
 
 inputs:
   # The relative path to the source proto files

@@ -38,12 +38,6 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 			return nil // ACK: Invalid routing is a terminal state.
 		}
 
-		// [LOCALITY_FILTER]
-		// Distributed scaling: process only if the target user is connected to THIS node.
-		if !h.hub.IsConnected(userID) {
-			return nil // ACK: Handled by another instance.
-		}
-
 		// [DECODING]
 		payload := new(T)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
@@ -62,9 +56,11 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 			return nil
 		}
 
-		// [FAN_OUT_DISPATCH]
-		// 1. Local delivery (WebSockets/gRPC).
-		h.hub.Broadcast(ev)
+		// 1. Local delivery: Only if the user has an active stream on THIS node.
+		if h.hub.IsConnected(userID) {
+			h.hub.Broadcast(ev)
+			h.logger.Debug("LOCAL_DISPATCH_SUCCESS", "user_id", userID)
+		}
 
 		// 2. Global delivery (RabbitMQ) for multi-node synchronization.
 		if _, ok := ev.(event.Exportable); ok {

@@ -22,6 +22,7 @@ type Config struct {
 type ServiceConfig struct {
 	ID         string           `mapstructure:"id"`
 	Address    string           `mapstructure:"addr"`
+	HTTPAddr   string           `mapstructure:"http_addr"`
 	Connection ConnectionConfig `mapstructure:"conn"`
 }
 
@@ -123,6 +124,7 @@ func defineFlags() {
 
 	pflag.String("service.id", "", "Service ID")
 	pflag.String("service.addr", "localhost:8080", "Service address")
+	pflag.String("service.http_addr", ":8081", "HTTP/WS service address")
 
 	pflag.String("log.level", "info", "Log level")
 	pflag.Bool("log.json", false, "Log in JSON format")

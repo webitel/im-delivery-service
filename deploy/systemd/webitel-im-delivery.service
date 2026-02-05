@@ -15,6 +15,7 @@ Group=webitel
 # Environment=CONFIG_FILE=
 Environment=SERVICE_SECRET=
 Environment=SERVICE_ADDR=127.0.0.1:10053
+Environment=SERVICE_HTTP_ADDR=127.0.0.1:8081
 
 # Required if SERVICE_CONN_VERIFY_CERTS=true
 # Environment=SERVICE_CONN_CA=

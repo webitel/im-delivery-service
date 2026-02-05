@@ -13,11 +13,13 @@ import (
 	validatemiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
 	"github.com/webitel/im-delivery-service/config"
 	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
+	"github.com/webitel/im-delivery-service/infra/tls"
 	"github.com/webitel/im-delivery-service/internal/service"
 	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 )
 
@@ -28,8 +30,9 @@ var Module = fx.Module("grpc_server",
 		lc fx.Lifecycle,
 		auther service.Auther,
 		deliverer service.Deliverer,
+		tls *tls.Config,
 	) (*Server, error) {
-		srv, err := New(conf.Service.Address, logger, auther, deliverer)
+		srv, err := New(conf.Service.Address, logger, auther, tls, deliverer)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +75,7 @@ type Server struct {
 	deliverer service.Deliverer
 }
 
-func New(addr string, log *slog.Logger, auther service.Auther, deliverer service.Deliverer) (*Server, error) {
+func New(addr string, log *slog.Logger, auther service.Auther, tls *tls.Config, deliverer service.Deliverer) (*Server, error) {
 	validator, err := protovalidate.New()
 	if err != nil {
 		return nil, err
@@ -139,6 +142,8 @@ func New(addr string, log *slog.Logger, auther service.Auther, deliverer service
 		grpc.ChainStreamInterceptor(
 			grpcinterceptors.NewStreamAuthInterceptor(auther),
 		),
+
+		grpc.Creds(credentials.NewTLS(tls.Server)),
 	)
 
 	// [TRANSPORT_BINDING] TCP_SOCKET_INITIALIZATION

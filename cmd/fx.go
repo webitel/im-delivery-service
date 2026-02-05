@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/webitel/im-delivery-service/config"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
+	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
 	httpsrv "github.com/webitel/im-delivery-service/infra/server/http"
 	"github.com/webitel/im-delivery-service/infra/tls"
@@ -46,5 +47,9 @@ func NewApp(cfg *config.Config) *fx.App {
 		// [SERVERS] Protocol-specific server listeners
 		grpcsrv.Module, // gRPC server lifecycle (port listening)
 		httpsrv.Module, // HTTP/WS server lifecycle (port listening)
+
+		// [DISTRIBUTED_CONSENSUS] Orchestrates leadership state to ensure
+		// strictly single-active-node publishing to the message broker.
+		leader.Module,
 	)
 }

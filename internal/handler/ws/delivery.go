@@ -1,70 +1,194 @@
 package ws
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	wsmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/ws"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
+const (
+	// [CONFIG] Time allowed to write a message to the peer.
+	writeWait = 10 * time.Second
+	// [CONFIG] Time allowed to read the next pong message from the peer.
+	pongWait = 60 * time.Second
+	// [CONFIG] Send pings to peer with this period. Must be less than pongWait.
+	pingPeriod = (pongWait * 9) / 10
+	// [CONFIG] Maximum message size allowed from peer.
+	maxMessageSize = 512
+)
+
+// [INTERFACE_GUARD] Ensure WSHandler implements http.Handler interface
+var _ http.Handler = (*WSHandler)(nil)
+
 type WSHandler struct {
 	logger    *slog.Logger
 	deliverer service.Deliverer
+	auther    service.Auther
 	upgrader  websocket.Upgrader
 }
 
-func NewWSHandler(logger *slog.Logger, deliverer service.Deliverer) *WSHandler {
+func NewWSHandler(logger *slog.Logger, deliverer service.Deliverer, auther service.Auther) *WSHandler {
 	return &WSHandler{
 		logger:    logger,
 		deliverer: deliverer,
+		auther:    auther,
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true }, // Security: adjust for production
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			// [SECURITY] Allow all origins for development; tighten for production
+			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 	}
 }
 
+// ServeHTTP manages the WebSocket handshake, authentication, and session orchestration.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// 1. EXTRACT USER ID (In production: from JWT/Cookie)
-	userID := uuid.MustParse("019bb6d7-8bb8-7a5c-b163-8cf8d362a474")
-
-	// 2. UPGRADE TO WEBSOCKET
-	ws, err := h.upgrader.Upgrade(w, r, nil)
+	// [IDENTITY_EXTRACTION] Retrieve and validate identity from metadata-enriched context
+	auth, err := h.auther.Inspect(r.Context())
 	if err != nil {
-		h.logger.Error("ws upgrade failed", "error", err)
+		h.logger.Warn("WS_AUTH_DENIED", slog.Any("err", err))
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	defer ws.Close()
 
-	// 3. SUBSCRIBE VIA THE SAME SERVICE
-	conn, err := h.deliverer.Subscribe(r.Context(), userID)
+	userID, err := uuid.Parse(auth.ContactID)
 	if err != nil {
+		h.logger.Error("WS_INVALID_USER_ID", slog.String("contact_id", auth.ContactID))
+		http.Error(w, "Invalid Identity", http.StatusBadRequest)
 		return
 	}
-	defer h.deliverer.Unsubscribe(userID, conn.GetID())
 
-	h.logger.Info("ws opened", "user_id", userID, "conn_id", conn.GetID())
+	// [UPGRADE] Protocol switch from HTTP/1.1 to WebSocket
+	conn, err := h.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		h.logger.Error("WS_UPGRADE_FAILED", slog.Any("err", err))
+		return
+	}
 
-	// 4. MAIN WS PUMP LOOP
+	// [ACTOR_ATTACHMENT] Link this socket to the User's delivery hub
+	sub, err := h.deliverer.Subscribe(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("WS_SUBSCRIPTION_FAILED", slog.String("user", userID.String()))
+		_ = conn.WriteMessage(websocket.CloseMessage, []byte("internal_server_error"))
+		conn.Close()
+		return
+	}
+
+	log := h.logger.With(
+		slog.String("user_id", userID.String()),
+		slog.String("conn_id", sub.GetID().String()),
+	)
+
+	// [LIFECYCLE_MANAGEMENT] Ensure resources are reclaimed on connection loss
+	ctx, cancel := context.WithCancel(r.Context())
+	defer func() {
+		// [TERMINATION_SENTINEL] Attempt to push a final Disconnected event
+		terminationEv := event.NewSystemEvent(userID, event.Disconnected, event.PriorityHigh, &model.DisconnectedPayload{
+			Reason: "session_terminated",
+		})
+
+		if data, err := wsmarshaller.MarshallDeliveryEvent(terminationEv); err == nil {
+			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = conn.WriteMessage(websocket.TextMessage, data)
+		}
+
+		cancel()
+		h.deliverer.Unsubscribe(userID, sub.GetID())
+		conn.Close()
+		log.Info("WS_SESSION_TERMINATED")
+	}()
+
+	log.Info("WS_SESSION_ESTABLISHED")
+
+	// [WELCOME_HANDSHAKE] Synchronously send the connection metadata to the client
+	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
+		Ok:            true,
+		ConnectionID:  sub.GetID().String(),
+		ServerVersion: model.ServerVersion,
+	})
+
+	if data, err := wsmarshaller.MarshallDeliveryEvent(welcomeEv); err == nil {
+		_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			log.Error("WS_WELCOME_SEND_FAILED", slog.Any("err", err))
+			return
+		}
+	}
+
+	// [CONCURRENCY] Spin up the I/O pumps
+	go h.readPump(ctx, conn, log)
+	h.writePump(ctx, conn, sub, log)
+}
+
+// readPump maintains connection health by consuming control frames and heartbeats.
+func (h *WSHandler) readPump(ctx context.Context, conn *websocket.Conn, log *slog.Logger) {
+	conn.SetReadLimit(maxMessageSize)
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+
+	// [HEARTBEAT] Reset read deadline upon receiving a Pong from the client
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
 		select {
-		case <-r.Context().Done():
+		case <-ctx.Done():
 			return
-		case ev, ok := <-conn.Recv():
+		default:
+			// [DRAIN] Continuously read messages to process control frames (Ping/Pong/Close)
+			if _, _, err := conn.NextReader(); err != nil {
+				return
+			}
+		}
+	}
+}
+
+// writePump handles event dispatching from the internal hub to the WebSocket peer.
+func (h *WSHandler) writePump(ctx context.Context, conn *websocket.Conn, sub registry.Connector, log *slog.Logger) {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// [SHUTDOWN] Graceful WebSocket closure sequence
+			msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "server_shutdown")
+			_ = conn.WriteControl(websocket.CloseMessage, msg, time.Now().Add(writeWait))
+			return
+
+		case ev, ok := <-sub.Recv():
 			if !ok {
 				return
 			}
 
+			// [SERIALIZATION] Convert domain event to wire-ready JSON
 			data, err := wsmarshaller.MarshallDeliveryEvent(ev)
 			if err != nil {
-				h.logger.Error("failed to marshal ws event", "error", err)
+				log.Error("WS_MARSHALL_FAILED", slog.Any("err", err))
 				continue
 			}
 
-			if err := ws.WriteMessage(websocket.TextMessage, data); err != nil {
-				h.logger.Warn("ws send failed", "error", err)
+			// [TRANSMISSION] Push the data message to the peer
+			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Error("WS_WRITE_FAILED", slog.Any("err", err))
+				return
+			}
+
+		case <-ticker.C:
+			// [KEEP_ALIVE] Proactively send Pings to keep the connection alive through proxies
+			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}

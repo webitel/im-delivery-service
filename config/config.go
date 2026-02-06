@@ -20,8 +20,9 @@ type Config struct {
 }
 
 type ServiceConfig struct {
-	Id         string           `mapstructure:"id"`
+	ID         string           `mapstructure:"id"`
 	Address    string           `mapstructure:"addr"`
+	HTTPAddr   string           `mapstructure:"http_addr"`
 	Connection ConnectionConfig `mapstructure:"conn"`
 }
 
@@ -129,6 +130,7 @@ func defineFlags() {
 	pflag.String("service.conn.client.ca", "", "Client CA certificate path")
 	pflag.String("service.conn.client.key", "", "Client certificate key path")
 	pflag.String("service.conn.client.cert", "", "Client certificate path")
+	pflag.String("service.http_addr", ":8081", "HTTP/WS service address")
 
 	pflag.String("log.level", "info", "Log level")
 	pflag.Bool("log.json", false, "Log in JSON format")
@@ -149,7 +151,7 @@ func defineFlags() {
 }
 
 func (c *Config) validate() error {
-	if c.Service.Id == "" {
+	if c.Service.ID == "" {
 		return fmt.Errorf("config: service.id is required (use --service.id or SERVICE_ID env)")
 	}
 

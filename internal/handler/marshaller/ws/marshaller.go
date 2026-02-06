@@ -5,46 +5,56 @@ import (
 
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 )
 
-// WSEvent is a generic wrapper for WebSocket messages to provide consistent structure.
-type WSEvent struct {
-	Event   string `json:"event"`   // [TYPE] e.g., "message_created", "connected", "disconnected"
-	ID      string `json:"id"`      // [IDENTITY] Unique event ID
-	SentAt  int64  `json:"sent_at"` // [TIMESTAMP] Unix milliseconds
-	Payload any    `json:"payload"` // [DATA] Specific event content
-}
+// [INTERFACE_GUARD] Ensure Marshaller implements the global interface.
+var _ marshaller.EventMarshaller = (*Marshaller)(nil)
 
-// MarshallDeliveryEvent prepares data for WebSocket transmission using JSON.
-func MarshallDeliveryEvent(ev event.Eventer) ([]byte, error) {
-	// [INITIALIZATION] Create the base envelope
-	res := &WSEvent{
-		ID:     ev.GetID(),
-		SentAt: ev.GetOccurredAt(),
+type Marshaller struct{}
+
+func New() *Marshaller { return &Marshaller{} }
+
+// Marshal transforms a domain event into JSON bytes, utilizing cache if available.
+func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
+	// 1. [PERFORMANCE] Check if this event was already marshaled for WS.
+	// Since different protocols (WS vs gRPC) have different binary outputs,
+	// we should ideally use a protocol-specific cache key or check the type.
+	if cached := ev.GetCached(); cached != nil {
+		if data, ok := cached.([]byte); ok {
+			return data, nil
+		}
 	}
 
-	// [PAYLOAD_MAPPING] Route domain models to JSON-friendly structures
+	// 2. [ENVELOPE] Initialize the transport-specific structure.
+	res := &ServerEvent{
+		ID:        ev.GetID(),
+		CreatedAt: ev.GetOccurredAt(),
+		Priority:  PriorityHigh, // Or map from ev.GetPriority()
+		Payload:   make(map[string]any),
+	}
+
+	// 3. [STRATEGY] Map domain payload to transport schema.
 	switch p := ev.GetPayload().(type) {
-
 	case *model.Message:
-		res.Event = "message_created"
-		res.Payload = mapMessage(p)
-
+		res.Payload[EventMessage] = mapMessage(p)
 	case *model.ConnectedPayload:
-		// [SYSTEM_EVENT] Handshake success
-		res.Event = "connected"
-		res.Payload = p
-
+		res.Payload[EventConnected] = p
 	case *model.DisconnectedPayload:
-		// [SYSTEM_EVENT] Termination notice
-		res.Event = "disconnected"
-		res.Payload = p
-
+		res.Payload[EventDisconnected] = p
 	default:
-		// [FALLBACK] Use the event's own kind string if not explicitly mapped
-		res.Event = ev.GetKind().String()
-		res.Payload = p
+		// Fallback for system or unknown events.
+		res.Payload[ev.GetKind().String()] = p
 	}
 
-	return json.Marshal(res)
+	// 4. [SERIALIZATION] Convert to JSON bytes.
+	data, err := json.Marshal(res)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. [CACHE] Store the serialized JSON for reuse by other concurrent WS streams.
+	ev.SetCached(data)
+
+	return data, nil
 }

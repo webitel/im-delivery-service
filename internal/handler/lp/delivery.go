@@ -1,59 +1,67 @@
 package lp
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 type LPHandler struct {
-	deliverer service.Deliverer
+	logger     *slog.Logger
+	deliverer  service.Deliverer
+	marshaller marshaller.BatchMarshaller
 }
 
-func NewLPHandler(deliverer service.Deliverer) *LPHandler {
+func NewLPHandler(
+	logger *slog.Logger,
+	deliverer service.Deliverer,
+	marshaller *lpmarshaller.Marshaller,
+) *LPHandler {
 	return &LPHandler{
-		deliverer: deliverer,
+		logger:     logger,
+		deliverer:  deliverer,
+		marshaller: marshaller,
 	}
 }
 
-// Poll handles the long-polling request.
-// It holds the connection until an event arrives or timeout occurs.
+// Poll handles the long-polling request cycle.
 func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
-	// 1. Extract Identity (UserID should be validated via middleware in production).
+	// [IDENTITY_EXTRACTION]
 	userIDStr := chi.URLParam(r, "userID")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
+		h.logger.Warn("LP_INVALID_USER_ID", slog.String("raw_id", userIDStr))
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Temporary Subscription.
-	// We create a connector that will live only for the duration of this HTTP request.
+	// [SUBSCRIPTION] Create a transient connector for this request.
 	conn, err := h.deliverer.Subscribe(r.Context(), userID)
 	if err != nil {
+		h.logger.Error("LP_SUBSCRIPTION_FAILED", slog.Any("err", err), slog.String("user_id", userID.String()))
 		http.Error(w, "failed to subscribe", http.StatusInternalServerError)
 		return
 	}
 
-	// Ensure cleanup: remove from registry and return to pool when request finishes.
+	// [LIFECYCLE] Cleanup connector resources on request completion.
 	defer h.deliverer.Unsubscribe(userID, conn.GetID())
 	defer conn.Close()
 
 	var events []event.Eventer
 
-	// 3. Wait for data or timeout.
+	// [WAIT_STRATEGY] Block until event arrives or timeout occurs.
 	select {
 	case <-r.Context().Done():
-		// Client disconnected.
 		return
 
 	case <-time.After(30 * time.Second):
-		// Standard Long-Polling timeout to prevent hanging connections.
 		w.WriteHeader(http.StatusNoContent)
 		return
 
@@ -63,12 +71,14 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 		events = append(events, ev)
 
-		// [OPTIONAL] Drain remaining events from buffer to provide batching.
-		// This minimizes the number of subsequent HTTP requests.
+		// [BATCHING] Proactively drain the buffer to reduce HTTP roundtrips.
 	drainLoop:
 		for range 15 {
 			select {
-			case nextEv := <-conn.Recv():
+			case nextEv, nextOk := <-conn.Recv():
+				if !nextOk {
+					break drainLoop
+				}
 				events = append(events, nextEv)
 			default:
 				break drainLoop
@@ -76,13 +86,23 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Final transmission.
-	data, err := lpmarshaller.MarshallEvents(events)
+	// [SERIALIZATION] Use the batch marshaller interface.
+	val, err := h.marshaller.MarshalBatch(events)
 	if err != nil {
-		http.Error(w, "marshal error", http.StatusInternalServerError)
+		h.logger.Error("LP_MARSHALL_FAILED", slog.Any("err", err))
+		http.Error(w, "internal serialization error", http.StatusInternalServerError)
 		return
 	}
 
+	// [ASSERTION] Ensure result is ready for wire transmission.
+	data, ok := val.([]byte)
+	if !ok {
+		h.logger.Error("LP_TYPE_MISMATCH", slog.Any("received", val))
+		http.Error(w, "unexpected data format", http.StatusInternalServerError)
+		return
+	}
+
+	// [TRANSMISSION] Final response delivery.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)

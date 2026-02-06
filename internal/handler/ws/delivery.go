@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
+	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	wsmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/ws"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
@@ -30,22 +32,27 @@ const (
 var _ http.Handler = (*WSHandler)(nil)
 
 type WSHandler struct {
-	logger    *slog.Logger
-	deliverer service.Deliverer
-	auther    service.Auther
-	upgrader  websocket.Upgrader
+	logger     *slog.Logger
+	deliverer  service.Deliverer
+	auther     service.Auther
+	marshaller marshaller.EventMarshaller
+	upgrader   websocket.Upgrader
 }
 
-func NewWSHandler(logger *slog.Logger, deliverer service.Deliverer, auther service.Auther) *WSHandler {
+func NewWSHandler(
+	logger *slog.Logger,
+	deliverer service.Deliverer,
+	auther service.Auther,
+	marshaller *wsmarshaller.Marshaller,
+) *WSHandler {
 	return &WSHandler{
-		logger:    logger,
-		deliverer: deliverer,
-		auther:    auther,
+		logger:     logger,
+		deliverer:  deliverer,
+		auther:     auther,
+		marshaller: marshaller,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			// [SECURITY] Allow all origins for development; tighten for production
-			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 	}
 }
@@ -96,9 +103,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Reason: "session_terminated",
 		})
 
-		if data, err := wsmarshaller.MarshallDeliveryEvent(terminationEv); err == nil {
-			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
-			_ = conn.WriteMessage(websocket.TextMessage, data)
+		// [TERMINATION_SENTINEL]
+		if val, err := h.marshaller.Marshal(terminationEv); err == nil {
+			// Type assertion from any to []byte
+			if data, ok := val.([]byte); ok {
+				_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+				_ = conn.WriteMessage(websocket.TextMessage, data)
+			}
 		}
 
 		cancel()
@@ -116,11 +127,17 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ServerVersion: model.ServerVersion,
 	})
 
-	if data, err := wsmarshaller.MarshallDeliveryEvent(welcomeEv); err == nil {
-		_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
-		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			log.Error("WS_WELCOME_SEND_FAILED", slog.Any("err", err))
-			return
+	// [WELCOME_HANDSHAKE]
+	if val, err := h.marshaller.Marshal(welcomeEv); err == nil {
+		// [ASSERTION] Cast any to []byte for WebSocket transmission
+		if data, ok := val.([]byte); ok {
+			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Error("WS_WELCOME_SEND_FAILED", slog.Any("err", err))
+				return
+			}
+		} else {
+			log.Error("WS_MARSHALL_TYPE_MISMATCH", slog.String("expected", "[]byte"))
 		}
 	}
 
@@ -172,9 +189,19 @@ func (h *WSHandler) writePump(ctx context.Context, conn *websocket.Conn, sub reg
 			}
 
 			// [SERIALIZATION] Convert domain event to wire-ready JSON
-			data, err := wsmarshaller.MarshallDeliveryEvent(ev)
+			val, err := h.marshaller.Marshal(ev)
 			if err != nil {
 				log.Error("WS_MARSHALL_FAILED", slog.Any("err", err))
+				continue
+			}
+
+			// [ASSERTION] Check if the marshaler returned []byte
+			data, ok := val.([]byte)
+			if !ok {
+				log.Error("WS_TYPE_ASSERTION_FAILED",
+					slog.String("expected", "[]byte"),
+					slog.Any("received", fmt.Sprintf("%T", val)),
+				)
 				continue
 			}
 

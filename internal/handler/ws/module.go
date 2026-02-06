@@ -4,11 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	wsmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/ws"
 	"go.uber.org/fx"
 )
 
 var Module = fx.Module("delivery-ws",
 	fx.Provide(
+		wsmarshaller.New,
 		// [REGISTRATION]
 		fx.Annotate(
 			NewWSHandler,

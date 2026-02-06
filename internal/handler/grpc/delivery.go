@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -8,29 +9,36 @@ import (
 	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-var _ impb.DeliveryServer = (*DeliveryService)(nil)
+var _ impb.DeliveryServer = (*DeliveryHandler)(nil)
 
-type DeliveryService struct {
-	logger    *slog.Logger
-	deliverer service.Deliverer
+type DeliveryHandler struct {
+	logger     *slog.Logger
+	deliverer  service.Deliverer
+	marshaller marshaller.EventMarshaller
 	impb.UnimplementedDeliveryServer
 }
 
-func NewDeliveryService(logger *slog.Logger, deliverer service.Deliverer) *DeliveryService {
-	return &DeliveryService{
-		logger:    logger,
-		deliverer: deliverer,
+func NewDeliveryHandler(
+	logger *slog.Logger,
+	deliverer service.Deliverer,
+	marshaller *grpcmarshaller.Marshaller,
+) *DeliveryHandler {
+	return &DeliveryHandler{
+		logger:     logger,
+		deliverer:  deliverer,
+		marshaller: marshaller,
 	}
 }
 
 // Stream manages the lifecycle of a long-lived HTTP/2 bidirectional/server-streaming session.
-func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
+func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_StreamServer) error {
 	// [IDENTITY_EXTRACTION] Retrieve pre-validated contact from interceptor context
 	auth, ok := grpcinterceptors.GetAuthContact(stream.Context())
 	if !ok {
@@ -76,16 +84,28 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	l.Info("[STREAM] session established", slog.String("conn_id", conn.GetID().String()))
 
 	// [HANDSHAKE_LOGIC]
-	// Create the payload from model package.
 	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
 		Ok:            true,
 		ConnectionID:  conn.GetID().String(),
 		ServerVersion: model.ServerVersion,
 	})
 
-	if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(welcomeEv)); err != nil {
-		l.Error("[STREAM] handshake delivery failed", slog.Any("err", err))
-		return err
+	// [MARSHALLING]
+	val, err := d.marshaller.Marshal(welcomeEv)
+	if err != nil {
+		l.Error("[STREAM] handshake mapping failed", slog.Any("err", err))
+		return status.Error(codes.Internal, "mapping error")
+	}
+
+	// [ASSERTION] Ensure it's a Proto message
+	if pb, ok := val.(*impb.ServerEvent); ok {
+		if err := stream.Send(pb); err != nil {
+			l.Error("[STREAM] handshake delivery failed", slog.Any("err", err))
+			return err
+		}
+	} else {
+		l.Error("[STREAM] marshaller returned invalid type", slog.String("got", fmt.Sprintf("%T", val)))
+		return status.Error(codes.Internal, "unexpected data type")
 	}
 
 	// [EVENT_LOOP]
@@ -108,9 +128,12 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 					Reason: "session_closed_by_server",
 				})
 
-				// Send the "goodbye" message. We ignore the error here because if the
-				// transport is already failing, we just proceed to return the status.
-				_ = stream.Send(grpcmarshaller.MarshallDeliveryEvent(terminationEv))
+				// [MARSHALL & ASSERT]
+				if val, err := d.marshaller.Marshal(terminationEv); err == nil {
+					if pb, ok := val.(*impb.ServerEvent); ok {
+						_ = stream.Send(pb)
+					}
+				}
 
 				return status.Error(codes.Unavailable, "session_terminated_by_server")
 			}
@@ -118,13 +141,21 @@ func (d *DeliveryService) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// [TRANSMIT_OVER_HTTP2]
 			// Serialize and push the event into the gRPC transmit buffer.
 			// gRPC handles internal flow control and HTTP/2 framing.
-			if err := stream.Send(grpcmarshaller.MarshallDeliveryEvent(ev)); err != nil {
-				l.Error("[STREAM] transmission error",
-					slog.Any("err", err),
-					slog.String("event_id", ev.GetID()),
-				)
-				// Returning error here triggers a gRPC status code (DataLoss) to the client.
-				return status.Error(codes.DataLoss, "stream_transmission_failed")
+			val, err := d.marshaller.Marshal(ev)
+			if err != nil {
+				l.Error("[STREAM] marshalling error", slog.Any("err", err))
+				continue
+			}
+
+			// [ASSERT & SEND]
+			if pb, ok := val.(*impb.ServerEvent); ok {
+				if err := stream.Send(pb); err != nil {
+					l.Error("[STREAM] transmission error", slog.Any("err", err))
+					return status.Error(codes.DataLoss, "stream_transmission_failed")
+				}
+			} else {
+				l.Error("[STREAM] type mismatch", slog.String("got", fmt.Sprintf("%T", val)))
+				continue
 			}
 
 			l.Debug("[STREAM] event pushed to wire", slog.String("event_type", ev.GetKind().String()))

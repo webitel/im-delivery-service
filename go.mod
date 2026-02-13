@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20251209175733-2a1774d88802.1
-	buf.build/go/protovalidate v1.1.0
+	buf.build/go/protovalidate v1.1.2
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/ThreeDotsLabs/watermill-amqp/v3 v3.0.2
 	github.com/fsnotify/fsnotify v1.9.0

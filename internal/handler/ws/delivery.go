@@ -99,9 +99,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer func() {
 		// [TERMINATION_SENTINEL] Attempt to push a final Disconnected event
-		terminationEv := event.NewSystemEvent(userID, event.Disconnected, event.PriorityHigh, &model.DisconnectedPayload{
-			Reason: "session_terminated",
-		})
+		terminationEv := event.NewSystemEvent(
+			userID,
+			event.Disconnected,
+			event.PriorityHigh,
+			&model.DisconnectedPayload{
+				Reason: "session_terminated",
+			})
 
 		// [TERMINATION_SENTINEL]
 		if val, err := h.marshaller.Marshal(terminationEv); err == nil {
@@ -121,11 +125,15 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Info("WS_SESSION_ESTABLISHED")
 
 	// [WELCOME_HANDSHAKE] Synchronously send the connection metadata to the client
-	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
-		Ok:            true,
-		ConnectionID:  sub.GetID().String(),
-		ServerVersion: model.ServerVersion,
-	})
+	welcomeEv := event.NewSystemEvent(
+		userID,
+		event.Connected,
+		event.PriorityNormal,
+		&model.ConnectedPayload{
+			Ok:            true,
+			ConnectionID:  sub.GetID().String(),
+			ServerVersion: model.ServerVersion,
+		})
 
 	// [WELCOME_HANDSHAKE]
 	if val, err := h.marshaller.Marshal(welcomeEv); err == nil {
@@ -170,7 +178,7 @@ func (h *WSHandler) readPump(ctx context.Context, conn *websocket.Conn, log *slo
 	}
 }
 
-// writePump handles event dispatching from the internal hub to the WebSocket peer.
+// // writePump handles event dispatching from the internal hub to the WebSocket peer.
 func (h *WSHandler) writePump(ctx context.Context, conn *websocket.Conn, sub registry.Connector, log *slog.Logger) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()

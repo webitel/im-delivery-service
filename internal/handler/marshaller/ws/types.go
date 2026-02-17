@@ -1,29 +1,40 @@
 package wsmarshaller
 
-// [ENUM] EventPriority matches the Proto enumeration.
+// [ENUM] EventPriority matches the Protobuf enumeration for delivery urgency.
+//
+//go:generate stringer -type=EventPriority -linecomment
 type EventPriority int32
 
 const (
-	PriorityUnspecified EventPriority = iota // 0
-	PriorityHigh                             // 1
-	PriorityNormal                           // 2
-	PriorityLow                              // 3
+	// [STRICT_TYPING] Explicit iota for proto-compatibility.
+	PriorityUnspecified EventPriority = iota // unspecified
+	PriorityHigh                             // high
+	PriorityNormal                           // normal
+	PriorityLow                              // low
 )
 
-// [CONSTANTS] Event type keys unified with Protobuf 'oneof' field names.
+// [ENUM] EventType defines the unique key used in the JSON payload map.
+// This ensures that transport keys remain consistent across all sessions.
+//
+//go:generate stringer -type=EventType -linecomment
+type EventType int32
+
 const (
-	EventConnected    = "connected_event"
-	EventDisconnected = "disconnected_event"
-	EventMessage      = "message_event"
-	EventAck          = "ack_event"
-	EventError        = "error_event"
-	EventPing         = "ping_event"
+	// [TYPES] These comments define the exact string key in the JSON output.
+	EventConnected     EventType = iota // connected_event
+	EventDisconnected                   // disconnected_event
+	EventMessage                        // message_event
+	EventThreadCreated                  // thread_created_event
+	EventAck                            // ack_event
+	EventError                          // error_event
+	EventPing                           // ping_event
 )
 
 // [ENVELOPE] ServerEvent is the top-level WebSocket JSON container.
 type ServerEvent struct {
-	ID        string         `json:"id"`
-	CreatedAt int64          `json:"created_at"`
-	Priority  EventPriority  `json:"priority"`
-	Payload   map[string]any `json:"payload"`
+	ID        string        `json:"id"`
+	CreatedAt int64         `json:"created_at"`
+	Priority  EventPriority `json:"priority"`
+	// Payload keys are populated using EventType.String() for type-safety.
+	Payload map[string]any `json:"payload"`
 }

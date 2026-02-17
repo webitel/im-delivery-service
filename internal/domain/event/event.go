@@ -9,6 +9,7 @@ const (
 	Connected      EventKind = iota + 1 // [SYSTEM]
 	Disconnected                        // [SYSTEM]
 	MessageCreated                      // [BUSINESS]
+	ThreadCreated  = 4                  // [BUSINESS]
 )
 
 type EventPriority int32
@@ -36,4 +37,9 @@ type Exportable interface {
 	// We return the key only if the event is ready to be exported.
 	// If it returns an empty string, the binder will skip publishing.
 	GetRoutingKey() string
+}
+
+// Multicast defines an event that needs to be delivered to multiple users.
+type Multicast interface {
+	GetRecipients() []uuid.UUID
 }

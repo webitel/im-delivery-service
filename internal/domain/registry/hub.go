@@ -98,7 +98,6 @@ func (h *Hub) getShard(userID uuid.UUID) *shard {
 // It detects [MULTICAST] events to perform fan-out delivery or falls back
 // to a single-recipient [DIRECT] dispatch.
 func (h *Hub) Broadcast(ev event.Eventer) {
-	var pushAttempts int // [DEBUG] Counter to track cell.Push calls
 
 	// [DISPATCH] Encapsulates the logic of routing to a specific cell.
 	// Defined locally to capture 'h' and 'ev' without extra allocations.
@@ -111,8 +110,6 @@ func (h *Hub) Broadcast(ev event.Eventer) {
 		s.RUnlock()
 
 		if exists {
-			// [DEBUG] Increment counter before pushing
-			pushAttempts++
 			// [NON_BLOCKING] Hand off the event to the user's actor cell mailbox.
 			cell.Push(ev)
 		}

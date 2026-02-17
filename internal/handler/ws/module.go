@@ -41,5 +41,5 @@ var Module = fx.Module("delivery-ws",
 
 func RegisterRoutes(mux *http.ServeMux, handler http.Handler) {
 	// [BINDING]
-	mux.Handle("/ws", handler)
+	mux.Handle("/im/ws", handler)
 }

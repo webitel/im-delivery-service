@@ -13,7 +13,7 @@ type PeerDTO struct {
 	Type int    `json:"type"`
 }
 
-type MessageV1 struct {
+type MessageCreatedV1 struct {
 	MessageID  string        `json:"message_id"`
 	ThreadID   string        `json:"thread_id"`
 	DomainID   int32         `json:"domain_id"`
@@ -25,7 +25,7 @@ type MessageV1 struct {
 	Documents  []DocumentDTO `json:"documents"`
 }
 
-func (d *MessageV1) ToDomain() *model.Message {
+func (d *MessageCreatedV1) ToDomain() *model.Message {
 	return &model.Message{
 		ID:        util.SafeParseUUID(d.MessageID),
 		ThreadID:  util.SafeParseUUID(d.ThreadID),
@@ -45,7 +45,7 @@ func (d PeerDTO) ToDomain() model.Peer {
 	)
 }
 
-func (d *MessageV1) mapImages() []*model.Image {
+func (d *MessageCreatedV1) mapImages() []*model.Image {
 	res := make([]*model.Image, 0, len(d.Images))
 	for _, img := range d.Images {
 		res = append(res, &model.Image{
@@ -58,7 +58,7 @@ func (d *MessageV1) mapImages() []*model.Image {
 	return res
 }
 
-func (d *MessageV1) mapDocs() []*model.Document {
+func (d *MessageCreatedV1) mapDocs() []*model.Document {
 	res := make([]*model.Document, 0, len(d.Documents))
 	for _, doc := range d.Documents {
 		res = append(res, &model.Document{

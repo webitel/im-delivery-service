@@ -57,10 +57,8 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 		}
 
 		// 1. Local delivery: Only if the user has an active stream on THIS node.
-		if h.hub.IsConnected(userID) {
-			h.hub.Broadcast(ev)
-			h.logger.Debug("LOCAL_DISPATCH_SUCCESS", "user_id", userID)
-		}
+		h.hub.Broadcast(ev)
+		h.logger.Debug("LOCAL_DISPATCH_SUCCESS", "user_id", userID)
 
 		// 2. Global delivery (RabbitMQ) for multi-node synchronization.
 		if _, ok := ev.(event.Exportable); ok {

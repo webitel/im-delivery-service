@@ -17,10 +17,9 @@ var _ Hubber = (*Hub)(nil)
 // It acts as the entry point for both incoming events (Broadcast) and
 // transport lifecycle management (Register/Unregister).
 type Hubber interface {
-	Broadcast(ev event.Eventer) bool
+	Broadcast(ev event.Eventer)
 	Register(conn Connector)
 	Unregister(userID, connID uuid.UUID)
-	IsConnected(userID uuid.UUID) bool
 	Shutdown()
 }
 
@@ -95,29 +94,44 @@ func (h *Hub) getShard(userID uuid.UUID) *shard {
 	return h.shards[userID[0]]
 }
 
-// IsConnected checks if a user has an active [CELL] in the registry.
-func (h *Hub) IsConnected(userID uuid.UUID) bool {
-	s := h.getShard(userID)
-	s.RLock()
-	defer s.RUnlock()
-	_, ok := s.cells[userID]
-	return ok
-}
+// [BROADCAST] orchestrates the delivery of an event to its intended recipients.
+// It detects [MULTICAST] events to perform fan-out delivery or falls back
+// to a single-recipient [DIRECT] dispatch.
+func (h *Hub) Broadcast(ev event.Eventer) {
+	var pushAttempts int // [DEBUG] Counter to track cell.Push calls
 
-// Broadcast dispatches an event to the specific user's [MAILBOX].
-func (h *Hub) Broadcast(ev event.Eventer) bool {
-	userID := ev.GetUserID()
-	s := h.getShard(userID)
+	// [DISPATCH] Encapsulates the logic of routing to a specific cell.
+	// Defined locally to capture 'h' and 'ev' without extra allocations.
+	dispatch := func(userID uuid.UUID) {
+		s := h.getShard(userID)
 
-	// [READ_OPTIMIZATION] Use RLock for fast path event distribution.
-	s.RLock()
-	cell, ok := s.cells[userID]
-	s.RUnlock()
+		// [CRITICAL_SECTION] Minimal locking for shard lookup.
+		s.RLock()
+		cell, exists := s.cells[userID]
+		s.RUnlock()
 
-	if ok {
-		return cell.Push(ev)
+		if exists {
+			// [DEBUG] Increment counter before pushing
+			pushAttempts++
+			// [NON_BLOCKING] Hand off the event to the user's actor cell mailbox.
+			cell.Push(ev)
+		}
 	}
-	return false
+
+	// [MULTICAST_STRATEGY]
+	// If the event supports fan-out, iterate through all recipients and exit early.
+	if m, ok := ev.(event.Multicast); ok {
+		recipients := m.GetRecipients()
+		for _, userID := range recipients {
+			dispatch(userID)
+		}
+
+		return
+	}
+
+	// [DIRECT_PATH] Fallback to standard point-to-point delivery.
+	dispatch(ev.GetUserID())
+
 }
 
 // Register performs an [IDEMPOTENT] registration of a new connection.

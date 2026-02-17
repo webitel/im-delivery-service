@@ -14,15 +14,16 @@ type WSPeer struct {
 }
 
 type WSMessage struct {
-	ID        string         `json:"id"`
-	ThreadID  string         `json:"thread_id"`
-	From      *WSPeer        `json:"from"`
-	To        *WSPeer        `json:"to"`
-	CreatedAt int64          `json:"created_at"`
-	EditedAt  int64          `json:"edited_at,omitempty"`
-	Text      string         `json:"text"`
-	Type      string         `json:"type"`
-	Content   map[string]any `json:"content,omitempty"`
+	ID        string  `json:"id"`
+	ThreadID  string  `json:"thread_id"`
+	From      *WSPeer `json:"from"`
+	To        *WSPeer `json:"to"`
+	CreatedAt int64   `json:"created_at"`
+	EditedAt  int64   `json:"edited_at,omitempty"`
+	Text      string  `json:"text"`
+	//FIXME REMOVE ; could be text or text + image
+	Type    string         `json:"type"`
+	Content map[string]any `json:"content,omitempty"`
 }
 
 func mapPeer(p model.Peer) *WSPeer {
@@ -36,9 +37,14 @@ func mapPeer(p model.Peer) *WSPeer {
 
 func mapMessage(m *model.Message) *WSMessage {
 	msg := &WSMessage{
-		ID:        m.ID.String(),
-		ThreadID:  m.ThreadID.String(),
-		From:      mapPeer(m.From),
+		ID:       m.ID.String(),
+		ThreadID: m.ThreadID.String(),
+		From: &WSPeer{
+			ID:     m.From.Sub,
+			Type:   m.From.Type.String(),
+			Name:   m.From.Name,
+			Issuer: m.From.Issuer,
+		},
 		To:        mapPeer(m.To),
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,

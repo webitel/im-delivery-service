@@ -40,6 +40,7 @@ func serverCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
+
 			app := NewApp(cfg)
 
 			if err := app.Start(c.Context); err != nil {

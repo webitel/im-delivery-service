@@ -17,43 +17,48 @@ func New() *Marshaller { return &Marshaller{} }
 
 // Marshal transforms a domain event into JSON bytes, utilizing cache if available.
 func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
-	// 1. [PERFORMANCE] Check if this event was already marshaled for WS.
-	// Since different protocols (WS vs gRPC) have different binary outputs,
-	// we should ideally use a protocol-specific cache key or check the type.
+	// 1. [PERFORMANCE] Check cache
 	if cached := ev.GetCached(); cached != nil {
 		if data, ok := cached.([]byte); ok {
 			return data, nil
 		}
 	}
 
-	// 2. [ENVELOPE] Initialize the transport-specific structure.
+	// 2. [ENVELOPE] Initialize with prioritized delivery metadata.
 	res := &ServerEvent{
 		ID:        ev.GetID(),
 		CreatedAt: ev.GetOccurredAt(),
-		Priority:  PriorityHigh, // Or map from ev.GetPriority()
+		Priority:  PriorityHigh,
 		Payload:   make(map[string]any),
 	}
 
 	// 3. [STRATEGY] Map domain payload to transport schema.
+	// [FIX] We must call .String() because EventType is now an integer-based enum.
 	switch p := ev.GetPayload().(type) {
 	case *model.Message:
-		res.Payload[EventMessage] = mapMessage(p)
+		res.Payload[EventMessage.String()] = mapMessage(p)
+
 	case *model.ConnectedPayload:
-		res.Payload[EventConnected] = p
+		res.Payload[EventConnected.String()] = p
+
 	case *model.DisconnectedPayload:
-		res.Payload[EventDisconnected] = p
+		res.Payload[EventDisconnected.String()] = p
+
+	case *model.Thread:
+		res.Payload[EventThreadCreated.String()] = mapThread(p)
+
 	default:
-		// Fallback for system or unknown events.
+		// Fallback for system or unknown events using the event kind name.
 		res.Payload[ev.GetKind().String()] = p
 	}
 
-	// 4. [SERIALIZATION] Convert to JSON bytes.
+	// 4. [SERIALIZATION]
 	data, err := json.Marshal(res)
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. [CACHE] Store the serialized JSON for reuse by other concurrent WS streams.
+	// 5. [CACHE] Store for reuse across concurrent WebSocket streams.
 	ev.SetCached(data)
 
 	return data, nil

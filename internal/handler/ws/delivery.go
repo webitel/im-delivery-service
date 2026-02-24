@@ -82,13 +82,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// [ACTOR_ATTACHMENT] Link this socket to the User's delivery hub
-	sub, err := h.deliverer.Subscribe(r.Context(), userID)
-	if err != nil {
-		h.logger.Error("WS_SUBSCRIPTION_FAILED", slog.String("user", userID.String()))
-		_ = conn.WriteMessage(websocket.CloseMessage, []byte("internal_server_error"))
-		conn.Close()
-		return
-	}
+	sub := h.deliverer.Subscribe(r.Context(), userID)
 
 	log := h.logger.With(
 		slog.String("user_id", userID.String()),

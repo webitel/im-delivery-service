@@ -65,11 +65,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	// [ACTOR_ATTACHMENT]
 	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).
 	// This ensures all events routed to the Hub for this UserID will reach this stream.
-	conn, err := d.deliverer.Subscribe(stream.Context(), userID)
-	if err != nil {
-		l.Error("[HUB] subscription rejected", slog.Any("err", err))
-		return status.Error(codes.Internal, "failed to establish connection session")
-	}
+	conn := d.deliverer.Subscribe(stream.Context(), userID)
 
 	// [RESOURCE_RECLAMATION]
 	// Ensure the connector is detached from the Hub when the function returns.

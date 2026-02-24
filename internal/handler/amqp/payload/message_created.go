@@ -1,5 +1,5 @@
 // internal/service/dto/message.go
-package dto
+package payload
 
 import (
 	"strconv"
@@ -8,21 +8,21 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/util"
 )
 
-type PeerDTO struct {
+type Peer struct {
 	ID   string `json:"id"`
 	Type int    `json:"type"`
 }
 
 type MessageCreatedV1 struct {
-	MessageID  string        `json:"message_id"`
-	ThreadID   string        `json:"thread_id"`
-	DomainID   int32         `json:"domain_id"`
-	From       PeerDTO       `json:"from"`
-	To         PeerDTO       `json:"to"`
-	Body       string        `json:"body"`
-	OccurredAt string        `json:"occurred_at"`
-	Images     []ImageDTO    `json:"images"`
-	Documents  []DocumentDTO `json:"documents"`
+	MessageID  string     `json:"message_id"`
+	ThreadID   string     `json:"thread_id"`
+	DomainID   int32      `json:"domain_id"`
+	From       Peer       `json:"from"`
+	To         Peer       `json:"to"`
+	Body       string     `json:"body"`
+	OccurredAt string     `json:"occurred_at"`
+	Images     []Image    `json:"images"`
+	Documents  []Document `json:"documents"`
 }
 
 func (d *MessageCreatedV1) ToDomain() *model.Message {
@@ -38,7 +38,7 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 	}
 }
 
-func (d PeerDTO) ToDomain() model.Peer {
+func (d Peer) ToDomain() model.Peer {
 	return model.NewPeer(
 		util.SafeParseUUID(d.ID),
 		model.PeerType(d.Type),
@@ -71,14 +71,14 @@ func (d *MessageCreatedV1) mapDocs() []*model.Document {
 	return res
 }
 
-type ImageDTO struct {
+type Image struct {
 	FileID int64  `json:"file_id"`
 	Mime   string `json:"mime"`
 	Name   string `json:"name"`
 	URL    string `json:"url"`
 }
 
-type DocumentDTO struct {
+type Document struct {
 	FileID int64  `json:"file_id"`
 	Mime   string `json:"mime"`
 	Name   string `json:"name"`

@@ -1,4 +1,4 @@
-package dto
+package payload
 
 import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"

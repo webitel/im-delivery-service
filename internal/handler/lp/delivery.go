@@ -43,12 +43,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// [SUBSCRIPTION] Create a transient connector for this request.
-	conn, err := h.deliverer.Subscribe(r.Context(), userID)
-	if err != nil {
-		h.logger.Error("LP_SUBSCRIPTION_FAILED", slog.Any("err", err), slog.String("user_id", userID.String()))
-		http.Error(w, "failed to subscribe", http.StatusInternalServerError)
-		return
-	}
+	conn := h.deliverer.Subscribe(r.Context(), userID)
 
 	// [LIFECYCLE] Cleanup connector resources on request completion.
 	defer h.deliverer.Unsubscribe(userID, conn.GetID())

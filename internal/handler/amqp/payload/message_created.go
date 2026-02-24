@@ -1,4 +1,3 @@
-// internal/service/dto/message.go
 package payload
 
 import (

@@ -26,7 +26,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/goleak v1.3.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.1
 )
 
 require (

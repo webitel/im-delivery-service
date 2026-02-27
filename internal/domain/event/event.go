@@ -9,7 +9,7 @@ const (
 	Connected      EventKind = iota + 1 // [SYSTEM]
 	Disconnected                        // [SYSTEM]
 	MessageCreated                      // [BUSINESS]
-	ThreadCreated  = 4                  // [BUSINESS]
+	ThreadCreated                       // [BUSINESS]
 )
 
 type EventPriority int32

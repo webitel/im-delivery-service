@@ -8,6 +8,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
+// INTERFACE GUARDS
 var (
 	_ Eventer    = (*MessageCreatedV1Event)(nil)
 	_ Exportable = (*MessageCreatedV1Event)(nil)

@@ -13,7 +13,7 @@ import (
 func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUID, raw *payload.MessageCreatedV1) (event.Eventer, error) {
 	// [ENRICHMENT]
 	// Fetch profile details for From/To entities from external services.
-	from, to, err := h.enricher.ResolvePeers(
+	from, to, err := h.enricher.ResolvePair(
 		ctx,
 		raw.From.ToDomain(),
 		raw.To.ToDomain(),
@@ -33,7 +33,36 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, userID uuid.UUI
 
 // [ON_THREAD_CREATED]
 func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, _ uuid.UUID, raw *payload.ThreadCreatedV1) (event.Eventer, error) {
-	return event.NewThreadCreatedV1Event(raw.ToDomain()), nil
+	// Use helper to safely convert strings to UUIDs
+	memberIDs := toUUIDs(raw.Members)
+
+	// Resolve all members in one batch (cache + gRPC)
+	peers, err := h.enricher.ResolveMany(ctx, memberIDs, raw.DomainID)
+	if err != nil {
+		h.logger.Error("THREAD_MEMBERS_ENRICHMENT_FAILED",
+			"err", err,
+			"thread_id", raw.ThreadID,
+		)
+		return nil, err
+	}
+
+	// Map raw payload to domain model and attach enriched peers
+	thread := raw.ToDomain()
+	thread.Members = peers
+
+	// event.NewThreadCreatedV1Event now gets exactly what it wants: *model.Thread
+	return event.NewThreadCreatedV1Event(thread), nil
+}
+
+// toUUIDs safely converts a slice of strings to UUIDs, skipping invalid ones.
+func toUUIDs(ids []string) []uuid.UUID {
+	res := make([]uuid.UUID, 0, len(ids))
+	for _, s := range ids {
+		if u, err := uuid.Parse(s); err == nil {
+			res = append(res, u)
+		}
+	}
+	return res
 }
 
 // [ON_MESSAGE_DELETED]

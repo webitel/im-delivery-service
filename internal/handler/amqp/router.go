@@ -32,14 +32,14 @@ const (
 type MessageHandler struct {
 	hub        registry.Hubber
 	logger     *slog.Logger
-	enricher   service.Enricher
+	enricher   service.Contacter
 	dispatcher pubsub.EventDispatcher
 }
 
 func NewMessageHandler(
 	hub registry.Hubber,
 	logger *slog.Logger,
-	enricher service.Enricher,
+	enricher service.Contacter,
 	dispatcher pubsub.EventDispatcher,
 ) *MessageHandler {
 	return &MessageHandler{hub, logger, enricher, dispatcher}

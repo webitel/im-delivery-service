@@ -13,4 +13,6 @@ type Thread struct {
 	CreatedAt int64     `json:"created_id"`
 	Subject   string    `json:"subject"`
 	Recipient Recipient `json:"recipient"`
+	Type      string    `json:"type"`
+	Members   []Peer    `json:"members,omitempty"`
 }

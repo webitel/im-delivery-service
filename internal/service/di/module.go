@@ -1,8 +1,6 @@
 package servicedi
 
 import (
-	"log/slog"
-
 	"github.com/webitel/im-delivery-service/internal/service"
 	"go.uber.org/fx"
 )
@@ -16,21 +14,14 @@ var Module = fx.Module(
 			service.NewDeliveryService,
 			fx.As(new(service.Deliverer)),
 		),
+		// Now directly providing ContactEnricher without decorator
 		fx.Annotate(
-			service.NewPeerEnricherService,
-			fx.As(new(service.Enricher)),
+			service.NewContactEnricher,
+			fx.As(new(service.Contacter)),
 		),
 		fx.Annotate(
 			service.NewAuthService,
 			fx.As(new(service.Auther)),
 		),
 	),
-
-	// [DECORATION_LAYER] Intercept Enricher to add cross-cutting concerns
-	fx.Decorate(func(orig service.Enricher, logger *slog.Logger) service.Enricher {
-		return &service.EnricherMiddleware{
-			Next:   orig,
-			Logger: logger,
-		}
-	}),
 )

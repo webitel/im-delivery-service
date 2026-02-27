@@ -98,7 +98,6 @@ func (h *Hub) getShard(userID uuid.UUID) *shard {
 // It detects [MULTICAST] events to perform fan-out delivery or falls back
 // to a single-recipient [DIRECT] dispatch.
 func (h *Hub) Broadcast(ev event.Eventer) {
-
 	// [DISPATCH] Encapsulates the logic of routing to a specific cell.
 	// Defined locally to capture 'h' and 'ev' without extra allocations.
 	dispatch := func(userID uuid.UUID) {
@@ -128,7 +127,6 @@ func (h *Hub) Broadcast(ev event.Eventer) {
 
 	// [DIRECT_PATH] Fallback to standard point-to-point delivery.
 	dispatch(ev.GetUserID())
-
 }
 
 // Register performs an [IDEMPOTENT] registration of a new connection.

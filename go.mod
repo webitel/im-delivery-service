@@ -1,6 +1,6 @@
 module github.com/webitel/im-delivery-service
 
-go 1.25.5
+go 1.25.7
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.8
-	github.com/hashicorp/consul/api v1.33.2
+	github.com/hashicorp/consul/api v1.33.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/pflag v1.0.10

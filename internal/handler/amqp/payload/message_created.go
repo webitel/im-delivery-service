@@ -20,6 +20,7 @@ type MessageCreatedV1 struct {
 	To         Peer       `json:"to"`
 	Body       string     `json:"body"`
 	OccurredAt string     `json:"occurred_at"`
+	SendID     string     `json:"send_id"`
 	Images     []Image    `json:"images"`
 	Documents  []Document `json:"documents"`
 }
@@ -27,6 +28,7 @@ type MessageCreatedV1 struct {
 func (d *MessageCreatedV1) ToDomain() *model.Message {
 	return &model.Message{
 		ID:        util.SafeParseUUID(d.MessageID),
+		SendID:    d.SendID,
 		ThreadID:  util.SafeParseUUID(d.ThreadID),
 		DomainID:  int64(d.DomainID),
 		Text:      d.Body,

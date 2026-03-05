@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -13,23 +12,18 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// Contacter provides identity discovery and data enrichment for messaging peers.
 type Contacter interface {
-	Resolve(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error)
-	ResolvePair(ctx context.Context, first, second model.Peer, domainID int32) (model.Peer, model.Peer, error)
-	ResolveMany(ctx context.Context, ids []uuid.UUID, domainID int32) ([]model.Peer, error)
+	Resolve(ctx context.Context, domainID int32, ids ...uuid.UUID) ([]model.Peer, error)
 }
 
-// ContactEnricher implements Contacter with local LRU caching and gRPC fetching.
 type ContactEnricher struct {
 	client *imcontact.Client
-	cache  *lru.Cache[string, model.Peer]
+	cache  *lru.Cache[uuid.UUID, model.Peer]
 	logger *slog.Logger
 }
 
-// NewContactEnricher creates a service instance with a 10k entries cache.
 func NewContactEnricher(client *imcontact.Client, logger *slog.Logger) *ContactEnricher {
-	cache, _ := lru.New[string, model.Peer](10000)
+	cache, _ := lru.New[uuid.UUID, model.Peer](10000)
 	return &ContactEnricher{
 		client: client,
 		cache:  cache,
@@ -37,118 +31,104 @@ func NewContactEnricher(client *imcontact.Client, logger *slog.Logger) *ContactE
 	}
 }
 
-// Resolve pulls a single peer through the batch pipeline.
-func (e *ContactEnricher) Resolve(ctx context.Context, peer model.Peer, domainID int32) (model.Peer, error) {
-	res, err := e.ResolveMany(ctx, []uuid.UUID{peer.ID}, domainID)
-	if err != nil || len(res) == 0 {
-		return peer, err
-	}
-	return res[0], nil
-}
-
-// ResolvePair optimizes dual-peer lookups by grouping them into one request.
-func (e *ContactEnricher) ResolvePair(ctx context.Context, first, second model.Peer, domainID int32) (model.Peer, model.Peer, error) {
-	res, err := e.ResolveMany(ctx, []uuid.UUID{first.ID, second.ID}, domainID)
-	if err != nil {
-		return first, second, err
-	}
-	return res[0], res[1], nil
-}
-
-// ResolveMany is the core engine for identity enrichment with cache-aside pattern.
-func (e *ContactEnricher) ResolveMany(ctx context.Context, ids []uuid.UUID, domainID int32) ([]model.Peer, error) {
+func (e *ContactEnricher) Resolve(ctx context.Context, domainID int32, ids ...uuid.UUID) ([]model.Peer, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
-	start := time.Now()
 	res := make([]model.Peer, len(ids))
-	pending := make(map[string]int, len(ids))
-	var lookupIDs []string
+	missing := make(map[uuid.UUID][]int)
 
-	// 1. [CACHE_LOOKUP]
+	// 1. [CACHE_LOOKUP] Try to fill as much as possible from local LRU
 	for i, id := range ids {
 		if id == uuid.Nil {
 			continue
 		}
-		key := id.String()
-		if cached, ok := e.cache.Get(key); ok {
+
+		if cached, ok := e.cache.Get(id); ok {
 			res[i] = cached
-			continue
+		} else {
+			missing[id] = append(missing[id], i)
 		}
-		lookupIDs = append(lookupIDs, key)
-		pending[key] = i
 	}
 
-	// [HOT_PATH] Return immediately if everything is cached
-	if len(lookupIDs) == 0 {
+	// [HOT_PATH] All identities found in cache
+	if len(missing) == 0 {
 		return res, nil
 	}
 
-	// 2. [REMOTE_FETCH]
-	e.fetch(ctx, lookupIDs, domainID, res, pending)
+	// 2. [REMOTE_FETCH] Request missing data from the contact service
+	e.fetch(ctx, domainID, missing, res)
 
-	// 3. [FALLBACK] Fill gaps for missing contacts
-	for key, idx := range pending {
-		res[idx] = model.Peer{
-			ID:   uuid.MustParse(key),
+	// 3. [FALLBACK] Ensure no empty slots remain for failed/missing contacts
+	for id, indices := range missing {
+		unknown := model.Peer{
+			ID:   id,
 			Type: model.PeerUser,
-			Name: fmt.Sprintf("Unknown (%s)", key[:8]),
+			Name: fmt.Sprintf("Unknown (%s)", id.String()[:8]),
+		}
+		for _, idx := range indices {
+			res[idx] = unknown
 		}
 	}
-
-	// [LOGGING] Record batch execution summary
-	e.logger.Debug("PEER_ENRICHMENT_COMPLETED",
-		"total", len(ids),
-		"fetched", len(lookupIDs),
-		"domain_id", domainID,
-		"duration_ms", time.Since(start).Milliseconds(),
-	)
 
 	return res, nil
 }
 
-func (e *ContactEnricher) fetch(ctx context.Context, ids []string, domainID int32, res []model.Peer, pending map[string]int) {
+func (e *ContactEnricher) fetch(ctx context.Context, domainID int32, missing map[uuid.UUID][]int, res []model.Peer) {
+	searchIDs := make([]string, 0, len(missing))
+	for id := range missing {
+		searchIDs = append(searchIDs, id.String())
+	}
+
 	resp, err := e.client.SearchContact(ctx, &contactv1.SearchContactRequest{
-		Ids:      ids,
+		Ids:      searchIDs,
 		DomainId: domainID,
-		Size:     int32(len(ids)),
+		Size:     int32(len(searchIDs)),
 	})
 	if err != nil {
-		e.logger.Error("CONTACT_GRPC_FETCH_FAILED", "err", err, "ids", ids)
+		e.logger.Error("CONTACT_FETCH_FAILED", "err", err)
 		return
 	}
 
-	for _, contact := range resp.GetContacts() {
-		id := contact.GetId()
-		idx, ok := pending[id]
-		if !ok {
+	// [MAP_RESULTS] Link back to original slice positions and update cache
+	for _, c := range resp.GetContacts() {
+		id, err := uuid.Parse(c.GetId())
+		if err != nil {
 			continue
 		}
 
-		peer := e.mapToPeer(contact)
-		res[idx] = peer
+		indices, found := missing[id]
+		if !found {
+			continue
+		}
+
+		peer := e.toPeer(c)
+		for _, idx := range indices {
+			res[idx] = peer
+		}
 
 		e.cache.Add(id, peer)
-		delete(pending, id)
+		delete(missing, id)
 	}
 }
 
-func (e *ContactEnricher) mapToPeer(c *contactv1.Contact) model.Peer {
+func (e *ContactEnricher) toPeer(c *contactv1.Contact) model.Peer {
 	name := c.GetName()
 	if name == "" {
 		name = c.GetUsername()
 	}
+
 	return model.Peer{
 		ID:     uuid.MustParse(c.GetId()),
-		Type:   e.mapType(c.GetType()),
+		Type:   e.parseType(c.GetType()),
 		Name:   name,
 		Sub:    c.GetSubject(),
 		Issuer: c.GetIssId(),
 	}
 }
 
-func (e *ContactEnricher) mapType(t string) model.PeerType {
+func (e *ContactEnricher) parseType(t string) model.PeerType {
 	switch t {
 	case "user":
 		return model.PeerUser

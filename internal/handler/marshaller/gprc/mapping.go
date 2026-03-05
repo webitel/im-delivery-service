@@ -19,8 +19,11 @@ func mapPriority(p event.EventPriority) impb.EventPriority {
 	}
 }
 
-func marshalPeer(p model.Peer) *impb.Peer {
+func marshalPeer(p *model.Peer) *impb.Peer {
 	res := &impb.Peer{}
+	if p == nil {
+		return nil
+	}
 	switch p.Type {
 	case model.PeerUser:
 		res.Kind = &impb.Peer_UserId{UserId: p.Sub}
@@ -39,7 +42,7 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	msg := &impb.ThreadMessage{
 		Id: m.ID.String(), ThreadId: m.ThreadID.String(), Text: m.Text,
 		CreatedAt: m.CreatedAt, EditedAt: m.EditedAt,
-		From: marshalPeer(m.From), To: marshalPeer(m.To),
+		From: marshalPeer(&m.From), To: marshalPeer(m.To),
 	}
 	if len(m.Images) > 0 {
 		msg.Type = impb.MessageType_IMAGE

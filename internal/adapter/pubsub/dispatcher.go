@@ -13,10 +13,16 @@ import (
 type EventDispatcher interface {
 	Publish(ctx context.Context, ev event.Eventer) error
 	Publisher() message.Publisher
+	IsLeader() bool
 }
 
 type eventDispatcher struct {
 	publisher message.Publisher
+}
+
+// IsLeader implements [EventDispatcher].
+func (d *eventDispatcher) IsLeader() bool {
+	return true // Base dispatcher is always active; leadership gating is handled by the atomic proxy.
 }
 
 func NewEventDispatcher(pub message.Publisher) EventDispatcher {

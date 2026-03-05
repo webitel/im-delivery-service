@@ -11,7 +11,7 @@ type (
 		ThreadID  uuid.UUID      `json:"thread_id"`
 		DomainID  int64          `json:"domain_id"`
 		From      Peer           `json:"from"`
-		To        Peer           `json:"to"`
+		To        *Peer         `json:"to"`
 		Text      string         `json:"text"`
 		CreatedAt int64          `json:"created_at"`
 		EditedAt  int64          `json:"updated_at,omitempty"`

@@ -3,84 +3,68 @@ package amqp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"runtime/debug"
-	"strings"
 
 	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
-// DomainHandler defines the functional signature for business logic.
-type DomainHandler[T any] func(ctx context.Context, userID uuid.UUID, payload *T) (event.Eventer, error)
+// [DOMAIN_HANDLER] Defines a generic function that processes a payload into multiple events.
+type DomainHandler[T any] func(ctx context.Context, payload *T) ([]event.Eventer, error)
 
-// [INFRASTRUCTURE_BRIDGE]
-// Bind connects Watermill to Domain logic, handling Panic Recovery, Locality, and Fan-out.
-func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandlerFunc {
-	return func(msg *message.Message) error {
-		// [PANIC_RECOVERY]
-		// Safely handle runtime panics to keep the consumer alive.
-		defer func() {
-			if r := recover(); r != nil {
-				h.logger.Error("PANIC_RECOVERED",
-					"err", r,
-					"stack", string(debug.Stack()),
-					"msg_id", msg.UUID)
-			}
-		}()
-
-		// [IDENTIFICATION]
-		// Extract recipient UUID from metadata for routing decisions.
-		userID, ok := resolveUserID(msg)
-		if !ok {
-			h.logger.Warn("ROUTING_FAILED: recipient_missing", "msg_id", msg.UUID)
-			return nil // ACK: Invalid routing is a terminal state.
-		}
-
-		// [DECODING]
-		payload := new(T)
-		if err := json.Unmarshal(msg.Payload, payload); err != nil {
-			h.logger.Error("DECODE_FAILED", "err", err, "msg_id", msg.UUID)
-			return nil // ACK: Poison Pill protection.
-		}
-
-		// [EXECUTION]
-		// Domain logic execution with enriched context (TraceID).
-		ev, err := fn(msg.Context(), userID, payload)
-		if err != nil {
-			return err // NACK: Business failure triggers Retry policy.
-		}
-
+func (h *MessageHandler) Dispatch(ctx context.Context, events []event.Eventer) {
+	for _, ev := range events {
+		// [GUARD] Skip empty events to prevent downstream nil pointer dereferences.
 		if ev == nil {
-			return nil
+			continue
 		}
 
-		// 1. Local delivery: Only if the user has an active stream on THIS node.
+		// [LOCAL_DELIVERY] Always notify local sessions via the sharded Hub.
+		// This is non-blocking and handles direct WebSocket communication.
 		h.hub.Broadcast(ev)
-		h.logger.Debug("LOCAL_DISPATCH_SUCCESS", "user_id", userID)
 
-		// 2. Global delivery (RabbitMQ) for multi-node synchronization.
+		// [GLOBAL_DELIVERY] Check if the event satisfies the Exportable interface.
+		// ---------------------------------------------------------------------------------
+		// [LOGIC]
+		// If 'ok' is true, the event is an ExportableEnvelope (e.g., MessageCreated).
+		// If 'ok' is false, it's a base Envelope (e.g., ThreadCreated, System signals),
+		// which are strictly node-local and should NOT be published to the global bus.
+		// ---------------------------------------------------------------------------------
 		if _, ok := ev.(event.Exportable); ok {
-			if err := h.dispatcher.Publish(msg.Context(), ev); err != nil {
-				return fmt.Errorf("GLOBAL_DISPATCH_FAILED: %w", err)
+			// Publish to RabbitMQ via the atomic proxy (checked for leader/active node inside).
+			if err := h.dispatcher.Publish(ctx, ev); err != nil {
+				h.logger.Error("GLOBAL_DISPATCH_FAILED",
+					"err", err,
+					"user_id", ev.GetUserID(),
+					"kind", ev.GetKind(),
+				)
 			}
 		}
-
-		return nil
 	}
 }
 
-func resolveUserID(msg *message.Message) (uuid.UUID, bool) {
-	rk := msg.Metadata.Get("x-routing-key")
-	if rk == "" {
-		rk = msg.Metadata.Get("routing_key")
-	}
+// Bind creates a Watermill handler with automatic decoding, recovery, and dispatching.
+func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandlerFunc {
+	return func(msg *message.Message) error {
+		defer func() {
+			if r := recover(); r != nil {
+				h.logger.Error("PANIC_RECOVERED", "err", r, "stack", string(debug.Stack()))
+			}
+		}()
 
-	for part := range strings.SplitSeq(rk, ".") {
-		if uid, err := uuid.Parse(part); err == nil {
-			return uid, true
+		payload := new(T)
+		p := json.Unmarshal(msg.Payload, payload)
+		println(p)
+		if err := json.Unmarshal(msg.Payload, payload); err != nil {
+			return nil // ACK invalid payloads
 		}
+
+		events, err := fn(msg.Context(), payload)
+		if err != nil {
+			return err // NACK for retries
+		}
+
+		h.Dispatch(msg.Context(), events)
+		return nil
 	}
-	return uuid.Nil, false
 }

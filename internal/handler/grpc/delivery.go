@@ -79,12 +79,17 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 
 	l.Info("[STREAM] session established", slog.String("conn_id", conn.GetID().String()))
 
-	// [HANDSHAKE_LOGIC]
-	welcomeEv := event.NewSystemEvent(userID, event.Connected, event.PriorityNormal, &model.ConnectedPayload{
-		Ok:            true,
-		ConnectionID:  conn.GetID().String(),
-		ServerVersion: model.ServerVersion,
-	})
+	// [HANDSHAKE] Using the new Generic System Event with Functional Options
+	welcomeEv := event.NewSystemEvent(
+		userID,
+		event.Connected,
+		&model.ConnectedPayload{
+			Ok:            true,
+			ConnectionID:  conn.GetID().String(),
+			ServerVersion: model.ServerVersion,
+		},
+		event.WithPriority[*model.ConnectedPayload](event.PriorityNormal),
+	)
 
 	// [MARSHALLING]
 	val, err := d.marshaller.Marshal(welcomeEv)
@@ -120,9 +125,13 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 				// Before returning the gRPC error, we push a final System Event to the wire.
 				l.Warn("[HUB] mailbox closed, sending termination event")
 
-				terminationEv := event.NewSystemEvent(userID, event.Disconnected, event.PriorityHigh, &model.DisconnectedPayload{
-					Reason: "session_closed_by_server",
-				})
+				// [TERMINATION] Mailbox closed, send final signal
+				terminationEv := event.NewSystemEvent(
+					userID,
+					event.Disconnected,
+					&model.DisconnectedPayload{Reason: "session_closed_by_server"},
+					event.WithPriority[*model.DisconnectedPayload](event.PriorityHigh),
+				)
 
 				// [MARSHALL & ASSERT]
 				if val, err := d.marshaller.Marshal(terminationEv); err == nil {

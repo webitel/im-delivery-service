@@ -38,8 +38,3 @@ type Exportable interface {
 	// If it returns an empty string, the binder will skip publishing.
 	GetRoutingKey() string
 }
-
-// Multicast defines an event that needs to be delivered to multiple users.
-type Multicast interface {
-	GetRecipients() []uuid.UUID
-}

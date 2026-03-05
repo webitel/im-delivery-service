@@ -35,6 +35,10 @@ func (a *atomicDispatcher) Publisher() message.Publisher {
 	return nil
 }
 
+func (a *atomicDispatcher) IsLeader() bool {
+	return a.active.Load() != nil
+}
+
 // [DEPENDENCIES] Explicit parameter structure for the Invoke stage
 type invokeParams struct {
 	fx.In

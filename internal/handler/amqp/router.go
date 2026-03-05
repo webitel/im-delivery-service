@@ -21,8 +21,6 @@ const (
 	// ------------------- TOPICS (ROUTING KEYS) -----------------
 	TopicMessageCreated = "im_message.#.message.created.v1"
 	TopicThreadCreated  = "im_thread.#.thread.created.v1"
-	TopicMessageDeleted = "im_message.#.message.deleted.v1"
-	TopicUserStatus     = "im_system.#.user.status.v1"
 
 	// ------------------- QUEUES (CONSUMERS) --------------------
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -58,28 +56,19 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 		topic    string
 		handler  message.NoPublishHandlerFunc
 	}{
-		{"ON_MSG_CREATED",
+		{
+			"ON_MSG_CREATED",
 			MessageEventsExchange,
 			TopicMessageCreated,
-			Bind(h, h.OnMessageCreatedV1)},
+			Bind(h, h.OnMessageCreatedV1),
+		},
 
-		{"ON_THREAD_CREATED",
+		{
+			"ON_THREAD_CREATED",
 			MessageEventsExchange,
 			TopicThreadCreated,
-			Bind(h, h.OnThreadCreatedV1)},
-
-		// [ARCHITECTURAL_PLACEHOLDERS]
-		// The following handlers serve as blueprints for scaling the system.
-		// Add new domain listeners here by following this table-driven pattern.
-		{"ON_MSG_DELETED",
-			MessageEventsExchange,
-			TopicMessageDeleted,
-			Bind(h, h.OnMessageDeletedV1)},
-
-		{"ON_USR_STATUS",
-			SystemEventsExchange,
-			TopicUserStatus,
-			Bind(h, h.OnStatusChangedV1)},
+			Bind(h, h.OnThreadCreatedV1),
+		},
 	}
 
 	for _, c := range configs {
@@ -95,9 +84,6 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 		}
 
 		router.AddConsumerHandler(c.name, c.topic, sub, c.handler).AddMiddleware(
-			TraceIDMiddleware,
-			LoggingMiddleware(h.logger),
-			NewRetryMiddleware().Middleware,
 			poison,
 			middleware.NewThrottle(100, time.Second).Middleware,
 			middleware.Timeout(time.Second*30),

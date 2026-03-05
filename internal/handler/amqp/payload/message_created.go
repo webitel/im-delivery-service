@@ -17,7 +17,7 @@ type MessageCreatedV1 struct {
 	ThreadID   string     `json:"thread_id"`
 	DomainID   int32      `json:"domain_id"`
 	From       Peer       `json:"from"`
-	To         Peer       `json:"to"`
+	To         []string   `json:"to"`
 	Body       string     `json:"body"`
 	OccurredAt string     `json:"occurred_at"`
 	SendID     string     `json:"send_id"`

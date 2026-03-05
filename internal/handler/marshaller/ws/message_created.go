@@ -27,7 +27,10 @@ type WSMessage struct {
 	Content map[string]any `json:"content,omitempty"`
 }
 
-func mapPeer(p model.Peer) *WSPeer {
+func mapPeer(p *model.Peer) *WSPeer {
+	if p == nil {
+		return nil
+	}
 	return &WSPeer{
 		ID:     p.Sub,
 		Type:   strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),

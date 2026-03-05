@@ -85,9 +85,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-// [WAIT_AUTH_FRAME] Blocks until the first JSON frame with a token arrives.
 func (h *WSHandler) waitAuthFrame(c *websocket.Conn) {
-	// Limit how long we wait for the client to send the JSON auth frame
 	if err := c.SetReadDeadline(time.Now().Add(authTimeout)); err != nil {
 		h.log.Error("ws: failed to set read deadline", slog.Any("err", err))
 	}
@@ -96,17 +94,15 @@ func (h *WSHandler) waitAuthFrame(c *websocket.Conn) {
 		Token string `json:"token"`
 	}
 
-	// Decode the expected JSON: {"token": "ey..."}
 	if err := c.ReadJSON(&req); err != nil {
 		h.log.Warn("ws: auth frame invalid or missing", slog.Any("err", err))
-		h.terminate(c, websocket.ClosePolicyViolation, "auth_required")
+		// [CHANGE] Send a clear 401 response before closing
+		h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
 		return
 	}
 
-	// [FIX] Separate the Auth Context from the Session Context.
-	// We use a short-lived context ONLY for the AuthService.Inspect call.
 	authCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel() // This will trigger 5s after the function starts or when Inspect finishes
+	defer cancel()
 
 	md := metadata.Pairs("x-webitel-access", req.Token)
 	authCtx = metadata.NewIncomingContext(authCtx, md)
@@ -114,15 +110,12 @@ func (h *WSHandler) waitAuthFrame(c *websocket.Conn) {
 	authInfo, err := h.auther.Inspect(authCtx)
 	if err != nil {
 		h.log.Warn("ws: delayed auth denied", slog.Any("err", err))
-		h.terminate(c, websocket.ClosePolicyViolation, "invalid_token")
+		// [CHANGE] Explicit 401 error
+		h.terminate(c, websocket.ClosePolicyViolation, "401_invalid_token")
 		return
 	}
 
-	// [FIX] Reset the deadline before starting the long-lived session.
 	_ = c.SetReadDeadline(time.Time{})
-
-	// [CRITICAL] Pass context.Background() to initSession.
-	// If you pass authCtx here, the session will die in 5 seconds because of the 'defer cancel()' above.
 	h.initSession(context.Background(), c, authInfo)
 }
 
@@ -231,7 +224,21 @@ func (h *WSHandler) sendSystem(c *websocket.Conn, uid uuid.UUID, kind event.Even
 }
 
 func (h *WSHandler) terminate(c *websocket.Conn, code int, reason string) {
+	// [1. OPTIONAL] Send a JSON payload so the client app gets a "401" in the stream
+	// This helps frontend developers handle it via onMessage instead of just onClose.
+	h.sendSystem(c, uuid.Nil, event.Disconnected, map[string]any{
+		"error":  "unauthorized",
+		"code":   401,
+		"reason": reason,
+	})
+
+	// [2. CLOSE_FRAME] Send the official WS close frame
 	msg := websocket.FormatCloseMessage(code, reason)
+
+	// Set a very short deadline for the close message
+	_ = c.SetWriteDeadline(time.Now().Add(time.Second))
 	_ = c.WriteControl(websocket.CloseMessage, msg, time.Now().Add(writeWait))
+
+	// [3. SOCKET_CLOSE]
 	_ = c.Close()
 }

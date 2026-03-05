@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -96,68 +95,20 @@ func (h *Hub) getShard(userID uuid.UUID) *shard {
 	return h.shards[userID[0]]
 }
 
+// [BROADCAST] Routes a pre-addressed event to a specific user's Cell.
 func (h *Hub) Broadcast(ev event.Eventer) {
-	userID := ev.GetUserID()
+	userID := ev.GetUserID() // Already resolved at the handler level
 	s := h.getShard(userID)
-
-	// [DEBUG_BLOCK_START]
-	fmt.Printf("\n--- DEBUG BROADCAST START ---\n")
-	fmt.Printf("EVENT_USER_ID: %s\n", userID.String())
-	fmt.Printf("EVENT_SHARD_INDEX (from byte[0]): %d\n", userID[0])
-
-	// Перевіряємо всі шарди на наявність цього ID
-	foundInShard := -1
-	for i, sh := range h.shards {
-		sh.RLock()
-		if _, ok := sh.cells[userID]; ok {
-			foundInShard = i
-		}
-		sh.RUnlock()
-	}
-
-	if foundInShard != -1 {
-		fmt.Printf("✅ SUCCESS: User found in Shard [%d]\n", foundInShard)
-	} else {
-		fmt.Printf("❌ FAILURE: User NOT FOUND in any of %d shards\n", shardCount)
-
-		s.RLock()
-		fmt.Printf("CURRENT_SHARD [%d] CONTENT (first 5 IDs):\n", userID[0])
-		count := 0
-		for id := range s.cells {
-			fmt.Printf("  - Existing ID: %s\n", id.String())
-			count++
-			if count >= 5 {
-				break
-			}
-		}
-		s.RUnlock()
-	}
-	fmt.Printf("--- DEBUG BROADCAST END ---\n\n")
-	// [DEBUG_BLOCK_END]
 
 	s.RLock()
 	cell, exists := s.cells[userID]
 	s.RUnlock()
 
 	if exists {
+		// [NON_BLOCKING] Dedicated actor delivery
 		cell.Push(ev)
 	}
 }
-
-// // [BROADCAST] Routes a pre-addressed event to a specific user's Cell.
-// func (h *Hub) Broadcast(ev event.Eventer) {
-// 	userID := ev.GetUserID() // Already resolved at the handler level
-// 	s := h.getShard(userID)
-
-// 	s.RLock()
-// 	cell, exists := s.cells[userID]
-// 	s.RUnlock()
-
-// 	if exists {
-// 		// [NON_BLOCKING] Dedicated actor delivery
-// 		cell.Push(ev)
-// 	}
-// }
 
 // Register performs an [IDEMPOTENT] registration of a new connection.
 // It creates a new Cell (Actor) if the user is connecting for the first time.

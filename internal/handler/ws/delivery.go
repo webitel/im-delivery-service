@@ -135,7 +135,11 @@ func (h *WSHandler) initSession(ctx context.Context, c *websocket.Conn, auth *mo
 
 	defer func() {
 		// Attempt to notify the client about the disconnection
-		h.sendSystem(c, uid, event.Disconnected, &model.DisconnectedPayload{Reason: "terminated"})
+		h.sendSystem(c, uid, event.Disconnected, &model.DisconnectedPayload{
+			Reason: "terminated",
+			Code:   1000, // Normal Closure
+			Status: model.StatusShutdown,
+		})
 		cancel()
 		h.deliverer.Unsubscribe(uid, sub.GetID())
 		_ = c.Close()
@@ -226,10 +230,10 @@ func (h *WSHandler) sendSystem(c *websocket.Conn, uid uuid.UUID, kind event.Even
 func (h *WSHandler) terminate(c *websocket.Conn, code int, reason string) {
 	// [1. OPTIONAL] Send a JSON payload so the client app gets a "401" in the stream
 	// This helps frontend developers handle it via onMessage instead of just onClose.
-	h.sendSystem(c, uuid.Nil, event.Disconnected, map[string]any{
-		"error":  "unauthorized",
-		"code":   401,
-		"reason": reason,
+	h.sendSystem(c, uuid.Nil, event.Disconnected, &model.DisconnectedPayload{
+		Reason: reason,
+		Code:   401,
+		Status: model.UNAUTHORIZED,
 	})
 
 	// [2. CLOSE_FRAME] Send the official WS close frame

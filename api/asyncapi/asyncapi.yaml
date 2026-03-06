@@ -1,0 +1,166 @@
+asyncapi: 3.0.0
+info:
+  title: Webitel IM Delivery Service
+  version: 1.0.0
+  description: WebSocket API for real-time chat delivery.
+
+channels:
+  ws:
+    address: /ws/im
+    messages:
+      ServerEvent:
+        $ref: '#/components/messages/ServerEvent'
+
+operations:
+  receiveEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/ws'
+    messages:
+      - $ref: '#/channels/ws/messages/ServerEvent'
+
+components:
+  messages:
+    ServerEvent:
+      name: ServerEvent
+      payload:
+        $ref: '#/components/schemas/ServerEventPayload'
+
+  schemas:
+    # --- ENVELOPE ---
+    ServerEventPayload:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+        priority:
+          $ref: '#/components/schemas/EventPriority'
+        payload:
+          $ref: '#/components/schemas/EventPayload'
+
+    MessageType:
+      type: string
+      enum: ["text", "image", "document"]
+      x-enumNames: ["text", "image", "document"]
+
+    EventPriority:
+      type: integer
+      enum: [0, 1, 2, 3]
+      x-enumNames: ["unspecified", "high", "normal", "low"]
+
+    # --- POLYMORPHIC PAYLOAD ---
+    EventPayload:
+      type: object
+      properties:
+        connected:
+          $ref: '#/components/schemas/ConnectedPayload'
+        disconnected:
+          $ref: '#/components/schemas/DisconnectedPayload'
+        message:
+          $ref: '#/components/schemas/MessagePayload'
+        thread_created:
+          $ref: '#/components/schemas/ThreadPayload'
+        ack:
+          $ref: '#/components/schemas/AckPayload'
+        error:
+          $ref: '#/components/schemas/ErrorPayload'
+        ping:
+          $ref: '#/components/schemas/PingPayload'
+
+    # --- CONNECT/DISCONNECT ---
+    ConnectedPayload:
+      type: object
+      properties:
+        ok: { type: boolean }
+        connection_id: { type: string }
+        server_version: { type: string }
+
+    DisconnectedPayload:
+      type: object
+      properties:
+        reason: { type: string }
+        code: { type: integer }
+        status: { type: string }
+
+    # --- ACK / ERROR / PING ---
+    AckPayload:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string }
+
+    ErrorPayload:
+      type: object
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+
+    PingPayload:
+      type: object
+      properties:
+        timestamp: { type: integer, format: int64 }
+
+    # --- MESSAGE / THREAD ---
+    MessagePayload:
+      type: object
+      properties:
+        message:
+          $ref: '#/components/schemas/WSMessage'
+
+    ThreadPayload:
+      type: object
+      properties:
+        thread:
+          $ref: '#/components/schemas/WSThread'
+
+    # --- DATA MODELS ---
+    WSPeer:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        name: { type: string }
+        issuer: { type: string }
+
+    WSMessage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        send_id: { type: string }
+        thread_id: { type: string, format: uuid }
+        from: { $ref: '#/components/schemas/WSPeer' }
+        to: { $ref: '#/components/schemas/WSPeer' }
+        created_at: { type: integer, format: int64 }
+        edited_at: { type: integer, format: int64 }
+        text: { type: string }
+        type:
+          $ref: '#/components/schemas/MessageType'
+          content:
+          type: object
+          additionalProperties: true
+
+    WSThread:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        domain_id: { type: integer }
+        created_at: { type: integer, format: int64 }
+        subject: { type: string }
+        type: { type: string }
+        recipient:
+          $ref: '#/components/schemas/WSRecipient'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/WSPeer'
+
+    WSRecipient:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }

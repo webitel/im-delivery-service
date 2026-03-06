@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
@@ -9,152 +10,147 @@ import (
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
 )
 
-// [ON_MESSAGE_CREATED] Processes message creation with high-efficiency fan-out.
+// [ON_MESSAGE_CREATED] Handles message fan-out with smart enrichment for local targets.
 func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.MessageCreatedV1) ([]event.Eventer, error) {
-	// [1. FILTER] Resolve which participants need processing on this node.
-	senderID, targets := h.filter(raw.From.ID, h.extractIDs(raw))
+	sID, participants := extractParticipants(raw)
 
-	// [2. ENRICH] Resolve profiles in a single batch for filtered targets.
-	peers, err := h.enricher.Resolve(ctx, raw.DomainID, targets...)
-	if err != nil {
-		h.logger.Error("failed to resolve peers", "err", err, "domain_id", raw.DomainID)
-		return nil, err
-	}
-
-	// [PREPARATION] Build a lookup map for resolved peers.
-	peerMap := make(map[uuid.UUID]*model.Peer)
-	for i := range peers {
-		// [REFERENCE_ASSIGNMENT] Take the address of the peer structure.
-		peerMap[peers[i].ID] = &peers[i]
-	}
-
-	// [3. PREPARE_BASE] Map payload to domain model once.
-	base := raw.ToDomain()
-
-	// [SENDER_ATTACHMENT] Inject sender profile into the base model.
-	if sender, ok := peerMap[senderID]; ok {
-		// [DEREFERENCE] model.Message.From is a Value (Peer), so we dereference the pointer (*).
-		base.From = *sender
-	}
-
-	// [4. FAN-OUT] Build unique events for each recipient.
-	events := make([]event.Eventer, 0, len(targets))
-	for _, id := range targets {
-		// [SHALLOW_COPY] Create a copy of the base message structure.
-		msgInstance := *base
-
-		if recipient, ok := peerMap[id]; ok {
-			// [POINTER_ASSIGNMENT] model.Message.To is a Pointer (*Peer).
-			// Assign directly since recipient is already a pointer.
-			msgInstance.To = recipient
-		}
-
-		events = append(events, event.NewMessageEvent(
-			&msgInstance,
-			id,
-			event.WithPriority[*model.Message](event.PriorityHigh),
-		))
-	}
-
-	return events, nil
-}
-
-// [ON_THREAD_CREATED] Handles both Direct (single recipient) and Group (fan-out) thread events.
-func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, raw *payload.ThreadCreatedV1) ([]event.Eventer, error) {
-	var targets []uuid.UUID
-
-	// [1. STRATEGY_SELECTION] Determine if we target a single recipient or all members.
-	// If Recipient ID is present, we treat it as a personalized "Direct" event.
-	if raw.Recipient.ID != "" {
-		rID, err := uuid.Parse(raw.Recipient.ID)
-		if err != nil {
-			h.logger.Error("failed to parse recipient id", "err", err, "id", raw.Recipient.ID)
-			return nil, nil // ACK invalid data
-		}
-
-		// Only process if the recipient is connected to this node.
-		if h.hub.Connected(rID) {
-			targets = append(targets, rID)
-		}
-	} else {
-		// [GROUP_LOGIC] If recipient is missing, it's a group/channel.
-		// We use the standard filter to find local participants from the members list.
-		_, targets = h.filter("", toUUIDs(raw.Members))
-	}
-
-	// [2. EARLY_EXIT] If no local targets found, stop processing to save resources (enrichment).
+	// [FILTER] Identify who on THIS node should receive the event
+	_, targets := h.filter(raw.From.ID, participants)
 	if len(targets) == 0 {
 		return nil, nil
 	}
 
-	// [3. ENRICH] Resolve all members for the UI participant list.
-	allPeers, err := h.enricher.Resolve(ctx, raw.DomainID, toUUIDs(raw.Members)...)
+	// [ENRICHMENT_LOGIC] Determine the minimal set of peers to resolve
+	toResolve := targets
+	isSenderLocal := slices.Contains(targets, sID)
+
+	if isSenderLocal {
+		// [SENDER_ECHO] If sender is local, we need everyone to populate the "To" field correctly
+		toResolve = participants
+	} else {
+		// [RECIPIENT_ONLY] If only recipients are local, we need them + the sender for the "From" field
+		if sID != uuid.Nil && !slices.Contains(targets, sID) {
+			toResolve = append(slices.Clone(targets), sID)
+		}
+	}
+
+	// [RESOLVE] Fetch metadata for the required participants
+	peers, err := h.enricher.Resolve(ctx, raw.DomainID, toResolve...)
 	if err != nil {
-		h.logger.Error("failed to resolve thread members", "err", err)
 		return nil, err
 	}
 
-	// [4. PREPARE_BASE] Map the common thread data.
-	baseThread := raw.ToDomain()
-	baseThread.Members = allPeers
-
-	// [5. DISPATCH_PREPARATION]
-	events := make([]event.Eventer, 0, len(targets))
-	for _, id := range targets {
-		// [SHALLOW_COPY] Create a unique instance per user if needed (e.g., for logging/tracking).
-		threadInstance := *baseThread
-
-		events = append(events, event.NewThreadEvent(
-			&threadInstance,
-			id,
-			event.WithPriority[*model.Thread](event.PriorityNormal),
-		))
+	// [MAP_PEERS] Build lookup map and identify a default recipient (not sender) for the echo event
+	peerMap := make(map[uuid.UUID]*model.Peer, len(peers))
+	var recipient *model.Peer
+	for i := range peers {
+		p := &peers[i]
+		peerMap[p.ID] = p
+		if recipient == nil && p.ID != sID {
+			recipient = p
+		}
 	}
 
+	base := raw.ToDomain()
+	if s, ok := peerMap[sID]; ok {
+		base.From = *s
+	}
+
+	// [BUILD_EVENTS] Create events only for targets connected to this node
+	events := make([]event.Eventer, 0, len(targets))
+	for _, uid := range targets {
+		p, ok := peerMap[uid]
+		if !ok {
+			continue
+		}
+
+		msg := *base
+		// [RECIPIENT_LOGIC] Set 'To' field: recipient peer for sender, or self-peer for recipients
+		msg.To = recipient
+		if uid != sID {
+			msg.To = p
+		}
+		events = append(events, event.NewMessageEvent(&msg, uid))
+	}
 	return events, nil
 }
 
-// [HELPERS]
+// [ON_THREAD_CREATED] Handles thread creation. Resolves ALL members for full UI state.
+func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, raw *payload.ThreadCreatedV1) ([]event.Eventer, error) {
+	memberIDs := toUUIDs(raw.Members)
+	var targets []uuid.UUID
 
-// filter abstracts leadership logic: Leader processes all; Follower processes only local + sender.
+	// [FILTER_TARGETS] Only prepare events for locally connected users or if we are the leader
+	if id, err := uuid.Parse(raw.Recipient.ID); err == nil {
+		if h.dispatcher.IsLeader() || h.hub.Connected(id) {
+			targets = []uuid.UUID{id}
+		}
+	} else {
+		_, targets = h.filter("", memberIDs)
+	}
+
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	// [RESOLVE_ALL] For thread creation, we resolve ALL members to provide full chat context
+	peers, err := h.enricher.Resolve(ctx, raw.DomainID, memberIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	base := raw.ToDomain()
+	base.Members = peers
+
+	// [BUILD_EVENTS] Dispatch the full thread object to each local target
+	events := make([]event.Eventer, 0, len(targets))
+	for _, uid := range targets {
+		thread := *base
+		events = append(events, event.NewThreadEvent(&thread, uid))
+	}
+	return events, nil
+}
+
+// [EXTRACT_PARTICIPANTS] Parses and deduplicates sender and recipient IDs.
+func extractParticipants(raw *payload.MessageCreatedV1) (uuid.UUID, []uuid.UUID) {
+	sID, _ := uuid.Parse(raw.From.ID)
+	seen := make(map[uuid.UUID]struct{}, len(raw.To)+1)
+	res := make([]uuid.UUID, 0, len(raw.To)+1)
+
+	if sID != uuid.Nil {
+		seen[sID], res = struct{}{}, append(res, sID)
+	}
+	for _, s := range raw.To {
+		if id, err := uuid.Parse(s); err == nil {
+			if _, ok := seen[id]; !ok {
+				seen[id], res = struct{}{}, append(res, id)
+			}
+		}
+	}
+	return sID, res
+}
+
+// [FILTER] Decides which IDs should be processed by this node based on Hub connections.
 func (h *MessageHandler) filter(senderIDStr string, all []uuid.UUID) (uuid.UUID, []uuid.UUID) {
 	sID, _ := uuid.Parse(senderIDStr)
-
-	// Leader Node: Responsible for global propagation via RabbitMQ.
 	if h.dispatcher.IsLeader() {
 		return sID, all
 	}
-
-	// Follower Node: Only handles the sender (for multi-device sync) or locally connected clients.
-	filtered := make([]uuid.UUID, 0)
+	res := make([]uuid.UUID, 0, len(all))
 	for _, id := range all {
 		if id == sID || h.hub.Connected(id) {
-			filtered = append(filtered, id)
+			res = append(res, id)
 		}
 	}
-	return sID, filtered
+	return sID, res
 }
 
-// extractIDs pulls participant UUIDs from the message payload.
-func (h *MessageHandler) extractIDs(raw *payload.MessageCreatedV1) []uuid.UUID {
-	ids := make([]uuid.UUID, 0, 1+len(raw.To))
-	if f, err := uuid.Parse(raw.From.ID); err == nil {
-		ids = append(ids, f)
-	}
-	for _, id := range raw.To {
-		if t, err := uuid.Parse(id); err == nil {
-			ids = append(ids, t)
-		}
-	}
-	return ids
-}
-
-// toUUIDs safely converts a slice of strings to UUIDs, skipping invalid formats.
+// [TO_UUIDS] Helper for converting a slice of strings to UUIDs.
 func toUUIDs(src []string) []uuid.UUID {
 	res := make([]uuid.UUID, 0, len(src))
 	for _, s := range src {
-		if u, err := uuid.Parse(s); err == nil {
-			res = append(res, u)
+		if id, err := uuid.Parse(s); err == nil {
+			res = append(res, id)
 		}
 	}
 	return res

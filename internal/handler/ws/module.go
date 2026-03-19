@@ -1,26 +1,45 @@
-// internal/handler/ws/module.go
 package ws
 
 import (
+	"log/slog"
 	"net/http"
 
-	"github.com/webitel/im-delivery-service/internal/handler/marshaller" // Import the interface package
 	wsmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/ws"
 	"go.uber.org/fx"
 )
 
 var Module = fx.Module("delivery-ws",
 	fx.Provide(
-		// Use fx.Annotate to cast the concrete implementation to the interface
+		wsmarshaller.New,
+		// [REGISTRATION]
 		fx.Annotate(
-			wsmarshaller.New,
-			fx.As(new(marshaller.EventMarshaller)),
+			NewWSHandler,
+			fx.As(new(http.Handler)),
+			fx.ResultTags(`name:"ws_handler"`),
 		),
-		NewWSHandler,
 	),
+
+	// [DECORATION]
+	fx.Decorate(
+		fx.Annotate(
+			func(handler http.Handler, log *slog.Logger) http.Handler {
+				return ContextBridge(handler, log)
+			},
+			fx.ParamTags(`name:"ws_handler"`),
+			fx.ResultTags(`name:"ws_handler"`),
+		),
+	),
+
+	// [EXECUTION]
 	fx.Invoke(
-		func(mux *http.ServeMux, h *WSHandler) {
-			mux.Handle("/im/ws", h.AuthenticationMiddleware(h))
-		},
+		fx.Annotate(
+			RegisterRoutes,
+			fx.ParamTags("", `name:"ws_handler"`),
+		),
 	),
 )
+
+func RegisterRoutes(mux *http.ServeMux, handler http.Handler) {
+	// [BINDING]
+	mux.Handle("/im/ws", handler)
+}

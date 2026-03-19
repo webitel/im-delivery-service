@@ -3,16 +3,18 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"github.com/webitel/im-delivery-service/internal/store"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
-const prefixScheduler = "delivery:scheduler:pending"
+const (
+	prefixScheduler = "delivery:scheduler:pending"
+	fmtEventKey     = "delivery:event:%s"
+)
 
 type RedisScheduler struct {
 	rdb *redis.Client
@@ -22,39 +24,87 @@ func NewRedisScheduler(rdb *redis.Client) *RedisScheduler {
 	return &RedisScheduler{rdb: rdb}
 }
 
-func (s *RedisScheduler) Schedule(ctx context.Context, eid, uid uuid.UUID, delay time.Duration) error {
-	return s.rdb.ZAdd(ctx, prefixScheduler, redis.Z{
+// [SCHEDULE] Atomically stores event data and sets execution time.
+func (s *RedisScheduler) Schedule(ctx context.Context, ev event.Eventer, delay time.Duration) error {
+	eid := ev.GetID()
+	uid := ev.GetUserID().String()
+
+	data, err := json.Marshal(ev)
+	if err != nil {
+		return fmt.Errorf("marshal_failed: %w", err)
+	}
+
+	eventKey := fmt.Sprintf(fmtEventKey, eid)
+	// [TTL] Safety margin for orphan data (24h).
+	// Lua script will delete it much sooner (immediately after processing).
+	eventTTL := delay + (24 * time.Hour)
+
+	pipe := s.rdb.Pipeline()
+	pipe.Set(ctx, eventKey, data, eventTTL)
+	pipe.ZAdd(ctx, prefixScheduler, redis.Z{
 		Score:  float64(time.Now().Add(delay).Unix()),
 		Member: fmt.Sprintf("%s:%s", eid, uid),
-	}).Err()
+	})
+
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
-func (s *RedisScheduler) PullReady(ctx context.Context) ([]store.ScheduledTask, error) {
+// [PULL_READY] The Atomic Unified Fetcher.
+func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error) {
 	now := time.Now().Unix()
 
-	// Atomic: Fetch and Delete ready tasks to prevent double-processing in a cluster.
+	// [LUA] This script guarantees that data is pulled and deleted in one step.
 	script := `
-		local val = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
-		if #val > 0 then
-			redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+		local members = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+		if #members == 0 then return {} end
+		
+		local payloads = {}
+		for i, member in ipairs(members) do
+			-- Extract eid from "eid:uid" string
+			local eid = string.match(member, "([^:]+)")
+			local key = "delivery:event:" .. eid
+			
+			payloads[i] = redis.call('GET', key)
+			redis.call('DEL', key) -- Immediate cleanup
 		end
-		return val
+		
+		redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+		return payloads
 	`
+
 	res, err := s.rdb.Eval(ctx, script, []string{prefixScheduler}, now).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	rawTasks := res.([]any)
-	tasks := make([]store.ScheduledTask, 0, len(rawTasks))
+	rawPayloads := res.([]any)
+	events := make([]event.Eventer, 0, len(rawPayloads))
 
-	for _, raw := range rawTasks {
-		parts := strings.Split(raw.(string), ":")
-		if len(parts) == 2 {
-			eid, _ := uuid.Parse(parts[0])
-			uid, _ := uuid.Parse(parts[1])
-			tasks = append(tasks, store.ScheduledTask{EventID: eid, UserID: uid})
+	for _, raw := range rawPayloads {
+		if raw == nil {
+			continue
 		}
+		data := []byte(raw.(string))
+
+		// [POLYMORPHIC_RESTORE] Detect kind and create concrete struct.
+		var meta struct {
+			Kind event.EventKind `json:"kind"`
+		}
+		if err := json.Unmarshal(data, &meta); err != nil {
+			continue
+		}
+
+		ev := event.NewEnvelopeForKind(meta.Kind)
+		if ev == nil {
+			continue
+		}
+
+		if err := json.Unmarshal(data, ev); err != nil {
+			continue
+		}
+		events = append(events, ev)
 	}
-	return tasks, nil
+
+	return events, nil
 }

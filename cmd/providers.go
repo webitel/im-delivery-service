@@ -10,6 +10,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/lmittmann/tint"
 	"github.com/redis/go-redis/v9"
 	"github.com/webitel/im-delivery-service/config"
 	"github.com/webitel/im-delivery-service/infra/pubsub"
@@ -55,7 +56,11 @@ func ProvideLogger(cfg *config.Config, lc fx.Lifecycle) (*slog.Logger, error) {
 		if logSettings.JSON {
 			h = slog.NewJSONHandler(os.Stdout, opts)
 		} else {
-			h = slog.NewTextHandler(os.Stdout, opts)
+			h = tint.NewHandler(os.Stdout, &tint.Options{
+				Level:      level,
+				TimeFormat: time.DateTime,
+				NoColor:    false,
+			})
 		}
 		handlers = append(handlers, h)
 	}

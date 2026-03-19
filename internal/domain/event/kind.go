@@ -1,5 +1,6 @@
 package event
 
+// [EVENT_KIND] Efficient numeric representation for transport.
 type EventKind int16
 
 //go:generate stringer -type=EventKind

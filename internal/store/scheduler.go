@@ -5,22 +5,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
-// DeliveryScheduler manages persistent, time-delayed tasks.
-// It ensures that even if a node fails, the scheduled delivery check will
-// be picked up by another instance once the timeout expires.
+// [DELIVERY_SCHEDULER] Unified interface for task & event management.
 type DeliveryScheduler interface {
-	// Schedule adds an event for a delayed delivery check.
-	Schedule(ctx context.Context, eid, uid uuid.UUID, delay time.Duration) error
-
-	// PullReady retrieves and atomically removes tasks that reached their execution time.
-	PullReady(ctx context.Context) ([]ScheduledTask, error)
-}
-
-// ScheduledTask carries the minimum identity required to process a push check.
-type ScheduledTask struct {
-	EventID uuid.UUID
-	UserID  uuid.UUID
+	// Schedule persists the event and its delay.
+	Schedule(ctx context.Context, ev event.Eventer, delay time.Duration) error
+	// PullReady returns full event objects and cleans up storage atomically.
+	PullReady(ctx context.Context) ([]event.Eventer, error)
 }

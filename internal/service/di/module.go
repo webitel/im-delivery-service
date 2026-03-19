@@ -22,7 +22,7 @@ var Module = fx.Module(
 
 		// [TIMEOUT_CONFIG] Grace period for client acknowledgment.
 		fx.Annotate(
-			func() time.Duration { return 10 * time.Second },
+			func() time.Duration { return 20 * time.Second },
 			fx.ResultTags(`name:"ack_timeout"`),
 		),
 

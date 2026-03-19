@@ -11,20 +11,25 @@ import (
 var _ Eventer = (*Envelope[any])(nil)
 
 // [NEW_MESSAGE_EVENT] Factory for core messaging business logic.
+// Automatically extracts metadata for push notifications to avoid circular imports.
 func NewMessageEvent(
 	msg *model.Message,
 	targetID uuid.UUID,
 	opts ...Option[*model.Message],
 ) Eventer {
 	e := &Envelope[*model.Message]{
-		id:         uuid.New(),
-		payload:    msg,
-		userID:     targetID,
-		domainID:   msg.DomainID,
-		kind:       MessageCreated,
-		priority:   PriorityHigh,
-		occurredAt: msg.CreatedAt,
-		canPush:    true, // Messages are trackable by default.
+		ID:         uuid.New(),
+		Payload:    msg,
+		UserID:     targetID,
+		DomainID:   msg.DomainID,
+		Kind:       MessageCreated,
+		Priority:   PriorityHigh,
+		OccurredAt: msg.CreatedAt,
+		CanPush:    true,
+		Metadata: map[string]string{
+			"sender_name": msg.NotificationTitle(),
+			"text":        msg.NotificationBody(),
+		},
 	}
 
 	for _, apply := range opts {
@@ -33,20 +38,24 @@ func NewMessageEvent(
 	return e
 }
 
-// [NEW_THREAD_EVENT] Factory for room/thread lifecycle.
+// [NEW_THREAD_EVENT] Factory for room/thread lifecycle events.
 func NewThreadEvent(
 	thread *model.Thread,
 	targetID uuid.UUID,
 	opts ...Option[*model.Thread],
 ) Eventer {
 	e := &Envelope[*model.Thread]{
-		id:         uuid.New(),
-		payload:    thread,
-		userID:     targetID,
-		domainID:   int64(thread.DomainID),
-		kind:       ThreadCreated,
-		priority:   PriorityNormal,
-		occurredAt: thread.CreatedAt,
+		ID:         uuid.New(),
+		Payload:    thread,
+		UserID:     targetID,
+		DomainID:   int64(thread.DomainID),
+		Kind:       ThreadCreated,
+		Priority:   PriorityNormal,
+		OccurredAt: thread.CreatedAt,
+		Metadata: map[string]string{
+			"sender_name": "System",
+			"text":        "New chat conversation started",
+		},
 	}
 
 	for _, apply := range opts {
@@ -55,7 +64,8 @@ func NewThreadEvent(
 	return e
 }
 
-// [NEW_SYSTEM_EVENT] Helper for generic system triggers.
+// [NEW_SYSTEM_EVENT] Senior-level generic helper for internal triggers.
+// Allows passing any T as payload while maintaining strict event contract.
 func NewSystemEvent[T any](
 	userID uuid.UUID,
 	kind EventKind,
@@ -63,12 +73,12 @@ func NewSystemEvent[T any](
 	opts ...Option[T],
 ) Eventer {
 	e := &Envelope[T]{
-		id:         uuid.New(),
-		payload:    payload,
-		userID:     userID,
-		kind:       kind,
-		priority:   PriorityLow,
-		occurredAt: time.Now().UnixMilli(),
+		ID:         uuid.New(),
+		Payload:    payload,
+		UserID:     userID,
+		Kind:       kind,
+		Priority:   PriorityLow, // Default for system tasks
+		OccurredAt: time.Now().UnixMilli(),
 	}
 
 	for _, apply := range opts {
@@ -77,15 +87,15 @@ func NewSystemEvent[T any](
 	return e
 }
 
-// [NEW_READ_EVENT] Optimized read confirmation event.
+// [NEW_READ_EVENT] Optimized factory for message read confirmations.
 func NewReadEvent(eventID, userID uuid.UUID) Eventer {
 	return &Envelope[*model.MessageReadPayload]{
-		id:         eventID, // Reuse original message ID for easy lookup.
-		userID:     userID,
-		kind:       MessageRead,
-		priority:   PriorityLow,
-		occurredAt: time.Now().UnixMilli(),
-		payload: &model.MessageReadPayload{
+		ID:         eventID,
+		UserID:     userID,
+		Kind:       MessageRead,
+		Priority:   PriorityLow,
+		OccurredAt: time.Now().UnixMilli(),
+		Payload: &model.MessageReadPayload{
 			MessageID: eventID,
 		},
 	}

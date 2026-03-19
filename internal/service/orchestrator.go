@@ -101,6 +101,10 @@ func (o *EventOrchestrator) Dismiss(ctx context.Context, ev event.Eventer) {
 
 // [ACK] Finalizes the delivery process for a specific session.
 func (o *EventOrchestrator) Ack(ctx context.Context, eid, cid uuid.UUID) error {
+	o.log.Info("ACK_RECEIVED_FROM_WS",
+		slog.String("eid", eid.String()),
+		slog.String("cid", cid.String()))
+
 	return o.tracker.Ack(ctx, eid, cid, o.ackTimeout)
 }
 

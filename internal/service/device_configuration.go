@@ -81,19 +81,19 @@ func (r *DeviceResolver) GetDevices(ctx context.Context, uid uuid.UUID) ([]model
 
 func (r *DeviceResolver) enrichConfigs(ctx context.Context, devices []model.Device) ([]model.Device, error) {
 	appConfigs := make(map[string]*adminv1.Application)
-	for _, d := range devices {
-		if d.AppID == "" || appConfigs[d.AppID] != nil {
+	for _, device := range devices {
+		if device.AppID == "" || appConfigs[device.AppID] != nil {
 			continue
 		}
 
-		res, err := r.imadmin.SearchApps(ctx, &adminv1.SearchAppRequest{Id: d.AppID})
+		res, err := r.imadmin.SearchApps(ctx, &adminv1.SearchAppRequest{Id: device.AppID})
 		if err != nil {
-			r.log.Warn("APP_LOOKUP_FAILED", slog.String("app", d.AppID), slog.Any("err", err))
+			r.log.Warn("APP_LOOKUP_FAILED", slog.String("app", device.AppID), slog.Any("err", err))
 			continue
 		}
 
 		if res != nil && len(res.Data) > 0 {
-			appConfigs[d.AppID] = res.Data[0]
+			appConfigs[device.AppID] = res.Data[0]
 		}
 	}
 
@@ -123,13 +123,14 @@ func (r *DeviceResolver) applyProviderConfig(d *model.Device, ps *adminv1.PUSHSe
 		}
 
 	case APNS:
-		// [APNS] Use GetApn() for iOS specific settings.
 		if apn := ps.GetApn(); apn != nil {
-			d.PushConfig.Proxy = apn.Proxy
-			d.PushConfig.Topic = apn.Topic
-			// Check if token-based auth is configured.
-			if apn.Token != nil {
-				d.PushConfig.Credentials = apn.Token.AuthKey
+			d.PushConfig.Proxy = apn.GetProxy()
+			d.PushConfig.Topic = apn.GetTopic()
+			// [TOKEN_AUTH] Extract Apple specific metadata
+			if token := apn.GetToken(); token != nil {
+				d.PushConfig.Credentials = token.GetAuthKey()
+				d.PushConfig.KeyID = token.GetKeyId()
+				d.PushConfig.TeamID = token.GetTeamId()
 			}
 		}
 

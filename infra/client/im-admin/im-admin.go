@@ -15,23 +15,10 @@ import (
 
 const ServiceName string = "im-account-service"
 
-// [INTERFACE_GUARD] Now correctly matches the CLIENT interface.
-var _ adminv1.ApplicationsClient = (*Client)(nil)
-
 type Client struct {
 	logger *slog.Logger
 	rpc    *rpc.Client[adminv1.ApplicationsClient]
 	tls    *infratls.Config
-}
-
-// CreateApp implements [admin.ApplicationsClient].
-func (c *Client) CreateApp(ctx context.Context, in *adminv1.CreateAppRequest, opts ...grpc.CallOption) (*adminv1.Application, error) {
-	panic("unimplemented")
-}
-
-// DeleteApps implements [admin.ApplicationsClient].
-func (c *Client) DeleteApps(ctx context.Context, in *adminv1.DeleteAppRequest, opts ...grpc.CallOption) (*adminv1.ApplicationList, error) {
-	panic("unimplemented")
 }
 
 // SearchApps implements [admin.ApplicationsClient].
@@ -43,11 +30,6 @@ func (c *Client) SearchApps(ctx context.Context, in *adminv1.SearchAppRequest, o
 		return err
 	})
 	return resp, err
-}
-
-// UpdateApp implements [admin.ApplicationsClient].
-func (c *Client) UpdateApp(ctx context.Context, in *adminv1.UpdateAppRequest, opts ...grpc.CallOption) (*adminv1.Application, error) {
-	panic("unimplemented")
 }
 
 // New initializes a resilient gRPC client for the Auth service.

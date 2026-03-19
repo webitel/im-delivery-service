@@ -6,44 +6,55 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	"github.com/webitel/im-delivery-service/infra/push"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-const (
-	Webhook = "webhook"
-)
+const Name = "webhook"
 
-type webhookProvider struct {
+// [SHARED_HTTP_CLIENT] Reuse connections to avoid socket exhaustion.
+var sharedClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
+// [WEBHOOK_PROVIDER] Generic HTTP transport for push delegation.
+// ---------------------------------------------------------------------------------
+// [LOGIC]
+// - T is a generic native payload (e.g., *messaging.Message or *apns2.Notification).
+// - Dispatches JSON to a specified URL via POST.
+// ---------------------------------------------------------------------------------
+type webhookProvider[T any] struct {
 	url    string
 	client *http.Client
 }
 
-// [INTERFACE GUARD]
-var _ push.Provider = (*webhookProvider)(nil)
-
-func NewWebhookProvider(url string) push.Provider {
-	return &webhookProvider{
+func NewWebhookProvider[T any](url string) *webhookProvider[T] {
+	return &webhookProvider[T]{
 		url:    url,
-		client: &http.Client{Timeout: 10 * time.Second},
+		client: sharedClient,
 	}
 }
 
-func (w *webhookProvider) Name() string { return Webhook }
+func (w *webhookProvider[T]) Name() string { return Name }
 
-func (w *webhookProvider) Send(ctx context.Context, req *model.PushRequest) error {
-	data, _ := json.Marshal(req)
-	hReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, w.url, bytes.NewReader(data))
+// [SEND] Serializes the generic payload and executes the HTTP request.
+func (w *webhookProvider[T]) Send(ctx context.Context, payload T) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	hReq, err := http.NewRequestWithContext(ctx, http.MethodPost, w.url, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+
 	hReq.Header.Set("Content-Type", "application/json")
+	hReq.Header.Set("X-Debug-Proxy", "im-delivery-service")
 
 	resp, err := w.client.Do(hReq)
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		return err
 	}
-	return err
-}
+	defer resp.Body.Close()
 
-func (w *webhookProvider) Dismiss(ctx context.Context, req *model.PushRequest) error {
-	return w.Send(ctx, req)
+	return nil
 }

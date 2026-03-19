@@ -6,52 +6,41 @@ import (
 	"github.com/google/uuid"
 )
 
-// [OPTION_PATTERN]
+// [INTERFACE GUARDS]
+var (
+	_ Eventer    = (*Envelope[any])(nil)
+	_ IsPushable = (*Envelope[any])(nil)
+)
+
 type Option[T any] func(e *Envelope[T])
 
-// [BASE_ENVELOPE]
-// Implements Eventer. Used for local-only events like Threads or System signals.
+// [ENVELOPE] Generic event container. Fields are private for strict immutability.
 type Envelope[T any] struct {
-	ID         uuid.UUID     `json:"id"`
-	Payload    T             `json:"payload"`
-	UserID     uuid.UUID     `json:"user_id"`
-	DomainID   int64         `json:"domain_id"`
-	Kind       EventKind     `json:"kind"`
-	Priority   EventPriority `json:"priority"`
-	OccurredAt int64         `json:"occurred_at"`
-	TraceID    string        `json:"trace_id,omitempty"`
-	cached     atomic.Pointer[any]
+	id         uuid.UUID
+	payload    T
+	userID     uuid.UUID
+	domainID   int64
+	kind       EventKind
+	priority   EventPriority
+	occurredAt int64
+	traceID    string
+	canPush    bool
+	echo       bool
+
+	// [INTERNAL_CACHE] Thread-safe storage for transport-level data.
+	cached atomic.Value
 }
 
-// [EXPORTABLE_ENVELOPE]
-// Wraps Envelope and implements Exportable. Used for global RabbitMQ events.
-type ExportableEnvelope[T any] struct {
-	Envelope[T] // [EMBEDDING]
+// [GETTERS]
+func (e *Envelope[T]) GetID() string              { return e.id.String() }
+func (e *Envelope[T]) GetKind() EventKind         { return e.kind }
+func (e *Envelope[T]) GetUserID() uuid.UUID       { return e.userID }
+func (e *Envelope[T]) GetPriority() EventPriority { return e.priority }
+func (e *Envelope[T]) GetOccurredAt() int64       { return e.occurredAt }
+func (e *Envelope[T]) GetPayload() any            { return e.payload }
+func (e *Envelope[T]) CanPush() bool              { return e.canPush }
+func (e *Envelope[T]) IsEcho() bool               { return e.echo }
 
-	// RoutingKeyFunc defines the AMQP topic logic.
-	RoutingKeyFunc func(payload T) string `json:"-"`
-}
-
-// [EVENTER_IMPLEMENTATION]
-func (e *Envelope[T]) GetID() string              { return e.ID.String() }
-func (e *Envelope[T]) GetPayload() any            { return e.Payload }
-func (e *Envelope[T]) GetUserID() uuid.UUID       { return e.UserID }
-func (e *Envelope[T]) GetKind() EventKind         { return e.Kind }
-func (e *Envelope[T]) GetPriority() EventPriority { return e.Priority }
-func (e *Envelope[T]) GetOccurredAt() int64       { return e.OccurredAt }
-func (e *Envelope[T]) GetCached() any {
-	if v := e.cached.Load(); v != nil {
-		return *v
-	}
-	return nil
-}
-func (e *Envelope[T]) SetCached(v any) { e.cached.Store(&v) }
-
-// [EXPORTABLE_IMPLEMENTATION]
-// Only ExportableEnvelope has this method, satisfying the Exportable interface.
-func (e *ExportableEnvelope[T]) GetRoutingKey() string {
-	if e.RoutingKeyFunc != nil {
-		return e.RoutingKeyFunc(e.Payload)
-	}
-	return ""
-}
+// [CACHE_ACCESS]
+func (e *Envelope[T]) GetCached() any  { return e.cached.Load() }
+func (e *Envelope[T]) SetCached(v any) { e.cached.Store(v) }

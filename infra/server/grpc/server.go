@@ -29,10 +29,10 @@ var Module = fx.Module("grpc_server",
 		logger *slog.Logger,
 		lc fx.Lifecycle,
 		auther service.Auther,
-		deliverer service.Deliverer,
+		sessionManager service.SessionManager,
 		tls *tls.Config,
 	) (*Server, error) {
-		srv, err := New(conf.Service.Address, logger, auther, tls, deliverer)
+		srv, err := New(conf.Service.Address, logger, auther, tls, sessionManager)
 		if err != nil {
 			return nil, err
 		}
@@ -66,16 +66,16 @@ var Module = fx.Module("grpc_server",
 
 type Server struct {
 	*grpc.Server
-	Addr      string
-	host      string
-	port      int
-	log       *slog.Logger
-	listener  net.Listener
-	auther    service.Auther
-	deliverer service.Deliverer
+	Addr           string
+	host           string
+	port           int
+	log            *slog.Logger
+	listener       net.Listener
+	auther         service.Auther
+	sessionManager service.SessionManager
 }
 
-func New(addr string, log *slog.Logger, auther service.Auther, tls *tls.Config, deliverer service.Deliverer) (*Server, error) {
+func New(addr string, log *slog.Logger, auther service.Auther, tls *tls.Config, sessionManager service.SessionManager) (*Server, error) {
 	validator, err := protovalidate.New()
 	if err != nil {
 		return nil, err
@@ -163,14 +163,14 @@ func New(addr string, log *slog.Logger, auther service.Auther, tls *tls.Config, 
 	}
 
 	return &Server{
-		Addr:      addr,
-		Server:    s,
-		log:       log,
-		host:      h,
-		port:      port,
-		listener:  l,
-		auther:    auther,
-		deliverer: deliverer,
+		Addr:           addr,
+		Server:         s,
+		log:            log,
+		host:           h,
+		port:           port,
+		listener:       l,
+		auther:         auther,
+		sessionManager: sessionManager,
 	}, nil
 }
 
@@ -188,8 +188,8 @@ func (s *Server) Shutdown() error {
 	// This triggers a cascade: Hub -> Cell -> Connector.Close(), which closes the
 	// internal receive channels. Handlers detect the closed channel, send a final
 	// 'DisconnectedEvent' to the client, and exit the event loop gracefully.
-	if s.deliverer != nil {
-		s.deliverer.Close()
+	if s.sessionManager != nil {
+		s.sessionManager.Close()
 	}
 
 	// [PHASE 2] TRANSPORT-LEVEL TERMINATION

@@ -1,110 +1,92 @@
 package event
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// INTERFACE GUARD [MESSAGE_EVENT]
-var (
-	_ Eventer    = (*ExportableEnvelope[*model.Message])(nil)
-	_ Exportable = (*ExportableEnvelope[*model.Message])(nil)
-)
+// [INTERFACE_GUARDS] Ensure Envelope correctly implements Eventer.
+var _ Eventer = (*Envelope[any])(nil)
 
-// INTERFACE GUARD [THREAD_EVENT]
-var _ Eventer = (*Envelope[*model.Thread])(nil)
-
-// INTERFACE GUARD [SYSTEM_EVENT]
-var (
-	_ Eventer = (*Envelope[*model.ConnectedPayload])(nil)
-	_ Eventer = (*Envelope[*model.DisconnectedPayload])(nil)
-)
-
-// --- OPTIONS ---
-
-func WithPriority[T any](p EventPriority) Option[T] {
-	return func(e *Envelope[T]) { e.Priority = p }
-}
-
-func WithOccurredAt[T any](t int64) Option[T] {
-	return func(e *Envelope[T]) { e.OccurredAt = t }
-}
-
-func WithTraceID[T any](traceID string) Option[T] {
-	return func(e *Envelope[T]) { e.TraceID = traceID }
-}
-
-// --- FACTORIES ---
-
-// [NEW_MESSAGE_EVENT] Returns an ExportableEnvelope.
-func NewMessageEvent(msg *model.Message, targetID uuid.UUID, opts ...Option[*model.Message]) Eventer {
-	e := &ExportableEnvelope[*model.Message]{
-		Envelope: Envelope[*model.Message]{
-			ID:         uuid.New(),
-			Payload:    msg,
-			UserID:     targetID,
-			DomainID:   msg.DomainID,
-			Kind:       MessageCreated,
-			Priority:   PriorityHigh,
-			OccurredAt: msg.CreatedAt,
-		},
-		RoutingKeyFunc: func(m *model.Message) string {
-			peerType := "contact"
-			if m.To != nil {
-				issuer := strings.ToLower(m.To.Issuer)
-				if strings.Contains(issuer, "bot") || strings.Contains(issuer, "schema") {
-					peerType = "bot"
-				}
-			}
-			sub := "unknown"
-			if m.To != nil {
-				sub = m.To.Sub
-			}
-			return fmt.Sprintf("im_delivery.v1.%d.%s.%s.message.created", m.DomainID, peerType, sub)
-		},
+// [NEW_MESSAGE_EVENT] Factory for core messaging business logic.
+func NewMessageEvent(
+	msg *model.Message,
+	targetID uuid.UUID,
+	opts ...Option[*model.Message],
+) Eventer {
+	e := &Envelope[*model.Message]{
+		id:         uuid.New(),
+		payload:    msg,
+		userID:     targetID,
+		domainID:   msg.DomainID,
+		kind:       MessageCreated,
+		priority:   PriorityHigh,
+		occurredAt: msg.CreatedAt,
+		canPush:    true, // Messages are trackable by default.
 	}
 
-	for _, opt := range opts {
-		opt(&e.Envelope)
+	for _, apply := range opts {
+		apply(e)
 	}
 	return e
 }
 
-// [NEW_THREAD_EVENT] Returns a base Envelope (Not Exportable).
-func NewThreadEvent(thread *model.Thread, targetID uuid.UUID, opts ...Option[*model.Thread]) Eventer {
+// [NEW_THREAD_EVENT] Factory for room/thread lifecycle.
+func NewThreadEvent(
+	thread *model.Thread,
+	targetID uuid.UUID,
+	opts ...Option[*model.Thread],
+) Eventer {
 	e := &Envelope[*model.Thread]{
-		ID:         uuid.New(),
-		Payload:    thread,
-		UserID:     targetID,
-		DomainID:   int64(thread.DomainID),
-		Kind:       ThreadCreated,
-		Priority:   PriorityNormal,
-		OccurredAt: thread.CreatedAt,
+		id:         uuid.New(),
+		payload:    thread,
+		userID:     targetID,
+		domainID:   int64(thread.DomainID),
+		kind:       ThreadCreated,
+		priority:   PriorityNormal,
+		occurredAt: thread.CreatedAt,
 	}
 
-	for _, opt := range opts {
-		opt(e)
+	for _, apply := range opts {
+		apply(e)
 	}
 	return e
 }
 
-// [NEW_SYSTEM_EVENT] Returns a base Envelope (Not Exportable).
-func NewSystemEvent[T any](userID uuid.UUID, kind EventKind, payload T, opts ...Option[T]) Eventer {
+// [NEW_SYSTEM_EVENT] Helper for generic system triggers.
+func NewSystemEvent[T any](
+	userID uuid.UUID,
+	kind EventKind,
+	payload T,
+	opts ...Option[T],
+) Eventer {
 	e := &Envelope[T]{
-		ID:         uuid.New(),
-		Payload:    payload,
-		UserID:     userID,
-		Kind:       kind,
-		Priority:   PriorityLow,
-		OccurredAt: time.Now().UnixMilli(),
+		id:         uuid.New(),
+		payload:    payload,
+		userID:     userID,
+		kind:       kind,
+		priority:   PriorityLow,
+		occurredAt: time.Now().UnixMilli(),
 	}
 
-	for _, opt := range opts {
-		opt(e)
+	for _, apply := range opts {
+		apply(e)
 	}
 	return e
+}
+
+// [NEW_READ_EVENT] Optimized read confirmation event.
+func NewReadEvent(eventID, userID uuid.UUID) Eventer {
+	return &Envelope[*model.MessageReadPayload]{
+		id:         eventID, // Reuse original message ID for easy lookup.
+		userID:     userID,
+		kind:       MessageRead,
+		priority:   PriorityLow,
+		occurredAt: time.Now().UnixMilli(),
+		payload: &model.MessageReadPayload{
+			MessageID: eventID,
+		},
+	}
 }

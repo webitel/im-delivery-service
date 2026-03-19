@@ -4,14 +4,30 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/webitel/im-delivery-service/config"
 )
 
-type LeadershipElector interface {
+type Elector interface {
 	Run(ctx context.Context, onStart func(ctx context.Context) error, onStop func())
+}
+type LeaderAwarer interface {
+	IsLeader() bool
+}
+
+type Status struct {
+	isLeader atomic.Bool
+}
+
+func (ls *Status) IsLeader() bool {
+	return ls.isLeader.Load()
+}
+
+func (ls *Status) Set(val bool) {
+	ls.isLeader.Store(val)
 }
 
 const (

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/redis/go-redis/v9"
 	"github.com/webitel/im-delivery-service/config"
 	"github.com/webitel/im-delivery-service/infra/pubsub"
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
@@ -261,4 +262,30 @@ func ProvidePubSub(cfg *config.Config, l *slog.Logger, lc fx.Lifecycle) (pubsub.
 	})
 
 	return pubsub.NewDefaultProvider(router, pubsubFactory)
+}
+
+func ProvideRedis(cfg *config.Config, lc fx.Lifecycle, l *slog.Logger) (*redis.Client, error) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			err := rdb.Ping(ctx).Err()
+			if err != nil {
+				l.Error("redis connection failed", slog.Any("error", err))
+				return err
+			}
+			l.Info("redis connected", slog.String("addr", cfg.Redis.Addr))
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			l.Info("closing redis connection")
+			return rdb.Close()
+		},
+	})
+
+	return rdb, nil
 }

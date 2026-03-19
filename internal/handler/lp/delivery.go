@@ -14,20 +14,20 @@ import (
 )
 
 type LPHandler struct {
-	logger     *slog.Logger
-	deliverer  service.Deliverer
-	marshaller marshaller.BatchMarshaller
+	logger         *slog.Logger
+	sessionManager service.SessionManager
+	marshaller     marshaller.BatchMarshaller
 }
 
 func NewLPHandler(
 	logger *slog.Logger,
-	deliverer service.Deliverer,
+	sessionManager service.SessionManager,
 	marshaller *lpmarshaller.Marshaller,
 ) *LPHandler {
 	return &LPHandler{
-		logger:     logger,
-		deliverer:  deliverer,
-		marshaller: marshaller,
+		logger:         logger,
+		sessionManager: sessionManager,
+		marshaller:     marshaller,
 	}
 }
 
@@ -43,10 +43,11 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// [SUBSCRIPTION] Create a transient connector for this request.
-	conn := h.deliverer.Subscribe(r.Context(), userID)
+	// TODO pass real deviceID and handle error
+	conn, _ := h.sessionManager.Attach(r.Context(), userID, uuid.New().String())
 
 	// [LIFECYCLE] Cleanup connector resources on request completion.
-	defer h.deliverer.Unsubscribe(userID, conn.GetID())
+	defer h.sessionManager.Detach(r.Context(), userID, conn.GetID())
 	defer conn.Close()
 
 	var events []event.Eventer

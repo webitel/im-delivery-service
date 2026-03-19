@@ -11,11 +11,13 @@ func _() {
 	_ = x[Connected-1]
 	_ = x[Disconnected-2]
 	_ = x[MessageCreated-3]
+	_ = x[ThreadCreated-4]
+	_ = x[MessageRead-5]
 }
 
-const _EventKind_name = "ConnectedDisconnectedMessageCreated"
+const _EventKind_name = "ConnectedDisconnectedMessageCreatedThreadCreatedMessageRead"
 
-var _EventKind_index = [...]uint8{0, 9, 21, 35}
+var _EventKind_index = [...]uint8{0, 9, 21, 35, 48, 59}
 
 func (i EventKind) String() string {
 	i -= 1

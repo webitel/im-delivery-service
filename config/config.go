@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
@@ -17,6 +18,17 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Consul   ConsulConfig   `mapstructure:"consul"`
 	Pubsub   PubsubConfig   `mapstructure:"pubsub"`
+	Delivery DeliveryConfig `mapstructure:"delivery"`
+}
+
+type DeliveryConfig struct {
+	EnablePush bool          `mapstructure:"enable_push"`
+	AckTimeout time.Duration `mapstructure:"ack_timeout"`
+	Webhook    WebhookConfig `mapstructure:"webhook"`
+}
+
+type WebhookConfig struct {
+	URL string `mapstructure:"url"`
 }
 
 type ServiceConfig struct {
@@ -142,12 +154,17 @@ func defineFlags() {
 
 	pflag.String("redis.addr", "localhost:6379", "Redis address")
 	pflag.String("redis.password", "", "Redis password")
-	pflag.Int("redis.db", 0, "Redis database number")
+	pflag.Int("redis.db", 1, "Redis database number")
 
 	pflag.String("consul.addr", "localhost:8500", "Consul address")
 
 	pflag.String("pubsub.broker_url", "", "PubSub broker URL")
 	pflag.String("pubsub.broker_driver", "", "PubSub broker driver")
+
+	pflag.Bool("delivery.enable_push", false, "Enable push notifications if delivery fails")
+	pflag.Duration("delivery.ack_timeout", 10*time.Second, "Timeout to wait for client ACK before pushing")
+
+	pflag.String("delivery.webhook.url", "", "Target URL for push webhooks")
 }
 
 func (c *Config) validate() error {

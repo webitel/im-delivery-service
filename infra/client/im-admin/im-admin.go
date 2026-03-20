@@ -38,7 +38,7 @@ func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infrat
 		return adminv1.NewApplicationsClient(conn)
 	}
 
-	c, err := webitel.New(logger, discovery, ServiceName, tls, factory)
+	c, err := webitel.New(logger, discovery, ServiceName, tls, factory, true)
 	if err != nil {
 		return nil, fmt.Errorf("[im-admin-client] initialization failed: %w", err)
 	}

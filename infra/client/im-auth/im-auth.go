@@ -30,7 +30,7 @@ func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infrat
 		return authv1.NewAccountClient(conn)
 	}
 
-	c, err := webitel.New(logger, discovery, ServiceName, tls, factory)
+	c, err := webitel.New(logger, discovery, ServiceName, tls, factory, false)
 	if err != nil {
 		return nil, fmt.Errorf("[im-auth-client] initialization failed: %w", err)
 	}

@@ -15,19 +15,28 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// New initializes a go-kit RPC client with embedded Circuit Breaker and Discovery
-func New[T any](log *slog.Logger, dp ds.DiscoveryProvider, target string, tlsCong *infratls.Config, factory rpc.ClientFactory[T]) (*rpc.Client[T], error) {
-	// [STABILITY] Create a method-aware circuit breaker for this specific connection
-	cb := interceptors.NewBreakerInterceptor()
-
+// New initializes a go-kit RPC client with Discovery and OPTIONAL Circuit Breaker.
+// [CHANGE] Added 'withBreaker' boolean parameter.
+func New[T any](
+	log *slog.Logger,
+	dp ds.DiscoveryProvider,
+	target string,
+	tlsCong *infratls.Config,
+	factory rpc.ClientFactory[T],
+	withBreaker bool,
+) (*rpc.Client[T], error) {
 	options := []grpc.DialOption{
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsCong.Client)),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithResolvers(discovery.NewBuilder(dp, discovery.WithInsecure(true))),
-		// [INTERCEPTOR] Circuit breaker wraps all unary calls
-		grpc.WithChainUnaryInterceptor(
+	}
+
+	// [STABILITY] Only wrap calls with Circuit Breaker if explicitly requested.
+	if withBreaker {
+		cb := interceptors.NewBreakerInterceptor()
+		options = append(options, grpc.WithChainUnaryInterceptor(
 			cb.UnaryClientInterceptor(),
-		),
+		))
 	}
 
 	client, err := rpc.NewClient(
@@ -35,7 +44,7 @@ func New[T any](log *slog.Logger, dp ds.DiscoveryProvider, target string, tlsCon
 		factory,
 		rpc.WithTarget(fmt.Sprintf("discovery:///%s", target)),
 		rpc.WithDialOptions(options...),
-		// [RETRY] Built-in transport-level retries
+		// [RETRY] Built-in transport-level retries (works regardless of breaker)
 		rpc.WithRetry(rpc.DefaultRetryConfig()),
 	)
 	if err != nil {

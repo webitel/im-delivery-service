@@ -22,14 +22,14 @@ type Client struct {
 	tls *infratls.Config
 }
 
-func New(logger *slog.Logger, discovery discovery.DiscoveryProvider,tls *infratls.Config) (*Client, error) {
+func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infratls.Config) (*Client, error) {
 	// [FACTORY] Required by go-kit to instantiate the gRPC stub
 	factory := func(conn *grpc.ClientConn) contactv1.ContactsClient {
 		return contactv1.NewContactsClient(conn)
 	}
 
 	// [INIT] Initialize the shared RPC client wrapper
-	c, err := webitel.New(logger, discovery, ServiceName,tls, factory)
+	c, err := webitel.New(logger, discovery, ServiceName, tls, factory, true)
 	if err != nil {
 		return nil, fmt.Errorf("[im-contact-client] initialization failed: %w", err)
 	}

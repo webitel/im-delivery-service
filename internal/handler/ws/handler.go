@@ -55,18 +55,31 @@ func NewWSHandler(
 
 // ServeHTTP implements the clean entry point for WebSocket connections.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	remote := r.RemoteAddr
+
+	// [UPGRADE] Attempt to switch to WebSocket protocol
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		h.log.Error("ws: upgrade failed", slog.Any("err", err))
+		h.log.Error("ws: upgrade failed",
+			slog.String("remote", remote),
+			slog.Any("err", err),
+		)
 		return
 	}
 
 	// [1] Check if middleware already resolved the user.
 	if auth, ok := r.Context().Value(authInfoKey).(*model.AuthContact); ok {
+		h.log.Info("ws: using fast-track auth from middleware",
+			slog.String("user_id", auth.ContactID),
+			slog.String("remote", remote),
+		)
 		h.initSession(conn, auth)
 		return
 	}
 
 	// [2] Late-binding auth for clients without headers.
+	h.log.Debug("ws: no header auth, waiting for client auth frame",
+		slog.String("remote", remote),
+	)
 	h.waitAuthFrame(r.Context(), conn)
 }

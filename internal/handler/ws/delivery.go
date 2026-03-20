@@ -26,7 +26,7 @@ const (
 	authTimeout    = 5 * time.Second
 )
 
-// [INTERFACE GUARD] Ensure WSHandler implements http.Handler at compile time.JK
+// [INTERFACE_GUARD] Ensure WSHandler implements http.Handler at compile time.
 var _ http.Handler = (*WSHandler)(nil)
 
 type WSHandler struct {
@@ -51,6 +51,7 @@ func NewWSHandler(
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
+			// [CORS_POLICY] Allow all origins to prevent handshake rejection.
 			CheckOrigin: func(r *http.Request) bool {
 				return true
 			},
@@ -58,95 +59,121 @@ func NewWSHandler(
 	}
 }
 
-// [SERVE_HTTP] Main entry point.
-// ---------------------------------------------------------------------------------
-// [LOGIC]
-// 1. First, we try to authorize via headers using the provided context.
-// 2. We perform the upgrade regardless of the auth result to avoid blocking the client.
-// 3. If headers failed, we start a "late-binding" authentication via WS message.
-// ---------------------------------------------------------------------------------
+// [SERVE_HTTP] Entry point for WebSocket upgrades.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// [1. HEADER_AUTH] Use shadowed variable for the first attempt.
+	// [AUDIT] Capture connection metadata for debugging.
+	remote := r.RemoteAddr
+	origin := r.Header.Get("Origin")
+
+	h.log.Debug("ws: incoming handshake",
+		slog.String("remote", remote),
+		slog.String("origin", origin),
+		slog.String("ua", r.UserAgent()),
+	)
+
+	// [1. HEADER_AUTH] Primary attempt using HTTP context (headers/query).
 	authInfo, errAuth := h.auther.Inspect(r.Context())
 
-	// [2. UPGRADE] Separate error handling to satisfy SA4006.
+	// [2. UPGRADE] Switch protocol from HTTP to WS.
 	c, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		h.log.Error("ws: upgrade failed", slog.Any("err", err))
+		h.log.Error("ws: upgrade failed",
+			slog.String("remote", remote),
+			slog.Any("err", err),
+		)
 		return
 	}
 
 	if errAuth == nil {
-		// [FAST_TRACK] Identity verified from HTTP context.
+		// [FAST_TRACK] User identified during handshake.
+		h.log.Info("ws: session authorized via headers",
+			slog.String("remote", remote),
+			slog.String("user_id", authInfo.ContactID),
+		)
 		h.initSession(r.Context(), c, authInfo)
 		return
 	}
 
-	// [3. DELAYED_AUTH] Wait for client-sent token.
-	go func() {
-		h.waitAuthFrame(c)
-	}()
+	// [3. DELAYED_AUTH] Header auth failed, wait for JSON token via socket.
+	h.log.Debug("ws: header auth failed, awaiting auth frame",
+		slog.String("remote", remote),
+		slog.Any("reason", errAuth),
+	)
+	go h.waitAuthFrame(c)
 }
 
+// [WAIT_AUTH_FRAME] Handles late-binding authentication.
 func (h *WSHandler) waitAuthFrame(c *websocket.Conn) {
+	remote := c.RemoteAddr().String()
+
 	if err := c.SetReadDeadline(time.Now().Add(authTimeout)); err != nil {
-		h.log.Error("ws: failed to set read deadline", slog.Any("err", err))
+		h.log.Error("ws: set read deadline failed", slog.Any("err", err))
 	}
 
-	// [CHANGE] Support both access token and client id in auth frame
 	var req struct {
 		Token  string `json:"x-webitel-access"`
 		Client string `json:"x-webitel-client"`
 	}
 
+	// [READ_JSON] Expecting auth credentials.
 	if err := c.ReadJSON(&req); err != nil {
-		h.log.Warn("ws: auth frame invalid or missing", slog.Any("err", err))
-		// [CHANGE] Send a clear 401 response before closing
+		h.log.Warn("ws: auth frame error",
+			slog.String("remote", remote),
+			slog.Any("err", err),
+		)
 		h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
 		return
 	}
 
+	// [CONTEXT_PREP] Mapping frame data to gRPC metadata.
 	authCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// [CHANGE] Properly map all provided credentials to gRPC metadata
 	md := metadata.Pairs("x-webitel-access", req.Token)
 	if req.Client != "" {
 		md.Set("x-webitel-client", req.Client)
 	}
 	authCtx = metadata.NewIncomingContext(authCtx, md)
 
+	// [INSPECT] Verify credentials against auth service.
 	authInfo, err := h.auther.Inspect(authCtx)
 	if err != nil {
-		h.log.Warn("ws: delayed auth denied", slog.Any("err", err))
-		// [CHANGE] Explicit 401 error
+		h.log.Warn("ws: delayed auth denied",
+			slog.String("remote", remote),
+			slog.Any("err", err),
+		)
 		h.terminate(c, websocket.ClosePolicyViolation, "401_invalid_token")
 		return
 	}
 
+	h.log.Info("ws: session authorized via frame",
+		slog.String("remote", remote),
+		slog.String("user_id", authInfo.ContactID),
+	)
+
+	// [RESET] Clear deadline for normal message flow.
 	_ = c.SetReadDeadline(time.Time{})
 	h.initSession(context.Background(), c, authInfo)
 }
 
-// [INIT_SESSION] Starts the full-duplex transmission pumps.
+// [INIT_SESSION] Lifecycle management for an active socket.
 func (h *WSHandler) initSession(ctx context.Context, c *websocket.Conn, auth *model.AuthContact) {
 	uid, _ := uuid.Parse(auth.ContactID)
-
-	// Create a new branch of context specifically for this session's lifecycle.
-	// It is now rooted in Background, so it won't be affected by the auth timeout.
 	sCtx, cancel := context.WithCancel(ctx)
 
+	// [SUBSCRIBE] Register connection in the deliverer.
 	sub := h.deliverer.Subscribe(sCtx, uid)
 	log := h.log.With(
 		slog.String("user_id", uid.String()),
 		slog.String("conn_id", sub.GetID().String()),
+		slog.String("remote", c.RemoteAddr().String()),
 	)
 
 	defer func() {
-		// Attempt to notify the client about the disconnection
+		// [CLEANUP] Ensure resources are released on exit.
 		h.sendSystem(c, uid, event.Disconnected, &model.DisconnectedPayload{
 			Reason: "terminated",
-			Code:   1000, // Normal Closure
+			Code:   1000,
 			Status: model.StatusShutdown,
 		})
 		cancel()
@@ -157,20 +184,19 @@ func (h *WSHandler) initSession(ctx context.Context, c *websocket.Conn, auth *mo
 
 	log.Info("ws: session established")
 
-	// Send the welcome event to the client
+	// [WELCOME] Notify client about successful setup.
 	h.sendSystem(c, uid, event.Connected, &model.ConnectedPayload{
 		Ok:            true,
 		ConnectionID:  sub.GetID().String(),
 		ServerVersion: model.ServerVersion,
 	})
 
-	// Start I/O pumps
+	// [PUMPS] Start full-duplex communication.
 	go h.readPump(c)
 	h.writePump(sCtx, c, sub, log)
 }
 
-// [I/O_PIPELINES]
-
+// [READ_PUMP] Drains input and handles control frames (Ping/Pong).
 func (h *WSHandler) readPump(c *websocket.Conn) {
 	c.SetReadLimit(maxMessageSize)
 	_ = c.SetReadDeadline(time.Now().Add(pongWait))
@@ -180,13 +206,14 @@ func (h *WSHandler) readPump(c *websocket.Conn) {
 	})
 
 	for {
-		// Drains input to process control frames (Ping/Close).
 		if _, _, err := c.NextReader(); err != nil {
+			// [BREAK] Exit on connection loss.
 			return
 		}
 	}
 }
 
+// [WRITE_PUMP] Forwards messages from queue to socket.
 func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub registry.Connector, log *slog.Logger) {
 	t := time.NewTicker(pingPeriod)
 	defer t.Stop()
@@ -194,6 +221,7 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 	for {
 		select {
 		case <-ctx.Done():
+			// [SHUTDOWN] Context canceled, close socket.
 			msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "shutdown")
 			_ = c.WriteControl(websocket.CloseMessage, msg, time.Now().Add(writeWait))
 			return
@@ -205,6 +233,7 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 			h.send(c, ev, log)
 
 		case <-t.C:
+			// [HEARTBEAT] Keep-alive ping.
 			_ = c.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
@@ -214,6 +243,7 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 }
 
 // [TRANSMISSION_HELPERS]
+
 func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) {
 	raw, err := h.marshaller.Marshal(ev)
 	if err != nil {
@@ -236,22 +266,16 @@ func (h *WSHandler) sendSystem(c *websocket.Conn, uid uuid.UUID, kind event.Even
 	}
 }
 
+// [TERMINATE] Closes connection with error state.
 func (h *WSHandler) terminate(c *websocket.Conn, code int, reason string) {
-	// [1. OPTIONAL] Send a JSON payload so the client app gets a "401" in the stream
-	// This helps frontend developers handle it via onMessage instead of just onClose.
 	h.sendSystem(c, uuid.Nil, event.Disconnected, &model.DisconnectedPayload{
 		Reason: reason,
 		Code:   401,
 		Status: model.UNAUTHORIZED,
 	})
 
-	// [2. CLOSE_FRAME] Send the official WS close frame
 	msg := websocket.FormatCloseMessage(code, reason)
-
-	// Set a very short deadline for the close message
 	_ = c.SetWriteDeadline(time.Now().Add(time.Second))
 	_ = c.WriteControl(websocket.CloseMessage, msg, time.Now().Add(writeWait))
-
-	// [3. SOCKET_CLOSE]
 	_ = c.Close()
 }

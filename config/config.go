@@ -24,11 +24,6 @@ type Config struct {
 type DeliveryConfig struct {
 	EnablePush bool          `mapstructure:"enable_push"`
 	AckTimeout time.Duration `mapstructure:"ack_timeout"`
-	Webhook    WebhookConfig `mapstructure:"webhook"`
-}
-
-type WebhookConfig struct {
-	URL string `mapstructure:"url"`
 }
 
 type ServiceConfig struct {
@@ -163,8 +158,6 @@ func defineFlags() {
 
 	pflag.Bool("delivery.enable_push", false, "Enable push notifications if delivery fails")
 	pflag.Duration("delivery.ack_timeout", 10*time.Second, "Timeout to wait for client ACK before pushing")
-
-	pflag.String("delivery.webhook.url", "", "Target URL for push webhooks")
 }
 
 func (c *Config) validate() error {

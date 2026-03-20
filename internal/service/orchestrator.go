@@ -15,7 +15,6 @@ import (
 )
 
 // --- Contracts ---
-
 // [EVENT_HANDLER] Standard interface for background event processing (e.g., Push, DB).
 type EventHandler interface {
 	Handle(ctx context.Context, ev event.Eventer)

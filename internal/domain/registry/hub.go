@@ -97,11 +97,10 @@ func (h *Hub) getShard(userID uuid.UUID) *shard {
 
 // [BROADCAST] Routes a pre-addressed event to a specific user's Cell.
 func (h *Hub) Broadcast(ev event.Eventer) {
-	userID := ev.GetUserID() // Already resolved at the handler level
-	s := h.getShard(userID)
+	s := h.getShard(ev.GetUserID())
 
 	s.RLock()
-	cell, exists := s.cells[userID]
+	cell, exists := s.cells[ev.GetUserID()]
 	s.RUnlock()
 
 	if exists {

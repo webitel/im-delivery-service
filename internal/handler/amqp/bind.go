@@ -14,31 +14,27 @@ type DomainHandler[T any] func(ctx context.Context, payload *T) ([]event.Eventer
 
 func (h *MessageHandler) Dispatch(ctx context.Context, events []event.Eventer) {
 	for _, ev := range events {
-		// [GUARD] Skip empty events to prevent downstream nil pointer dereferences.
 		if ev == nil {
 			continue
 		}
 
-		// [LOCAL_DELIVERY] Always notify local sessions via the sharded Hub.
-		// This is non-blocking and handles direct WebSocket communication.
-		h.hub.Broadcast(ev)
+		// [DELIVERY_ORCHESTRATION]
+		// This single call now handles:
+		// 1. Socket broadcast to local cells.
+		// 2. Redis tracking (if EnablePush is true).
+		// 3. Background wait for ACK.
+		// 4. Push fallback.
+		h.orchestrator.Notify(ctx, ev)
 
-		// [GLOBAL_DELIVERY] Check if the event satisfies the Exportable interface.
-		// ---------------------------------------------------------------------------------
-		// [LOGIC]
-		// If 'ok' is true, the event is an ExportableEnvelope (e.g., MessageCreated).
-		// If 'ok' is false, it's a base Envelope (e.g., ThreadCreated, System signals),
-		// which are strictly node-local and should NOT be published to the global bus.
-		// ---------------------------------------------------------------------------------
-		if _, ok := ev.(event.Exportable); ok {
-			// Publish to RabbitMQ via the atomic proxy (checked for leader/active node inside).
-			if err := h.dispatcher.Publish(ctx, ev); err != nil {
-				h.logger.Error("GLOBAL_DISPATCH_FAILED",
-					"err", err,
-					"user_id", ev.GetUserID(),
-					"kind", ev.GetKind(),
-				)
-			}
+		// [GLOBAL_REPLICATION]
+		// Dispatcher decides internally whether the event is routable.
+		if err := h.dist.Publish(ctx, ev); err != nil {
+			h.logger.Error(
+				"GLOBAL_DISPATCH_FAILED",
+				"err", err,
+				"user_id", ev.GetUserID(),
+				"kind", ev.GetKind(),
+			)
 		}
 	}
 }
@@ -53,8 +49,6 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 		}()
 
 		payload := new(T)
-		p := json.Unmarshal(msg.Payload, payload)
-		println(p)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
 			return nil // ACK invalid payloads
 		}

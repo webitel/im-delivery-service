@@ -8,6 +8,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/google/uuid"
+	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	"github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	"github.com/webitel/im-delivery-service/internal/service"
@@ -28,24 +29,35 @@ const (
 )
 
 type MessageHandler struct {
-	hub        registry.Hubber
-	logger     *slog.Logger
-	enricher   service.Contacter
-	dispatcher pubsub.EventDispatcher
+	orchestrator service.Orchestrator
+	hub          registry.Hubber
+	logger       *slog.Logger
+	enricher     service.Contacter
+	leader       leader.LeaderAwarer
+	dist         pubsub.EventDispatcher
 }
 
 func NewMessageHandler(
+	orchestrator service.Orchestrator,
 	hub registry.Hubber,
 	logger *slog.Logger,
 	enricher service.Contacter,
-	dispatcher pubsub.EventDispatcher,
+	leader leader.LeaderAwarer,
+	dist pubsub.EventDispatcher,
 ) *MessageHandler {
-	return &MessageHandler{hub, logger, enricher, dispatcher}
+	return &MessageHandler{
+		orchestrator: orchestrator,
+		hub:          hub,
+		logger:       logger,
+		enricher:     enricher,
+		leader:       leader,
+		dist:         dist,
+	}
 }
 
 // [REGISTRATION_PIPELINE]
 func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *pubsub.SubscriberProvider) error {
-	poison, err := middleware.PoisonQueue(h.dispatcher.Publisher(), DeliveryPoisonTopic)
+	poison, err := middleware.PoisonQueue(h.dist.Publisher(), DeliveryPoisonTopic)
 	if err != nil {
 		return fmt.Errorf("POISON_SETUP_FAILED: %w", err)
 	}

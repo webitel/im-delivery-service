@@ -21,8 +21,7 @@ var _ authv1.AccountClient = (*Client)(nil)
 type Client struct {
 	logger *slog.Logger
 	rpc    *rpc.Client[authv1.AccountClient]
-	tls *infratls.Config
-
+	tls    *infratls.Config
 }
 
 // New initializes a resilient gRPC client for the Auth service.
@@ -31,7 +30,7 @@ func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infrat
 		return authv1.NewAccountClient(conn)
 	}
 
-	c, err := webitel.New(logger,discovery,ServiceName, tls,factory)
+	c, err := webitel.New(logger, discovery, ServiceName, tls, factory)
 	if err != nil {
 		return nil, fmt.Errorf("[im-auth-client] initialization failed: %w", err)
 	}
@@ -93,16 +92,20 @@ func (c *Client) UnregisterDevice(ctx context.Context, in *authv1.UnregisterDevi
 	return resp, err
 }
 
+// GetAuthorizations implements [auth.AccountClient].
+func (c *Client) GetAuthorizations(ctx context.Context, in *authv1.GetAuthorizationRequest, opts ...grpc.CallOption) (*authv1.AuthorizationList, error) {
+	var resp *authv1.AuthorizationList
+	err := c.rpc.Execute(ctx, func(api authv1.AccountClient) error {
+		var err error
+		resp, err = api.GetAuthorizations(ctx, in, opts...)
+		return err
+	})
+	return resp, err
+}
+
 func (c *Client) Close() error {
 	if c.rpc != nil {
 		return c.rpc.Close()
 	}
 	return nil
-}
-
-func (c *Client) maskToken(t string) string {
-	if len(t) <= 8 {
-		return "****"
-	}
-	return t[:4] + "..." + t[len(t)-4:]
 }

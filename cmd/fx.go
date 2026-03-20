@@ -4,6 +4,7 @@ import (
 	"github.com/webitel/im-delivery-service/config"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
+	pushdi "github.com/webitel/im-delivery-service/infra/push/di"
 	grpcsrv "github.com/webitel/im-delivery-service/infra/server/grpc"
 	httpsrv "github.com/webitel/im-delivery-service/infra/server/http"
 	"github.com/webitel/im-delivery-service/infra/tls"
@@ -12,6 +13,7 @@ import (
 	grpchandler "github.com/webitel/im-delivery-service/internal/handler/grpc"
 	wshandler "github.com/webitel/im-delivery-service/internal/handler/ws"
 	servicedi "github.com/webitel/im-delivery-service/internal/service/di"
+	redisdi "github.com/webitel/im-delivery-service/internal/store/redis"
 	"github.com/webitel/webitel-go-kit/infra/discovery"
 	"go.uber.org/fx"
 )
@@ -26,6 +28,7 @@ func NewApp(cfg *config.Config) *fx.App {
 			ProvideWatermillLogger,
 			ProvideSD,
 			ProvidePubSub,
+			ProvideRedis,
 		),
 
 		// [INIT] Global service discovery orchestration
@@ -51,5 +54,11 @@ func NewApp(cfg *config.Config) *fx.App {
 		// [DISTRIBUTED_CONSENSUS] Orchestrates leadership state to ensure
 		// strictly single-active-node publishing to the message broker.
 		leader.Module,
+
+		// [STORES] Data persistence and caching layers
+		redisdi.Module,
+
+		// PUSH service module
+		pushdi.Module,
 	)
 }

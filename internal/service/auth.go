@@ -50,5 +50,10 @@ func (s *AuthService) Inspect(ctx context.Context) (*model.AuthContact, error) {
 		Sub:       auth.Contact.Sub,
 		Iss:       auth.Contact.Iss,
 		Name:      auth.Contact.Name,
+		Devices: []model.Device{{
+			ID:       auth.Device.Id,
+			Platform: auth.Device.App.Os,
+			AppID:  auth.Device.App.Name,
+		}},
 	}, nil
 }

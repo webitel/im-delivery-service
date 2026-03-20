@@ -13,7 +13,6 @@ import (
 type EventDispatcher interface {
 	Publish(ctx context.Context, ev event.Eventer) error
 	Publisher() message.Publisher
-	IsLeader() bool
 }
 
 type eventDispatcher struct {
@@ -34,9 +33,15 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 		return nil
 	}
 
-	// [CONTRACT] Check if the event is meant for external AMQP delivery
-	exportable, ok := ev.(event.Exportable)
+	// [ROUTABLE_CHECK] Only payloads that define routing are exported.
+	routable, ok := ev.GetPayload().(event.Routable)
 	if !ok {
+		return nil
+	}
+	// [ROUTING_KEY] Resolve routing from payload.
+	routingKey := routable.RoutingKey()
+
+	if routingKey == "" {
 		return nil
 	}
 
@@ -45,14 +50,11 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 		return fmt.Errorf("dispatcher: marshal error: %w", err)
 	}
 
-	// [ENVELOPE] Create a clean message without Watermill infrastructure noise
+	// [MESSAGE_ENVELOPE] Create AMQP message.
 	msg := message.NewMessage(watermill.NewUUID(), payload)
 	msg.SetContext(ctx)
 
-	// [ROUTING] The first argument is the Routing Key.
-	// In your Factory, GenerateRoutingKey: func(s string) string { return s }
-	// so the routing key will be exactly what 'exportable.GetRoutingKey()' returns.
-	if err := d.publisher.Publish(exportable.GetRoutingKey(), msg); err != nil {
+	if err := d.publisher.Publish(routingKey, msg); err != nil {
 		return fmt.Errorf("dispatcher: publish failed: %w", err)
 	}
 

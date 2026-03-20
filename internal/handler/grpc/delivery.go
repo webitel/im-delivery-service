@@ -19,21 +19,21 @@ import (
 var _ impb.DeliveryServer = (*DeliveryHandler)(nil)
 
 type DeliveryHandler struct {
-	logger     *slog.Logger
-	deliverer  service.Deliverer
-	marshaller marshaller.EventMarshaller
+	logger         *slog.Logger
+	sessionManager service.SessionManager
+	marshaller     marshaller.EventMarshaller
 	impb.UnimplementedDeliveryServer
 }
 
 func NewDeliveryHandler(
 	logger *slog.Logger,
-	deliverer service.Deliverer,
+	sessionManager service.SessionManager,
 	marshaller *grpcmarshaller.Marshaller,
 ) *DeliveryHandler {
 	return &DeliveryHandler{
-		logger:     logger,
-		deliverer:  deliverer,
-		marshaller: marshaller,
+		logger:         logger,
+		sessionManager: sessionManager,
+		marshaller:     marshaller,
 	}
 }
 
@@ -60,18 +60,25 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		slog.String("session_id", uuid.NewString()),
 	)
 
-	l.Info("[STREAM] incoming connection request", slog.String("version", model.ServerVersion))
+	l.Info("[STREAM] incoming connection requолest", slog.String("version", model.ServerVersion))
 
 	// [ACTOR_ATTACHMENT]
 	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).
 	// This ensures all events routed to the Hub for this UserID will reach this stream.
-	conn := d.deliverer.Subscribe(stream.Context(), userID)
+	conn, err := d.sessionManager.Attach(stream.Context(), userID, auth.Devices[0].ID)
+	if err != nil {
+		l.Error("[STREAM] failed to attach session",
+			slog.Any("err", err),
+			slog.String("device_id", auth.Devices[0].ID),
+		)
+		return status.Error(codes.Internal, "failed to establish session presence")
+	}
 
 	// [RESOURCE_RECLAMATION]
 	// Ensure the connector is detached from the Hub when the function returns.
 	// This prevents memory leaks and ensures the Hub doesn't try to send to a dead stream.
 	defer func() {
-		d.deliverer.Unsubscribe(userID, conn.GetID())
+		d.sessionManager.Detach(stream.Context(), userID, conn.GetID())
 		l.Info("[STREAM] connection closed and resources reclaimed",
 			slog.String("conn_id", conn.GetID().String()),
 		)

@@ -6,6 +6,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
+// TODO add is_bot everywhere we have members
 type WSPeer struct {
 	ID     string `json:"id"`
 	Type   string `json:"type"`

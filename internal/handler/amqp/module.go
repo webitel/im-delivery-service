@@ -3,7 +3,6 @@ package amqp
 import (
 	"context"
 	"log/slog"
-	"sync/atomic"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -13,33 +12,33 @@ import (
 	"go.uber.org/fx"
 )
 
-// [INFRASTRUCTURE] Global delivery constants
+// [CONSTANTS] Global infrastructure settings
 const DeliveryExchange = "im_delivery.broadcast"
 
-// [INTERFACE_ADAPTER] atomicDispatcher gates all side-effects based on leadership state
+// [DISPATCHER_PROXY] Gates execution based on the shared leadership state from leader package.
 type atomicDispatcher struct {
-	active atomic.Pointer[pubsubadapter.EventDispatcher]
+	awarer leader.LeaderAwarer
+	base   pubsubadapter.EventDispatcher
 }
 
+// Publish only executes if the current node is the leader.
 func (a *atomicDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
-	if d := a.active.Load(); d != nil {
-		return (*d).Publish(ctx, ev)
+	if !a.awarer.IsLeader() {
+		// [FOLLOWER] Standby nodes silently ignore outgoing events to prevent duplicates.
+		return nil
 	}
-	return nil // [NO-OP] Followers silently drop events to prevent duplicates
+	return a.base.Publish(ctx, ev)
 }
 
+// Publisher returns the underlying watermill publisher if leading.
 func (a *atomicDispatcher) Publisher() message.Publisher {
-	if d := a.active.Load(); d != nil {
-		return (*d).Publisher()
+	if !a.awarer.IsLeader() {
+		return nil
 	}
-	return nil
+	return a.base.Publisher()
 }
 
-func (a *atomicDispatcher) IsLeader() bool {
-	return a.active.Load() != nil
-}
-
-// [DEPENDENCIES] Explicit parameter structure for the Invoke stage
+// [DEPENDENCIES] Parameter structure for the Fx Invoke stage.
 type invokeParams struct {
 	fx.In
 
@@ -47,13 +46,10 @@ type invokeParams struct {
 	Handler   *MessageHandler
 	Router    *message.Router
 	SubProv   *pubsubadapter.SubscriberProvider
-	Elector   leader.LeadershipElector
+	Elector   leader.Elector
 	Logger    *slog.Logger
-
-	// [RESOLVE] Get the raw implementation by name to avoid the Proxy-to-Proxy loop
-	BaseDispatcher pubsubadapter.EventDispatcher `name:"base_dispatcher"`
-	// [RESOLVE] Get the proxy pointer to manage its state
-	Proxy *atomicDispatcher
+	// [STATE] We inject the concrete Status to update leadership during transitions.
+	Status *leader.Status
 }
 
 var Module = fx.Module("amqp-handler",
@@ -61,40 +57,40 @@ var Module = fx.Module("amqp-handler",
 		pubsubadapter.NewSubscriberProvider,
 		pubsubadapter.NewPublisherProvider,
 
-		// [BROKER] RabbitMQ publisher factory
+		// [BROKER] Primary RabbitMQ publisher factory
 		func(pp *pubsubadapter.PublisherProvider) (message.Publisher, error) {
 			return pp.Build(DeliveryExchange)
 		},
 
-		// [BASE_DISPATCHER] Register the real logic with a NAME
+		// [BASE_DISPATCHER] The actual domain logic registered with a name to avoid cycles.
 		fx.Annotate(
 			pubsubadapter.NewEventDispatcher,
 			fx.ResultTags(`name:"base_dispatcher"`),
 		),
 
-		// [PROXY_DISPATCHER] Register the atomic proxy as the PRIMARY interface for the app
-		// This is what NewMessageHandler will receive.
+		// [PROXY_DISPATCHER] We use fx.ParamTags to tell Fx which dependency is the "base_dispatcher"
 		fx.Annotate(
-			func() *atomicDispatcher {
-				return &atomicDispatcher{}
+			func(aw leader.LeaderAwarer, base pubsubadapter.EventDispatcher) pubsubadapter.EventDispatcher {
+				return &atomicDispatcher{
+					awarer: aw,
+					base:   base,
+				}
 			},
 			fx.As(new(pubsubadapter.EventDispatcher)),
+			// [TAGS] The first nil is for LeaderAwarer (no tag), the second is for our base dispatcher
+			fx.ParamTags(``, `name:"base_dispatcher"`),
 		),
-
-		// [STATE_ACCESS] Also provide the raw pointer so we can call Store() in Invoke
-		func(d pubsubadapter.EventDispatcher) *atomicDispatcher {
-			return d.(*atomicDispatcher)
-		},
 
 		NewMessageHandler,
 
+		// [ROUTER] Watermill router for handling incoming AMQP messages
 		func(logger *slog.Logger) (*message.Router, error) {
 			return message.NewRouter(message.RouterConfig{}, watermill.NewSlogLogger(logger))
 		},
 	),
 
 	fx.Invoke(func(p invokeParams) error {
-		// [WIRING] Map AMQP topics to domain handlers
+		// [WIRING] Map all AMQP topics to domain message handlers
 		if err := p.Handler.RegisterHandlers(p.Router, p.SubProv); err != nil {
 			return err
 		}
@@ -103,25 +99,25 @@ var Module = fx.Module("amqp-handler",
 
 		p.Lifecycle.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				// [WORKER] Standard consumer routine
+				// [WORKER] Start the background message consumer
 				go func() {
 					if err := p.Router.Run(mainCtx); err != nil {
-						p.Logger.Error("AMQP_ROUTER_FAILURE", "err", err)
+						p.Logger.Error("AMQP_ROUTER_STOPPED", slog.Any("err", err))
 					}
 				}()
 
-				// [LEADERSHIP] Dynamic implementation swapping
+				// [ORCHESTRATION] Start the Consul leader election loop
 				go p.Elector.Run(mainCtx,
 					func(leaderCtx context.Context) error {
-						p.Logger.Info("LEADER_PROMOTED: enabling global event dispatcher")
-						// [HOT_SWAP] Map the proxy to the real named dispatcher
-						p.Proxy.active.Store(&p.BaseDispatcher)
+						p.Logger.Info("LEADER_PROMOTED: enabling event delivery")
+						// [SYNC] Set global status to true, enabling the atomicDispatcher
+						p.Status.Set(true)
 						return nil
 					},
 					func() {
-						p.Logger.Warn("LEADER_DEMOTED: deactivating global event dispatcher")
-						// [SHUTDOWN] Disable the gate
-						p.Proxy.active.Store(nil)
+						p.Logger.Warn("LEADER_DEMOTED: disabling event delivery")
+						// [SYNC] Reset global status, putting atomicDispatcher into standby mode
+						p.Status.Set(false)
 					},
 				)
 				return nil

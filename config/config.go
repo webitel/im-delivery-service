@@ -19,6 +19,7 @@ type Config struct {
 	Consul   ConsulConfig   `mapstructure:"consul"`
 	Pubsub   PubsubConfig   `mapstructure:"pubsub"`
 	Delivery DeliveryConfig `mapstructure:"delivery"`
+	Profiler ProfilerConfig `mapstructure:"profiler"`
 }
 
 type DeliveryConfig struct {
@@ -70,6 +71,12 @@ type ConsulConfig struct {
 type PubsubConfig struct {
 	URL    string `mapstructure:"broker_url"`
 	Driver string `mapstructure:"broker_driver"`
+}
+
+type ProfilerConfig struct {
+	Addr                 string `mapstructure:"addr"`
+	MutexProfileFraction int    `mapstructure:"mutex_profile_fraction"`
+	BlockProfileRate     int    `mapstructure:"block_profile_rate"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -158,6 +165,10 @@ func defineFlags() {
 
 	pflag.Bool("delivery.enable_push", false, "Enable push notifications if delivery fails")
 	pflag.Duration("delivery.ack_timeout", 10*time.Second, "Timeout to wait for client ACK before pushing")
+
+	pflag.String("profiler.addr", "", "Profiler service address")
+	pflag.Int("profiler.mutex_profile_fraction", 1, "Profiler service mutex profile fraction")
+	pflag.Int("profiler.block_profile_rate", 1, "Profiler service block profile rate")
 }
 
 func (c *Config) validate() error {

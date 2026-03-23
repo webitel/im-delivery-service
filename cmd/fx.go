@@ -15,6 +15,7 @@ import (
 	servicedi "github.com/webitel/im-delivery-service/internal/service/di"
 	redisdi "github.com/webitel/im-delivery-service/internal/store/redis"
 	"github.com/webitel/webitel-go-kit/infra/discovery"
+	"github.com/webitel/webitel-go-kit/infra/profiler"
 	"go.uber.org/fx"
 )
 
@@ -29,6 +30,7 @@ func NewApp(cfg *config.Config) *fx.App {
 			ProvideSD,
 			ProvidePubSub,
 			ProvideRedis,
+			ProvideProfiler,
 		),
 
 		// [INIT] Global service discovery orchestration
@@ -60,5 +62,8 @@ func NewApp(cfg *config.Config) *fx.App {
 
 		// PUSH service module
 		pushdi.Module,
+
+		// Fetch metrics from profiler
+		profiler.Module,
 	)
 }

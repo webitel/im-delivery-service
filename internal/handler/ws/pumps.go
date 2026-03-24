@@ -1,4 +1,3 @@
-// internal/handler/ws/pumps.go
 package ws
 
 import (
@@ -12,12 +11,20 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 )
 
+// [READ_PUMP] Continuous read loop.
 func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
+	defer func() { _ = conn.Close() }()
+
 	conn.SetReadLimit(maxMessageSize)
 	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+
 	conn.SetPongHandler(func(string) error {
 		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
-		_ = h.presenceManager.Heartbeat(context.Background(), uid, cid)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = h.presenceManager.Heartbeat(ctx, uid, cid)
+		}()
 		return nil
 	})
 
@@ -27,7 +34,7 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 			EID  uuid.UUID `json:"event_id"`
 		}
 		if err := conn.ReadJSON(&req); err != nil {
-			break
+			break // Loop breaks immediately if terminate() is called.
 		}
 
 		ctx := context.Background()
@@ -40,6 +47,7 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 	}
 }
 
+// [WRITE_PUMP] Outbound event stream.
 func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub registry.Connector, log *slog.Logger) {
 	t := time.NewTicker(pingPeriod)
 	defer t.Stop()
@@ -49,9 +57,7 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 		case <-ctx.Done():
 			return
 		case ev, ok := <-sub.Recv():
-			if !ok {
-				return
-			}
+			if !ok { return }
 			h.send(c, ev, log)
 		case <-t.C:
 			_ = c.SetWriteDeadline(time.Now().Add(writeWait))

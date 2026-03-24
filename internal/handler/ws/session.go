@@ -14,20 +14,22 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// [WAIT_AUTH_FRAME] Handles authentication for connections that missed header auth.
+// waitAuthFrame handles authentication for connections that missed header-based auth.
 func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	remote := c.RemoteAddr().String()
+
+	// [1] Set a strict read deadline for the initial auth frame (5s).
+	// This prevents the connection from hanging if the client doesn't send anything.
 	_ = c.SetReadDeadline(time.Now().Add(authTimeout))
 
-	// [SCHEMA] Expected JSON body for WS authentication.
 	var req struct {
 		Token  string `json:"x-webitel-access"`
 		Client string `json:"x-webitel-client"`
 	}
 
-	// [READ] Attempt to parse the first frame as an auth object.
+	// [2] Read the JSON auth frame.
 	if err := c.ReadJSON(&req); err != nil {
-		h.log.Warn("ws: auth frame read failed",
+		h.log.Warn("ws: auth frame read failed or timed out",
 			slog.String("remote", remote),
 			slog.Any("err", err),
 		)
@@ -35,27 +37,31 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 		return
 	}
 
-	// [INSPECT] Verify credentials via gRPC account service.
-	auth, err := h.auther.Inspect(metadata.NewIncomingContext(ctx, metadata.Pairs(
+	// [3] Create a dedicated context with a short timeout for the gRPC call.
+	authCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	// [4] Verify credentials via gRPC account service using the timed-out context.
+	auth, err := h.auther.Inspect(metadata.NewIncomingContext(authCtx, metadata.Pairs(
 		"x-webitel-access", req.Token,
 		"x-webitel-client", req.Client,
 	)))
 	if err != nil {
-		// [ERROR_MAPPING] Check if it's a network/infra failure or auth failure.
 		st, ok := status.FromError(err)
 
-		if ok && (st.Code() == codes.Unavailable || st.Code() == codes.Internal || st.Code() == codes.DeadlineExceeded) {
-			// [500_ERROR] Infrastructure is down (e.g. connection refused).
-			h.log.Error("ws: auth service unavailable (500)",
+		// [5] Handle infrastructure/timeout errors (500 range).
+		if ok && (st.Code() == codes.DeadlineExceeded || st.Code() == codes.Unavailable || st.Code() == codes.Internal) {
+			h.log.Error("ws: auth service slow or unavailable",
 				slog.String("remote", remote),
+				slog.String("grpc_code", st.Code().String()),
 				slog.Any("err", err),
 			)
 			h.terminate(c, 500, "500_internal_error")
 			return
 		}
 
-		// [401_ERROR] Invalid credentials or expired token.
-		h.log.Warn("ws: auth denied (401)",
+		// [6] Handle invalid credentials (401 range).
+		h.log.Warn("ws: auth denied",
 			slog.String("remote", remote),
 			slog.Any("err", err),
 		)
@@ -68,8 +74,10 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 		slog.String("remote", remote),
 	)
 
-	// [RESET] Remove deadline for normal message exchange.
+	// [7] CRITICAL: Reset the read deadline for normal message exchange.
+	// Otherwise, the connection will close after the initial 5s window.
 	_ = c.SetReadDeadline(time.Time{})
+
 	h.initSession(c, auth)
 }
 

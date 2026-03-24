@@ -135,7 +135,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 				// [TERMINATION] Mailbox closed, send final signal
 				terminationEv := event.NewSystemEvent(
 					userID,
-					event.Disconnected,
+					event.DisconnectedEvent,
 					&model.DisconnectedPayload{Reason: "session_closed_by_server"},
 					event.WithPriority[*model.DisconnectedPayload](event.PriorityHigh),
 				)

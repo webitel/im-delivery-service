@@ -17,7 +17,7 @@ const authInfoKey contextKey = "auth_info"
 
 func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// [1] Attempt to extract credentials from headers or query params.
+		// [1] Extraction
 		hToken := r.Header.Get("x-webitel-access")
 		qToken := r.URL.Query().Get("x-webitel-access")
 		clientID := r.Header.Get("x-webitel-client")
@@ -30,20 +30,17 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 			token = qToken
 		}
 
-		// [2] If no token is present, decide whether to allow an unauthenticated Upgrade.
+		// [2] Decision Logic
+		// If there is NO token, we allow the Upgrade regardless of whether ClientID exists.
+		// The 'waitAuthFrame' will handle the 5-second timeout for the missing token.
 		if token == "" {
-			if clientID != "" {
-				// Client ID without a token is a logic error; reject immediately.
-				h.log.Warn("ws: auth failed, client_id without token", slog.String("remote", r.RemoteAddr))
-				http.Error(w, "401 Unauthorized: token required", http.StatusUnauthorized)
-				return
-			}
-			// Completely empty request - proceed to late-binding (waitAuthFrame).
+			h.log.Debug("ws: no token in headers, allowing upgrade for late-binding auth",
+				slog.String("remote", r.RemoteAddr))
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// [3] Perform identity inspection via gRPC.
+		// [3] Fast-track: Token is present, validate it immediately.
 		md := metadata.Pairs("x-webitel-access", token, "x-webitel-client", clientID)
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
@@ -56,7 +53,6 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 				slog.String("err", st.Message()),
 			)
 
-			// Map gRPC errors to HTTP statuses.
 			switch st.Code() {
 			case codes.Unauthenticated, codes.InvalidArgument, codes.Unknown:
 				http.Error(w, "401 Unauthorized: "+st.Message(), http.StatusUnauthorized)
@@ -68,7 +64,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// [4] Success: inject auth data and proceed to Upgrade.
+		// [4] Success
 		newCtx := context.WithValue(r.Context(), authInfoKey, auth)
 		next.ServeHTTP(w, r.WithContext(newCtx))
 	})

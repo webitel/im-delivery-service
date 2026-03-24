@@ -14,24 +14,33 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// [WAIT_AUTH_FRAME] Handles JSON-based authentication inside the socket.
+// [WAIT_AUTH_FRAME] Now waits 5s if only client_id was provided in headers.
 func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
+	// [1] If Fast-track was successful in middleware
 	if auth, ok := ctx.Value(authInfoKey).(*model.AuthContact); ok {
+		h.log.Info("ws: using fast-track auth from middleware",
+			slog.String("uid", auth.ContactID),
+			slog.String("remote", c.RemoteAddr().String()))
 		h.initSession(c, auth)
 		return
 	}
 
-	_ = c.SetReadDeadline(time.Now().Add(authTimeout))
+	// [2] Late-binding: Wait for the first JSON message
+	h.log.Debug("ws: waiting for auth payload", slog.String("remote", c.RemoteAddr().String()))
+	_ = c.SetReadDeadline(time.Now().Add(authTimeout)) // This is your 5s timeout
+
 	var req struct {
 		Token  string `json:"x-webitel-access"`
 		Client string `json:"x-webitel-client"`
 	}
 
 	if err := c.ReadJSON(&req); err != nil {
-		h.terminate(c, websocket.ClosePolicyViolation, "401_UNAUTHORIZED_TIMEOUT")
+		h.log.Warn("ws: auth payload timeout or invalid", slog.Any("err", err))
+		h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
 		return
 	}
 
+	// [3] Validate the credentials received via JSON
 	authCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -45,13 +54,14 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 
 		switch st.Code() {
 		case codes.Unauthenticated, codes.InvalidArgument, codes.Unknown:
-			h.terminate(c, websocket.ClosePolicyViolation, "401_UNAUTHORIZED: "+st.Message())
+			h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
 		default:
-			h.terminate(c, 1011, "500_INTERNAL_AUTH_ERROR")
+			h.terminate(c, 1011, "500_internal_server_error")
 		}
 		return
 	}
 
+	// [4] Success: clear deadline and start session
 	_ = c.SetReadDeadline(time.Time{})
 	h.initSession(c, auth)
 }

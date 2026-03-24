@@ -2,6 +2,7 @@ package ws
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,40 +10,52 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
-// [TERMINATE] Sends a disconnect event, then a close frame, and finally tears down TCP.
-func (h *WSHandler) terminate(c *websocket.Conn, code int, reason string) {
-	// [1] Safety check for RFC reason length (max 123 bytes)
+// [TERMINATE] Gracefully terminates the connection with a custom event.
+func (h *WSHandler) terminate(c *websocket.Conn, wsCode int, reason string) {
+	// [1] Extract HTTP-like status code from the reason string (e.g., "401_UNAUTHORIZED" -> "401")
+	// If no HTTP code is found, we fallback to a string representation of the WS code.
+	httpCode := "500"
+	if strings.Contains(reason, "401") {
+		httpCode = "401"
+	} else if strings.Contains(reason, "403") {
+		httpCode = "403"
+	} else if wsCode == websocket.ClosePolicyViolation {
+		httpCode = "401"
+	}
+
+	// [2] Send Disconnected system event with the mapped HTTP code.
+	h.sendSystem(c, uuid.Nil, event.Disconnected, map[string]string{
+		"reason": reason,
+		"code":   httpCode,
+	})
+
+	// [3] Linger to allow the JSON buffer to be transmitted.
+	time.Sleep(60 * time.Millisecond)
+
+	// [4] Prepare and send the RFC-compliant WebSocket Close Frame.
 	shortReason := reason
 	if len(shortReason) > 123 {
 		shortReason = shortReason[:120] + "..."
 	}
 
-	// [2] Send a high-level JSON event so the client application can parse the reason easily.
-	// We use a nil UUID if we're not sure about the user's identity yet.
-	h.sendSystem(c, uuid.Nil, event.Disconnected, map[string]string{
-		"reason": reason,
-		"code":   string(rune(code)),
-	})
-
-	// [3] Give the JSON message a moment to leave the userspace buffer.
-	time.Sleep(50 * time.Millisecond)
-
-	// [4] Send the native WebSocket Close Frame.
 	_ = c.SetWriteDeadline(time.Now().Add(time.Second * 1))
-	msg := websocket.FormatCloseMessage(code, shortReason)
+	msg := websocket.FormatCloseMessage(wsCode, shortReason)
 	_ = c.WriteMessage(websocket.CloseMessage, msg)
 
-	// [5] Force-expire read deadline to kill any active readPump goroutines.
+	// [5] Set immediate deadline to interrupt any active read pumps.
 	_ = c.SetReadDeadline(time.Now().Add(time.Millisecond * 10))
 
-	// [6] Final physical closure after a short linger.
+	// [6] Final physical connection tear down.
 	time.AfterFunc(150*time.Millisecond, func() {
 		_ = c.Close()
-		h.log.Debug("ws: connection physically closed", slog.String("reason", reason))
+		h.log.Debug("ws: connection terminated",
+			slog.String("http_code", httpCode),
+			slog.Int("ws_code", wsCode),
+		)
 	})
 }
 
-// [SEND] Marshalling and writing a text message to the socket.
+// [SEND] Marshals and writes a message to the websocket.
 func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) {
 	raw, err := h.marshaller.Marshal(ev)
 	if err != nil {
@@ -53,7 +66,7 @@ func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) 
 	if data, ok := raw.([]byte); ok {
 		_ = c.SetWriteDeadline(time.Now().Add(writeWait))
 		if err := c.WriteMessage(websocket.TextMessage, data); err != nil {
-			log.Warn("ws: failed to send message", slog.Any("err", err))
+			log.Warn("ws: write failed", slog.Any("err", err))
 		}
 	}
 }

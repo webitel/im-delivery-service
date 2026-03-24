@@ -14,25 +14,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// [WAIT_AUTH_FRAME] Handles late-binding authentication.
+// [WAIT_AUTH_FRAME] Handles JSON-based authentication inside the socket.
 func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
-	// [1] Skip if middleware already did the job
 	if auth, ok := ctx.Value(authInfoKey).(*model.AuthContact); ok {
 		h.initSession(c, auth)
 		return
 	}
 
-	remote := c.RemoteAddr().String()
 	_ = c.SetReadDeadline(time.Now().Add(authTimeout))
-
 	var req struct {
 		Token  string `json:"x-webitel-access"`
 		Client string `json:"x-webitel-client"`
 	}
 
 	if err := c.ReadJSON(&req); err != nil {
-		h.log.Warn("ws: auth frame malformed", slog.String("remote", remote), slog.Any("err", err))
-		h.terminate(c, websocket.ClosePolicyViolation, "INVALID_AUTH_PAYLOAD")
+		h.terminate(c, websocket.ClosePolicyViolation, "401_UNAUTHORIZED_TIMEOUT")
 		return
 	}
 
@@ -45,20 +41,11 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	)))
 	if err != nil {
 		st, _ := status.FromError(err)
-
-		// [LOG_CRITICAL] Detailed debug info about why identity failed
-		h.log.Error("ws: late-auth inspection failed",
-			slog.String("remote", remote),
-			slog.Int("grpc_code", int(st.Code())),
-			slog.String("grpc_status", st.Code().String()),
-			slog.String("grpc_msg", st.Message()), // Complete reason (e.g. "expired")
-		)
+		h.log.Error("ws: late-auth inspection failed", slog.String("err", st.Message()))
 
 		switch st.Code() {
 		case codes.Unauthenticated, codes.InvalidArgument, codes.Unknown:
-			h.terminate(c, websocket.ClosePolicyViolation, "401_UNAUTHORIZED")
-		case codes.PermissionDenied:
-			h.terminate(c, websocket.ClosePolicyViolation, "403_FORBIDDEN")
+			h.terminate(c, websocket.ClosePolicyViolation, "401_UNAUTHORIZED: "+st.Message())
 		default:
 			h.terminate(c, 1011, "500_INTERNAL_AUTH_ERROR")
 		}
@@ -69,15 +56,14 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	h.initSession(c, auth)
 }
 
-// [INIT_SESSION] Bootstraps the message delivery pipeline.
 func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 	uid, _ := uuid.Parse(auth.ContactID)
 	sessionCtx, cancel := context.WithCancel(context.Background())
 
 	sub, err := h.sessionManager.Attach(sessionCtx, uid, auth.Devices[0].ID)
 	if err != nil {
-		h.log.Error("ws: session attach failed", slog.String("uid", uid.String()), slog.Any("err", err))
-		h.terminate(c, websocket.CloseInternalServerErr, "SESSION_ATTACH_ERROR")
+		h.log.Error("ws: session attach failed", slog.Any("err", err))
+		h.terminate(c, 1011, "SESSION_ATTACH_ERROR")
 		cancel()
 		return
 	}
@@ -85,12 +71,10 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 	cid := sub.GetID()
 	log := h.log.With(slog.String("uid", uid.String()), slog.String("cid", cid.String()))
 
-	// [DEFER_CLEANUP] Managed session teardown.
 	defer func() {
 		cancel()
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cleanupCancel()
-
 		h.sessionManager.Detach(cleanupCtx, uid, cid)
 		_ = h.presenceManager.Offline(cleanupCtx, uid, cid)
 		_ = c.Close()

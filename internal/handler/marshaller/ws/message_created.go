@@ -6,37 +6,42 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// TODO add is_bot everywhere we have members
+// WSPeer represents a participant in the transport layer.
+// [SYNC] Using 'sub' and 'iss' to align with external API standards.
 type WSPeer struct {
-	ID     string `json:"id"`
-	Type   string `json:"type"`
-	Name   string `json:"name,omitempty"`
-	Issuer string `json:"issuer,omitempty"`
+	Sub   string `json:"sub"`
+	Iss   string `json:"iss,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Type  string `json:"type"`
+	IsBot bool   `json:"is_bot"`
 }
 
 type WSMessage struct {
-	ID        string  `json:"id"`
-	SendID    string  `json:"send_id"` // Correlates with the original message send operation
-	ThreadID  string  `json:"thread_id"`
-	From      *WSPeer `json:"from"`
-	To        *WSPeer `json:"to"`
-	CreatedAt int64   `json:"created_at"`
-	EditedAt  int64   `json:"edited_at,omitempty"`
-	Text      string  `json:"text"`
-	// FIXME REMOVE ; could be text or text + image
-	Type    string         `json:"type"`
-	Content map[string]any `json:"content,omitempty"`
+	ID        string         `json:"id"`
+	SendID    string         `json:"send_id"`
+	ThreadID  string         `json:"thread_id"`
+	From      *WSPeer        `json:"from"`
+	To        *WSPeer        `json:"to"`
+	CreatedAt int64          `json:"created_at"`
+	EditedAt  int64          `json:"edited_at,omitempty"`
+	Text      string         `json:"text"`
+	Type      string         `json:"type"`
+	Content   map[string]any `json:"content,omitempty"`
 }
 
+// mapPeer normalizes domain Peer into a transport-friendly DTO.
+// [POINTER_LOGIC] Accepting a pointer to handle optional peers (like 'To').
 func mapPeer(p *model.Peer) *WSPeer {
 	if p == nil {
 		return nil
 	}
 	return &WSPeer{
-		ID:     p.Sub,
-		Type:   strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),
-		Name:   p.Name,
-		Issuer: p.Issuer,
+		Sub:  p.Sub,
+		Iss:  p.Issuer,
+		Name: p.Name,
+		// [FORMAT] Consistent lowercase naming for types.
+		Type:  strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),
+		IsBot: p.IsBot,
 	}
 }
 
@@ -45,12 +50,8 @@ func mapMessage(m *model.Message) *WSMessage {
 		ID:       m.ID.String(),
 		SendID:   m.SendID,
 		ThreadID: m.ThreadID.String(),
-		From: &WSPeer{
-			ID:     m.From.Sub,
-			Type:   m.From.Type.String(),
-			Name:   m.From.Name,
-			Issuer: m.From.Issuer,
-		},
+		// [FIX] Use address operator '&' because m.From is a struct, but mapPeer expects *model.Peer.
+		From:      mapPeer(&m.From),
 		To:        mapPeer(m.To),
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
@@ -58,7 +59,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		Type:      "text",
 	}
 
-	// [MEDIA_MAPPING] Handle image/document attachments
+	// [MEDIA_MAPPING] Handle image/document attachments.
 	switch {
 	case len(m.Images) > 0:
 		msg.Type = "image"

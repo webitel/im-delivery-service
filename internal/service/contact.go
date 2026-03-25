@@ -63,9 +63,10 @@ func (e *ContactEnricher) Resolve(ctx context.Context, domainID int32, ids ...uu
 	// 3. [FALLBACK] Ensure no empty slots remain for failed/missing contacts
 	for id, indices := range missing {
 		unknown := model.Peer{
-			ID:   id,
-			Type: model.PeerUser,
-			Name: fmt.Sprintf("Unknown (%s)", id.String()[:8]),
+			ID:    id,
+			Type:  model.PeerUser,
+			Name:  fmt.Sprintf("Unknown (%s)", id.String()[:8]),
+			IsBot: false,
 		}
 		for _, idx := range indices {
 			res[idx] = unknown
@@ -125,6 +126,7 @@ func (e *ContactEnricher) toPeer(c *contactv1.Contact) model.Peer {
 		Name:   name,
 		Sub:    c.GetSubject(),
 		Issuer: c.GetIssId(),
+		IsBot:  c.GetIsBot(),
 	}
 }
 

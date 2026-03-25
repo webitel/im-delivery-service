@@ -33,7 +33,6 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	}
 
 	// 3. [STRATEGY] Map domain payload to transport schema.
-	// [FIX] We must call .String() because EventType is now an integer-based enum.
 	switch p := ev.GetPayload().(type) {
 	case *model.Message:
 		res.Payload[EventMessage.String()] = mapMessage(p)
@@ -48,7 +47,7 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload[EventThreadCreated.String()] = mapThread(p)
 
 	default:
-		// Fallback for system or unknown events using the event kind name.
+		// [FALLBACK] Use the event kind name for unknown types.
 		res.Payload[ev.GetKind().String()] = p
 	}
 

@@ -42,36 +42,32 @@ components:
         payload:
           $ref: '#/components/schemas/EventPayload'
 
-    MessageType:
-      type: string
-      enum: ["text", "image", "document"]
-      x-enumNames: ["text", "image", "document"]
-
     EventPriority:
       type: integer
       enum: [0, 1, 2, 3]
       x-enumNames: ["unspecified", "high", "normal", "low"]
 
     # --- POLYMORPHIC PAYLOAD ---
+    # Keys synchronized with Go EventType.String() outputs
     EventPayload:
       type: object
       properties:
-        connected:
+        connected_event:
           $ref: '#/components/schemas/ConnectedPayload'
-        disconnected:
+        disconnected_event:
           $ref: '#/components/schemas/DisconnectedPayload'
-        message:
-          $ref: '#/components/schemas/MessagePayload'
-        thread_created:
-          $ref: '#/components/schemas/ThreadPayload'
-        ack:
+        message_event:
+          $ref: '#/components/schemas/WSMessage'
+        thread_created_event:
+          $ref: '#/components/schemas/WSThread'
+        ack_event:
           $ref: '#/components/schemas/AckPayload'
-        error:
+        error_event:
           $ref: '#/components/schemas/ErrorPayload'
-        ping:
+        ping_event:
           $ref: '#/components/schemas/PingPayload'
 
-    # --- CONNECT/DISCONNECT ---
+    # --- PAYLOAD DETAILS ---
     ConnectedPayload:
       type: object
       properties:
@@ -86,7 +82,6 @@ components:
         code: { type: integer }
         status: { type: string }
 
-    # --- ACK / ERROR / PING ---
     AckPayload:
       type: object
       properties:
@@ -105,27 +100,15 @@ components:
       properties:
         timestamp: { type: integer, format: int64 }
 
-    # --- MESSAGE / THREAD ---
-    MessagePayload:
-      type: object
-      properties:
-        message:
-          $ref: '#/components/schemas/WSMessage'
-
-    ThreadPayload:
-      type: object
-      properties:
-        thread:
-          $ref: '#/components/schemas/WSThread'
-
     # --- DATA MODELS ---
     WSPeer:
       type: object
       properties:
-        id: { type: string }
-        type: { type: string }
+        sub: { type: string }
+        iss: { type: string }
         name: { type: string }
-        issuer: { type: string }
+        type: { type: string }
+        is_bot: { type: boolean }
 
     WSMessage:
       type: object
@@ -138,9 +121,8 @@ components:
         created_at: { type: integer, format: int64 }
         edited_at: { type: integer, format: int64 }
         text: { type: string }
-        type:
-          $ref: '#/components/schemas/MessageType'
-          content:
+        type: { type: string }
+        content:
           type: object
           additionalProperties: true
 
@@ -152,15 +134,7 @@ components:
         created_at: { type: integer, format: int64 }
         subject: { type: string }
         type: { type: string }
-        recipient:
-          $ref: '#/components/schemas/WSRecipient'
         members:
           type: array
           items:
             $ref: '#/components/schemas/WSPeer'
-
-    WSRecipient:
-      type: object
-      properties:
-        id: { type: string }
-        name: { type: string }

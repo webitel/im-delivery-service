@@ -9,7 +9,7 @@ type WSThread struct {
 	CreatedAt int64    `json:"created_at"`
 	Subject   string   `json:"subject"`
 	Type      string   `json:"type"`
-	Members   []WSPeer `json:"members,omitempty"` // [FIX] Now using unified WSPeer
+	Members   []WSPeer `json:"members,omitempty"`
 }
 
 // mapThread converts domain model to WebSocket DTO with members.

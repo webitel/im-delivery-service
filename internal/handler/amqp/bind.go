@@ -1,8 +1,11 @@
 package amqp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"runtime/debug"
 
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -50,7 +53,31 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 
 		payload := new(T)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
+			h.logger.Error("payload_unmarshal_failed", "err", err, "raw", string(msg.Payload))
 			return nil // ACK invalid payloads
+		}
+
+		if h.logger.Enabled(msg.Context(), slog.LevelDebug) {
+			var pretty bytes.Buffer
+			payloadType := fmt.Sprintf("%T", *payload)
+
+			// ANSI Escape Codes for colors
+			const (
+				colorBlue  = "\033[1;34m"
+				colorCyan  = "\033[0;36m"
+				colorReset = "\033[0m"
+				colorGray  = "\033[0;90m"
+			)
+
+			if err := json.Indent(&pretty, msg.Payload, "", "  "); err == nil {
+				// We use colors to distinguish the debug block from regular logs
+				fmt.Printf("\n%s--- EVENT RECEIVED ---%s\n", colorBlue, colorReset)
+				fmt.Printf("%sType:%s    %s\n", colorCyan, colorReset, payloadType)
+				fmt.Printf("%sPayload:%s\n%s%s%s\n", colorCyan, colorReset, colorGray, pretty.String(), colorReset)
+				fmt.Printf("%s------------------------------%s\n\n", colorBlue, colorReset)
+			} else {
+				h.logger.Debug("EVENT_RECEIVED", "type", payloadType, "raw", string(msg.Payload))
+			}
 		}
 
 		events, err := fn(msg.Context(), payload)

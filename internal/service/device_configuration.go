@@ -1,4 +1,4 @@
-// internal/service/device_resolver.go
+// internal/service/device_provider.go
 package service
 
 import (
@@ -17,125 +17,126 @@ import (
 )
 
 const (
-	FCM  = "fcm"
-	APNS = "apn"
-	WEB  = "web"
+	ProviderFCM  = "fcm"
+	ProviderAPNS = "apn"
+	ProviderWEB  = "web"
 )
 
-// [INTERFACE GUARDJK]
-var _ Configurator = (*DeviceResolver)(nil)
-
-// DeviceResolver defines the contract for fetching and enriching user devices.
-type Configurator interface {
-	GetDevices(ctx context.Context, uid uuid.UUID) ([]model.Device, error)
+// DeviceProvider defines the contract for user device discovery and synchronization.
+type DeviceProvider interface {
+	GetDevices(ctx context.Context, userID uuid.UUID) ([]model.Device, error)
+	Sync(ctx context.Context, userID uuid.UUID) ([]model.Device, error)
 }
 
-// [RESOLVER] Responsible for fetching, mapping, and enriching device data.
-type DeviceResolver struct {
-	presence store.PresenceStore
-	imauth   *imauth.Client
-	imadmin  *imadmin.Client
-	log      *slog.Logger
+// DeviceService handles orchestration between auth, admin services, and local cache.
+type DeviceService struct {
+	cache store.PresenceStore
+	auth  *imauth.Client
+	admin *imadmin.Client
+	log   *slog.Logger
 }
 
-func NewDeviceResolver(ps store.PresenceStore, auth *imauth.Client, admin *imadmin.Client, log *slog.Logger) *DeviceResolver {
-	return &DeviceResolver{
-		presence: ps,
-		imauth:   auth,
-		imadmin:  admin,
-		log:      log.With("component", "device_resolver"),
+func NewDeviceService(cache store.PresenceStore, auth *imauth.Client, admin *imadmin.Client, log *slog.Logger) *DeviceService {
+	return &DeviceService{
+		cache: cache,
+		auth:  auth,
+		admin: admin,
+		log:   log.With("component", "device_service"),
 	}
 }
 
-// [GET_ENRICHED_DEVICES] Entry point for device lookup.
-func (r *DeviceResolver) GetDevices(ctx context.Context, uid uuid.UUID) ([]model.Device, error) {
-	// 1. Try Cache
-	if cached, err := r.presence.UserDevices(ctx, uid); err == nil && cached != nil {
+// GetDevices returns active devices from cache or performs a full sync on miss.
+func (s *DeviceService) GetDevices(ctx context.Context, userID uuid.UUID) ([]model.Device, error) {
+	if cached, err := s.cache.UserDevices(ctx, userID); err == nil && cached != nil {
 		return *cached, nil
 	}
 
-	// 2. Fetch Authorizations
-	resp, err := r.imauth.GetAuthorizations(ctx, &authv1.GetAuthorizationRequest{
-		Contact: &authv1.InputContact{Input: &authv1.InputContact_Id{Id: uid.String()}},
+	return s.Sync(ctx, userID)
+}
+
+// Sync refreshes the device state from external services and updates the cache.
+func (s *DeviceService) Sync(ctx context.Context, userID uuid.UUID) ([]model.Device, error) {
+	// 1. Fetch from source
+	devices, err := s.pull(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(devices) == 0 {
+		_ = s.cache.SyncDevices(ctx, userID, nil)
+		return nil, nil
+	}
+
+	// 2. Enrich with app configurations
+	enriched := s.enrich(ctx, devices)
+
+	// 3. Update cache
+	if err := s.cache.SyncDevices(ctx, userID, enriched); err != nil {
+		s.log.Error("cache_sync_failed", slog.String("user_id", userID.String()), slog.Any("err", err))
+	}
+
+	return enriched, nil
+}
+
+// pull retrieves authorizations and maps them to domain models.
+func (s *DeviceService) pull(ctx context.Context, userID uuid.UUID) ([]model.Device, error) {
+	resp, err := s.auth.GetAuthorizations(ctx, &authv1.GetAuthorizationRequest{
+		Contact: &authv1.InputContact{Input: &authv1.InputContact_Id{Id: userID.String()}},
 		Push:    &wrapperspb.BoolValue{Value: true},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	devices := r.mapToDomain(resp)
-	if len(devices) == 0 {
-		return devices, nil
-	}
-
-	// 3. Enrich with App Configs
-	enriched, err := r.enrichConfigs(ctx, devices)
-	if err != nil {
-		r.log.Warn("ENRICHMENT_FAILED", slog.Any("err", err))
-	}
-
-	// 4. Sync Cache
-	_ = r.presence.SyncDevices(ctx, uid, enriched)
-	return enriched, nil
+	return s.toDomain(resp), nil
 }
 
-func (r *DeviceResolver) enrichConfigs(ctx context.Context, devices []model.Device) ([]model.Device, error) {
-	appConfigs := make(map[string]*adminv1.Application)
-	for _, device := range devices {
-		if device.AppID == "" || appConfigs[device.AppID] != nil {
-			continue
-		}
-
-		res, err := r.imadmin.SearchApps(ctx, &adminv1.SearchAppRequest{Id: device.AppID})
-		if err != nil {
-			r.log.Warn("APP_LOOKUP_FAILED", slog.String("app", device.AppID), slog.Any("err", err))
-			continue
-		}
-
-		if res != nil && len(res.Data) > 0 {
-			appConfigs[device.AppID] = res.Data[0]
-		}
-	}
+// enrich fetches push credentials for each unique application ID.
+func (s *DeviceService) enrich(ctx context.Context, devices []model.Device) []model.Device {
+	memo := make(map[string]*adminv1.Application)
 
 	for i := range devices {
-		app, ok := appConfigs[devices[i].AppID]
-		if !ok || app.Service == nil || app.Service.PushService == nil {
+		appID := devices[i].AppID
+		if appID == "" {
 			continue
 		}
-		r.applyProviderConfig(&devices[i], app.Service.PushService)
-	}
-	return devices, nil
-}
 
-// [APPLY] Maps generated proto configurations to the internal device model.
-func (r *DeviceResolver) applyProviderConfig(d *model.Device, ps *adminv1.PUSHServiceClient) {
-	if ps == nil {
-		return
-	}
-
-	switch d.PushType {
-	case FCM:
-		// [FCM] Use GetFcm() to safely access the nested Fcm client config.
-		if fcm := ps.GetFcm(); fcm != nil {
-			d.PushConfig.Proxy = fcm.Proxy
-			// Map 'Account' from proto to 'Credentials' in your model.
-			d.PushConfig.Credentials = fcm.Account
+		app, ok := memo[appID]
+		if !ok {
+			res, err := s.admin.SearchApps(ctx, &adminv1.SearchAppRequest{Id: appID})
+			if err != nil || res == nil || len(res.Data) == 0 {
+				continue
+			}
+			app = res.Data[0]
+			memo[appID] = app
 		}
 
-	case APNS:
+		if app.Service != nil && app.Service.PushService != nil {
+			s.apply(&devices[i], app.Service.PushService)
+		}
+	}
+	return devices
+}
+
+// apply binds provider-specific credentials to the device model.
+func (s *DeviceService) apply(d *model.Device, ps *adminv1.PUSHServiceClient) {
+	switch d.PushType {
+	case ProviderFCM:
+		if fcm := ps.GetFcm(); fcm != nil {
+			d.PushConfig.Proxy = fcm.Proxy
+			d.PushConfig.Credentials = fcm.Account
+		}
+	case ProviderAPNS:
 		if apn := ps.GetApn(); apn != nil {
 			d.PushConfig.Proxy = apn.GetProxy()
 			d.PushConfig.Topic = apn.GetTopic()
-			// [TOKEN_AUTH] Extract Apple specific metadata
 			if token := apn.GetToken(); token != nil {
 				d.PushConfig.Credentials = token.GetAuthKey()
 				d.PushConfig.KeyID = token.GetKeyId()
 				d.PushConfig.TeamID = token.GetTeamId()
 			}
 		}
-
-	case WEB:
-		// [WEB] Webitel push service client.
+	case ProviderWEB:
 		if web := ps.GetWeb(); web != nil {
 			d.PushConfig.Proxy = web.Proxy
 			d.PushConfig.Credentials = web.Token
@@ -143,30 +144,35 @@ func (r *DeviceResolver) applyProviderConfig(d *model.Device, ps *adminv1.PUSHSe
 	}
 }
 
-func (r *DeviceResolver) mapToDomain(resp *authv1.AuthorizationList) []model.Device {
-	res := make([]model.Device, 0)
-	if resp == nil {
-		return res
+// map converts proto authorizations into internal domain devices.
+func (s *DeviceService) toDomain(src *authv1.AuthorizationList) []model.Device {
+	if src == nil {
+		return nil
 	}
-	for _, a := range resp.Data {
+
+	dst := make([]model.Device, 0, len(src.Data))
+	for _, a := range src.Data {
 		if a.Device == nil || a.Device.Push == nil {
 			continue
 		}
-		d := model.Device{ID: a.Device.Id, AppID: a.AppId}
+
+		device := model.Device{ID: a.Device.Id, AppID: a.AppId}
+
 		switch t := a.Device.Push.Token.(type) {
 		case *authv1.PUSHSubscription_Fcm:
-			d.PushType, d.PushToken, d.Platform = "fcm", t.Fcm, model.PlatformAndroid
+			device.PushType, device.PushToken, device.Platform = ProviderFCM, t.Fcm, model.PlatformAndroid
 		case *authv1.PUSHSubscription_Apn:
-			d.PushType, d.PushToken, d.Platform = "apn", t.Apn, model.PlatformIOS
+			device.PushType, device.PushToken, device.Platform = ProviderAPNS, t.Apn, model.PlatformIOS
 		case *authv1.PUSHSubscription_Web:
-			d.PushType, d.Platform = "web", model.PlatformWeb
+			device.PushType, device.Platform = ProviderWEB, model.PlatformWeb
 			if b, err := json.Marshal(t.Web); err == nil {
-				d.PushToken = string(b)
+				device.PushToken = string(b)
 			}
 		}
-		if d.PushToken != "" {
-			res = append(res, d)
+
+		if device.PushToken != "" {
+			dst = append(dst, device)
 		}
 	}
-	return res
+	return dst
 }

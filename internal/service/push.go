@@ -37,21 +37,23 @@ type Pusher interface {
 }
 
 type PushHandler struct {
-	tracker   store.DeliveryTracker
-	scheduler store.DeliveryScheduler
-	resolver  *DeviceResolver
-	pusher    PushProvider
-	leader    leader.LeaderAwarer
-	cb        *gobreaker.CircuitBreaker
-	log       *slog.Logger
-	timeout   time.Duration
-	wg        sync.WaitGroup
+	tracker        store.DeliveryTracker
+	scheduler      store.DeliveryScheduler
+	deviceProvider DeviceProvider
+	presenceStore  store.PresenceStore
+	pusher         PushProvider
+	leader         leader.LeaderAwarer
+	cb             *gobreaker.CircuitBreaker
+	log            *slog.Logger
+	timeout        time.Duration
+	wg             sync.WaitGroup
 }
 
 func NewPushHandler(
 	tracker store.DeliveryTracker,
 	scheduler store.DeliveryScheduler,
-	resolver *DeviceResolver,
+	deviceProvider DeviceProvider,
+	presenceStore store.PresenceStore,
 	pusher PushProvider,
 	leader leader.LeaderAwarer,
 	cfg *config.Config,
@@ -66,14 +68,15 @@ func NewPushHandler(
 	})
 
 	return &PushHandler{
-		tracker:   tracker,
-		scheduler: scheduler,
-		resolver:  resolver,
-		pusher:    pusher,
-		leader:    leader,
-		cb:        cb,
-		log:       log.With("component", "push_handler"),
-		timeout:   cfg.Delivery.AckTimeout,
+		tracker:        tracker,
+		scheduler:      scheduler,
+		deviceProvider: deviceProvider,
+		presenceStore:  presenceStore,
+		pusher:         pusher,
+		leader:         leader,
+		cb:             cb,
+		log:            log.With("component", "push_handler"),
+		timeout:        cfg.Delivery.AckTimeout,
 	}
 }
 
@@ -94,32 +97,6 @@ func (h *PushHandler) Start(ctx context.Context) {
 		}
 	}
 }
-
-// // [PROCESS_PENDING_TASKS] Retrieves ready tasks and restores event context.
-// func (h *PushHandler) processPendingTasks(ctx context.Context) {
-// 	tasks, err := h.scheduler.PullReady(ctx)
-// 	if err != nil {
-// 		h.log.Error("PULL_FAILED", slog.Any("err", err))
-// 		return
-// 	}
-
-// 	for _, task := range tasks {
-// 		h.wg.Add(1)
-// 		go func(t store.ScheduledTask) {
-// 			defer h.wg.Done()
-
-// 			// [RESTORE_CONTEXT] Restore full event to access Title/Body via Notifier interface.
-// 			ev, err := h.scheduler.GetEvent(ctx, t.EventID)
-// 			if err != nil {
-// 				h.log.Warn("EVENT_EXPIRED_OR_LOST", slog.String("eid", t.EventID.String()))
-// 				_ = h.tracker.Remove(ctx, t.EventID)
-// 				return
-// 			}
-
-// 			h.dispatch(ev)
-// 		}(task)
-// 	}
-// }
 
 // [PROCESS_PENDING_TASKS] Unified flow: Fetch -> Dispatch.
 func (h *PushHandler) processPendingTasks(ctx context.Context) {
@@ -174,14 +151,14 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 	}
 
 	// [RESOLVE] Find all registered push tokens for the user.
-	devices, err := h.resolver.GetDevices(ctx, uid)
+	devices, err := h.deviceProvider.GetDevices(ctx, uid)
 	if err != nil || len(devices) == 0 {
 		_ = h.tracker.Remove(ctx, eid)
 		return
 	}
 
 	// [FILTER] Remove devices that have active/acked WebSocket sessions.
-	targets := h.filterPushTargets(ctx, uid, devices, acked)
+	targets := h.filter(ctx, uid, devices, acked)
 	if len(targets) > 0 {
 		h.ship(ctx, ev, targets)
 	}
@@ -219,14 +196,14 @@ func (h *PushHandler) ship(ctx context.Context, ev event.Eventer, targets []mode
 }
 
 // [FILTER_PUSH_TARGETS] Compares acked session devices with target push devices.
-func (h *PushHandler) filterPushTargets(ctx context.Context, uid uuid.UUID, devices []model.Device, acked []uuid.UUID) []model.Device {
+func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model.Device, acked []uuid.UUID) []model.Device {
 	if len(acked) == 0 {
 		return devices
 	}
 
 	ackedMap := make(map[string]struct{})
 	for _, cid := range acked {
-		if devID, err := h.resolver.presence.GetSessionDevice(ctx, uid, cid); err == nil && devID != "" {
+		if devID, err := h.presenceStore.GetSessionDevice(ctx, uid, cid); err == nil && devID != "" {
 			ackedMap[devID] = struct{}{}
 		}
 	}
@@ -246,7 +223,7 @@ func (h *PushHandler) HandleDismiss(ctx context.Context, ev event.Eventer) {
 		return
 	}
 
-	devices, err := h.resolver.GetDevices(ctx, ev.GetUserID())
+	devices, err := h.deviceProvider.GetDevices(ctx, ev.GetUserID())
 	if err != nil || len(devices) == 0 {
 		return
 	}

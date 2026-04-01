@@ -20,11 +20,11 @@ type WSMessage struct {
 	ID        string         `json:"id"`
 	SendID    string         `json:"send_id"`
 	ThreadID  string         `json:"thread_id"`
-	From      *WSPeer        `json:"from"`
+	Sender    *WSPeer        `json:"sender"`
 	To        *WSPeer        `json:"to"`
 	CreatedAt int64          `json:"created_at"`
 	EditedAt  int64          `json:"edited_at,omitempty"`
-	Text      string         `json:"text"`
+	Body      string         `json:"body"`
 	Type      string         `json:"type"`
 	Content   map[string]any `json:"content,omitempty"`
 }
@@ -51,11 +51,11 @@ func mapMessage(m *model.Message) *WSMessage {
 		SendID:   m.SendID,
 		ThreadID: m.ThreadID.String(),
 		// [FIX] Use address operator '&' because m.From is a struct, but mapPeer expects *model.Peer.
-		From:      mapPeer(&m.From),
+		Sender:    mapPeer(&m.From),
 		To:        mapPeer(m.To),
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
-		Text:      m.Text,
+		Body:      m.Text,
 		Type:      "text",
 	}
 

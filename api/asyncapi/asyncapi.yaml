@@ -104,27 +104,52 @@ components:
     WSPeer:
       type: object
       properties:
-        sub: { type: string }
-        iss: { type: string }
-        name: { type: string }
-        type: { type: string }
-        is_bot: { type: boolean }
+        sub: 
+          type: string
+          description: "Subject identifier (p.Sub)"
+        iss: 
+          type: string
+          description: "Issuer (p.Issuer)"
+        name: 
+          type: string
+        type: 
+          type: string
+          description: "Normalized type (e.g. user, bot, agent)"
+        is_bot: 
+          type: boolean
 
     WSMessage:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        send_id: { type: string }
-        thread_id: { type: string, format: uuid }
-        from: { $ref: '#/components/schemas/WSPeer' }
-        to: { $ref: '#/components/schemas/WSPeer' }
-        created_at: { type: integer, format: int64 }
-        edited_at: { type: integer, format: int64 }
-        text: { type: string }
-        type: { type: string }
+        id: 
+          type: string
+          format: uuid
+        send_id: 
+          type: string
+        thread_id: 
+          type: string
+          format: uuid
+        sender: 
+          $ref: '#/components/schemas/WSPeer'
+        to: 
+          $ref: '#/components/schemas/WSPeer'
+        created_at: 
+          type: integer
+          format: int64
+        edited_at: 
+          type: integer
+          format: int64
+        body: 
+          type: string
+          description: "The main text content"
+        type: 
+          type: string
+          enum: ["text", "image", "document"]
+          description: "Discriminator for the content field"
         content:
           type: object
           additionalProperties: true
+          description: "Media payload (image/document metadata)"
 
     WSThread:
       type: object

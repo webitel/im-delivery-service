@@ -1,14 +1,15 @@
 import WsPeer from './WsPeer';
+import AnonymousSchema_20 from './AnonymousSchema_20';
 class WsMessage {
   private _id?: string;
   private _sendId?: string;
   private _threadId?: string;
-  private _reservedFrom?: WsPeer;
+  private _sender?: WsPeer;
   private _to?: WsPeer;
   private _createdAt?: number;
   private _editedAt?: number;
-  private _reservedText?: string;
-  private _reservedType?: string;
+  private _body?: string;
+  private _reservedType?: AnonymousSchema_20;
   private _content?: Map<string, any>;
   private _additionalProperties?: Map<string, any>;
 
@@ -16,23 +17,23 @@ class WsMessage {
     id?: string,
     sendId?: string,
     threadId?: string,
-    reservedFrom?: WsPeer,
+    sender?: WsPeer,
     to?: WsPeer,
     createdAt?: number,
     editedAt?: number,
-    reservedText?: string,
-    reservedType?: string,
+    body?: string,
+    reservedType?: AnonymousSchema_20,
     content?: Map<string, any>,
     additionalProperties?: Map<string, any>,
   }) {
     this._id = input.id;
     this._sendId = input.sendId;
     this._threadId = input.threadId;
-    this._reservedFrom = input.reservedFrom;
+    this._sender = input.sender;
     this._to = input.to;
     this._createdAt = input.createdAt;
     this._editedAt = input.editedAt;
-    this._reservedText = input.reservedText;
+    this._body = input.body;
     this._reservedType = input.reservedType;
     this._content = input.content;
     this._additionalProperties = input.additionalProperties;
@@ -47,8 +48,8 @@ class WsMessage {
   get threadId(): string | undefined { return this._threadId; }
   set threadId(threadId: string | undefined) { this._threadId = threadId; }
 
-  get reservedFrom(): WsPeer | undefined { return this._reservedFrom; }
-  set reservedFrom(reservedFrom: WsPeer | undefined) { this._reservedFrom = reservedFrom; }
+  get sender(): WsPeer | undefined { return this._sender; }
+  set sender(sender: WsPeer | undefined) { this._sender = sender; }
 
   get to(): WsPeer | undefined { return this._to; }
   set to(to: WsPeer | undefined) { this._to = to; }
@@ -59,11 +60,11 @@ class WsMessage {
   get editedAt(): number | undefined { return this._editedAt; }
   set editedAt(editedAt: number | undefined) { this._editedAt = editedAt; }
 
-  get reservedText(): string | undefined { return this._reservedText; }
-  set reservedText(reservedText: string | undefined) { this._reservedText = reservedText; }
+  get body(): string | undefined { return this._body; }
+  set body(body: string | undefined) { this._body = body; }
 
-  get reservedType(): string | undefined { return this._reservedType; }
-  set reservedType(reservedType: string | undefined) { this._reservedType = reservedType; }
+  get reservedType(): AnonymousSchema_20 | undefined { return this._reservedType; }
+  set reservedType(reservedType: AnonymousSchema_20 | undefined) { this._reservedType = reservedType; }
 
   get content(): Map<string, any> | undefined { return this._content; }
   set content(content: Map<string, any> | undefined) { this._content = content; }

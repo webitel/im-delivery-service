@@ -97,15 +97,17 @@
                         "format": "uuid",
                         "x-parser-schema-id": "<anonymous-schema-11>"
                       },
-                      "from": {
+                      "sender": {
                         "type": "object",
                         "properties": {
                           "sub": {
                             "type": "string",
+                            "description": "Subject identifier (p.Sub)",
                             "x-parser-schema-id": "<anonymous-schema-12>"
                           },
                           "iss": {
                             "type": "string",
+                            "description": "Issuer (p.Issuer)",
                             "x-parser-schema-id": "<anonymous-schema-13>"
                           },
                           "name": {
@@ -114,6 +116,7 @@
                           },
                           "type": {
                             "type": "string",
+                            "description": "Normalized type (e.g. user, bot, agent)",
                             "x-parser-schema-id": "<anonymous-schema-15>"
                           },
                           "is_bot": {
@@ -123,7 +126,7 @@
                         },
                         "x-parser-schema-id": "WSPeer"
                       },
-                      "to": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.from",
+                      "to": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
                       "created_at": {
                         "type": "integer",
                         "format": "int64",
@@ -134,17 +137,25 @@
                         "format": "int64",
                         "x-parser-schema-id": "<anonymous-schema-18>"
                       },
-                      "text": {
+                      "body": {
                         "type": "string",
+                        "description": "The main text content",
                         "x-parser-schema-id": "<anonymous-schema-19>"
                       },
                       "type": {
                         "type": "string",
+                        "enum": [
+                          "text",
+                          "image",
+                          "document"
+                        ],
+                        "description": "Discriminator for the content field",
                         "x-parser-schema-id": "<anonymous-schema-20>"
                       },
                       "content": {
                         "type": "object",
                         "additionalProperties": true,
+                        "description": "Media payload (image/document metadata)",
                         "x-parser-schema-id": "<anonymous-schema-21>"
                       }
                     },
@@ -177,7 +188,7 @@
                       },
                       "members": {
                         "type": "array",
-                        "items": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.from",
+                        "items": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
                         "x-parser-schema-id": "<anonymous-schema-27>"
                       }
                     },
@@ -262,7 +273,7 @@
       "AckPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.ack_event",
       "ErrorPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.error_event",
       "PingPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.ping_event",
-      "WSPeer": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.from",
+      "WSPeer": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
       "WSMessage": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event",
       "WSThread": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.thread_created_event"
     }

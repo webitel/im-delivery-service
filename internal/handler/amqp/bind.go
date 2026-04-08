@@ -15,28 +15,16 @@ import (
 // [DOMAIN_HANDLER] Defines a generic function that processes a payload into multiple events.
 type DomainHandler[T any] func(ctx context.Context, payload *T) ([]event.Eventer, error)
 
-// Dispatch orchestrates the delivery of generated events.
-// It handles local delivery (WebSockets/Cells) for every target participant,
-// while ensuring global replication (RabbitMQ) happens only once per message set
-// to prevent redundant event storms across the cluster.
 func (h *MessageHandler) Dispatch(ctx context.Context, events []event.Eventer) {
 	for i, ev := range events {
 		if ev == nil {
 			continue
 		}
 
-		// [LOCAL_DELIVERY]
-		// Notify the local orchestrator for every event in the slice.
-		// This ensures that if multiple participants (e.g., sender and receiver)
-		// are connected to THIS specific service instance, they all receive
-		// their respective socket updates and push notifications.
+		// [LOCAL_DELIVERY] WebSocket / gRPC / Long-Polling dispatch for connected clients.
 		h.orchestrator.Notify(ctx, ev)
 
-		// [GLOBAL_REPLICATION]
-		// To keep the message bus clean and efficient, we only publish to
-		// the distributed broker (RabbitMQ) ONCE per batch.
-		// Other nodes in the cluster will receive this single event and
-		// trigger their own local Dispatch logic for their connected clients.
+		// [GLOBAL_REPLICATION] RabbitMQ publish for cross-instance delivery and fan-out.
 		if i == 0 {
 			if err := h.dist.Publish(ctx, ev); err != nil {
 				h.logger.Error(

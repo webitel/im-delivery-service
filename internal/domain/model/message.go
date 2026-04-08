@@ -7,15 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// Message is the central entity for chat communications.
 type Message struct {
-	ID       uuid.UUID `json:"id"`
-	SendID   string    `json:"send_id"`
-	ThreadID uuid.UUID `json:"thread_id"`
-	DomainID int64     `json:"domain_id"`
-	From     Peer      `json:"from"`
-	// To is an optional pointer to the recipient peer.
-	// Can be nil if the message is broadcast or system-oriented.
+	ID        uuid.UUID      `json:"id"`
+	SendID    string         `json:"send_id"`
+	ThreadID  uuid.UUID      `json:"thread_id"`
+	DomainID  int64          `json:"domain_id"`
+	From      Peer           `json:"from"`
 	To        *Peer          `json:"to"`
 	Text      string         `json:"text"`
 	CreatedAt int64          `json:"created_at"`

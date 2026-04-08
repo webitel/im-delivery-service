@@ -12,13 +12,13 @@ type Envelope[T any] struct {
 	Payload    T                 `json:"payload"`
 	UserID     uuid.UUID         `json:"user_id"`
 	DomainID   int64             `json:"domain_id"`
-	Kind       EventKind         `json:"kind"`
-	Priority   EventPriority     `json:"priority"`
+	Kind       EventKind         `json:"-"`
+	Priority   EventPriority     `json:"-"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
-	CanPush    bool              `json:"can_push"`
-	Echo       bool              `json:"echo"`
+	CanPush    bool              `json:"-"`
+	Echo       bool              `json:"-"`
 	OccurredAt int64             `json:"occurred_at"`
-	TraceID    string            `json:"trace_id"`
+	TraceID    string            `json:"-"`
 
 	// [INTERNAL_CACHE] Temporary storage for transport-level data.
 	cached atomic.Value `json:"-"`

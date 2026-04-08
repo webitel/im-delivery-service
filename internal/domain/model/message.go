@@ -23,30 +23,28 @@ type Message struct {
 }
 
 // RoutingKey generates an AMQP routing key based on the message destination.
-// It handles nil recipients safely to prevent runtime panics.
+// If the recipient (To) is missing, it returns a truncated key without trailing dots.
 func (m *Message) RoutingKey() string {
-	peerType := "contact"
-	// Default 'sub' identifier for system or unassigned routes
-	destinationSub := "system"
+	// Base prefix that is always present
+	// im_delivery.v1.{domain_id}
+	key := fmt.Sprintf("im_delivery.v1.%d", m.DomainID)
 
-	// Safety check: only access fields if the pointer is non-nil
-	if m.To != nil {
-		destinationSub = m.To.Sub
-
-		issuer := strings.ToLower(m.To.Issuer)
-		// Categorize as 'bot' if recipient is a bot or a workflow schema
-		if strings.Contains(issuer, "bot") || strings.Contains(issuer, "schema") {
-			peerType = "bot"
-		}
+	// If there is no recipient, we stop here to avoid empty segments or "system" labels
+	if m.To == nil {
+		// Results in: im_delivery.v1.1.message.created
+		return key + ".message.created"
 	}
 
-	// Format: im_delivery.v1.{domain_id}.{peer_type}.{sub}.message.created
-	return fmt.Sprintf(
-		"im_delivery.v1.%d.%s.%s.message.created",
-		m.DomainID,
-		peerType,
-		destinationSub,
-	)
+	// Determine peer type
+	peerType := "contact"
+	issuer := strings.ToLower(m.To.Issuer)
+	if strings.Contains(issuer, "bot") || strings.Contains(issuer, "schema") {
+		peerType = "bot"
+	}
+
+	// If recipient exists, we provide the full granular path
+	// Results in: im_delivery.v1.1.contact.3.message.created
+	return fmt.Sprintf("%s.%s.%s.message.created", key, peerType, m.To.Sub)
 }
 
 // NotificationTitle returns a friendly display name for push notifications.

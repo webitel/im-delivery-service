@@ -81,6 +81,7 @@ type Document struct {
 	FileName string `json:"file_name"`
 	MimeType string `json:"mime_type"`
 	Size     int64  `json:"size"`
+	URL      string `json:"url"`
 }
 
 // Image defines image-specific attachment metadata.

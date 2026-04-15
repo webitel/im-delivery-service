@@ -67,6 +67,7 @@ func (d *MessageCreatedV1) mapDocs() []*model.Document {
 			FileName: doc.Name,
 			MimeType: doc.Mime,
 			Size:     doc.Size,
+			URL:      doc.URL,
 		})
 	}
 	return res
@@ -84,4 +85,5 @@ type Document struct {
 	Mime   string `json:"mime"`
 	Name   string `json:"name"`
 	Size   int64  `json:"size"`
+	URL    string `json:"url"`
 }

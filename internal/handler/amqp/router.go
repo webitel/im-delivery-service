@@ -20,12 +20,13 @@ const (
 	SystemEventsExchange  = "im_system.events"
 
 	// Routing Keys
-	TopicMessageCreated = "im_message.#.message.created.v1"
-	TopicThreadCreated  = "im_thread.#.thread.created.v1"
-
+	TopicMessageCreated   = "im_message.#.message.created.v1"
+	TopicThreadCreated    = "im_thread.#.thread.created.v1"
 	TopicDeviceRegister   = "updates.device.register.#"
 	TopicDeviceUnregister = "updates.device.unregister.#"
 	TopicDeviceLogout     = "updates.device.logout.#"
+	TopicVariablesSet     = "im_thread.#.variables.set.#"
+	TopicVariablesFlush   = "im_thread.#.variables.flush.#"
 
 	// Queues
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -111,6 +112,18 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: SystemEventsExchange,
 			Topic:    TopicDeviceLogout,
 			Handler:  Bind(h, h.OnDeviceLogoutV1),
+		},
+		{
+			Name:     "ON_VARIABLES_SET",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicVariablesSet,
+			Handler:  Bind(h, h.OnVariablesSetV1),
+		},
+		{
+			Name:     "ON_VARIABLES_FLUSH",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicVariablesFlush,
+			Handler:  Bind(h, h.OnVariablesFlushV1),
 		},
 	}
 

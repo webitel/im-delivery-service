@@ -46,6 +46,13 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	case *model.Thread:
 		res.Payload[EventThreadCreated.String()] = mapThread(p)
 
+	case *model.VariablesPayload:
+		if ev.GetKind() == event.VariableFlush {
+			res.Payload["variable_flush_event"] = mapVariables(p)
+		} else {
+			res.Payload["variable_set_event"] = mapVariables(p)
+		}
+
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.
 		res.Payload[ev.GetKind().String()] = p

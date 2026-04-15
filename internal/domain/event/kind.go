@@ -10,4 +10,6 @@ const (
 	MessageCreated                         // [BUSINESS]
 	ThreadCreated                          // [BUSINESS]
 	MessageRead                            // [BUSINESS]
+	VariableSet                            // [BUSINESS]
+	VariableFlush                          // [BUSINESS]
 )

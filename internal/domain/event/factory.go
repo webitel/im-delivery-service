@@ -100,3 +100,20 @@ func NewReadEvent(eventID, userID uuid.UUID) Eventer {
 		},
 	}
 }
+
+func NewVariableEvent(
+	payload *model.VariablesPayload,
+	targetID uuid.UUID,
+	domainID int64,
+	kind EventKind, // Should be VariableSet or VariableFlush
+) Eventer {
+	return &Envelope[*model.VariablesPayload]{
+		ID:         uuid.New(),
+		Payload:    payload,
+		UserID:     targetID,
+		DomainID:   domainID,
+		Kind:       kind,
+		Priority:   PriorityLow,
+		OccurredAt: time.Now().UnixMilli(),
+	}
+}

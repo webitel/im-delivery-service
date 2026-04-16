@@ -49,7 +49,7 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 		msg.Content = &impb.ThreadMessage_Image{Image: &impb.Image{Id: m.Images[0].ID, Url: m.Images[0].URL}}
 	} else if len(m.Documents) > 0 {
 		msg.Type = impb.MessageType_DOCUMENT
-		msg.Content = &impb.ThreadMessage_Document{Document: &impb.Document{Id: m.Documents[0].ID, FileName: m.Documents[0].FileName}}
+		msg.Content = &impb.ThreadMessage_Document{Document: &impb.Document{Id: m.Documents[0].FileID, FileName: m.Documents[0].Name}}
 	} else {
 		msg.Type = impb.MessageType_TEXT
 	}

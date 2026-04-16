@@ -63,11 +63,11 @@ func (d *MessageCreatedV1) mapDocs() []*model.Document {
 	res := make([]*model.Document, 0, len(d.Documents))
 	for _, doc := range d.Documents {
 		res = append(res, &model.Document{
-			ID:       strconv.FormatInt(doc.FileID, 10),
-			FileName: doc.Name,
-			MimeType: doc.Mime,
-			Size:     doc.Size,
-			URL:      doc.URL,
+			FileID: strconv.FormatInt(doc.FileID, 10),
+			Name:   doc.Name,
+			Mime:   doc.Mime,
+			Size:   doc.Size,
+			URL:    doc.URL,
 		})
 	}
 	return res

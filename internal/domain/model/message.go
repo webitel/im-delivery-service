@@ -69,7 +69,7 @@ func (m *Message) NotificationBody() string {
 
 	if len(m.Documents) > 0 {
 		// Use the first document's filename as a hint
-		return m.Documents[0].FileName
+		return m.Documents[0].Name
 	}
 
 	return "Sent a message"
@@ -77,11 +77,11 @@ func (m *Message) NotificationBody() string {
 
 // Document defines a generic file attachment metadata.
 type Document struct {
-	ID       string `json:"id"`
-	FileName string `json:"file_name"`
-	MimeType string `json:"mime_type"`
-	Size     int64  `json:"size"`
-	URL      string `json:"url"`
+	FileID string `json:"file_id"`
+	Name   string `json:"name"`
+	Mime   string `json:"mime"`
+	Size   int64  `json:"size"`
+	URL    string `json:"url"`
 }
 
 // Image defines image-specific attachment metadata.

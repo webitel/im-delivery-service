@@ -6,23 +6,29 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// WSPeer represents a participant in the transport layer.
-// [SYNC] Using 'sub' and 'iss' to align with external API standards.
-type WSPeer struct {
-	Sub   string `json:"sub"`
-	Iss   string `json:"iss,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Type  string `json:"type"`
-	IsBot bool   `json:"is_bot"`
+// WSContact holds the identity provider information.
+type WSContact struct {
+	Sub      string `json:"sub"`
+	Iss      string `json:"iss,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Username string `json:"username,omitempty"`
+	Type     string `json:"type"`
+	IsBot    bool   `json:"is_bot"`
 }
 
-// WSMessage represents the message structure sent over WebSockets.
+// WSPeer represents a participant with nested contact info and role.
+type WSPeer struct {
+	ID      string     `json:"id"`
+	Contact *WSContact `json:"contact"`
+	Role    string     `json:"role"`
+}
+
 type WSMessage struct {
 	ID        string            `json:"id"`
 	SendID    string            `json:"send_id"`
 	ThreadID  string            `json:"thread_id"`
 	Sender    *WSPeer           `json:"sender"`
-	To        *WSPeer           `json:"to"`
+	To        []*WSPeer         `json:"to,omitempty"`
 	CreatedAt int64             `json:"created_at"`
 	EditedAt  int64             `json:"edited_at,omitempty"`
 	Body      string            `json:"body"`
@@ -31,43 +37,46 @@ type WSMessage struct {
 	Documents []*model.Document `json:"documents,omitempty"`
 }
 
-// mapPeer normalizes domain Peer into a transport-friendly DTO.
+// mapPeer converts internal model.Peer to the nested WSPeer structure.
 func mapPeer(p *model.Peer) *WSPeer {
 	if p == nil {
 		return nil
 	}
+
 	return &WSPeer{
-		Sub:   p.Sub,
-		Iss:   p.Issuer,
-		Name:  p.Name,
-		Type:  strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),
-		IsBot: p.IsBot,
+		ID:   p.MemberID, // mapping member_id to id
+		Role: model.ParseRole(p.Role).String(),
+		Contact: &WSContact{
+			Sub:      p.Sub,
+			Iss:      p.Issuer,
+			Name:     p.Name,
+			Username: p.Name, // Using name as username as fallback
+			Type:     strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),
+			IsBot:    p.IsBot, // Assigned inside the contact object
+		},
 	}
 }
 
-// mapMessage converts domain model.Message to WSMessage DTO.
+// mapMessage transforms the internal message domain into a WebSocket DTO.
 func mapMessage(m *model.Message) *WSMessage {
 	msg := &WSMessage{
 		ID:        m.ID.String(),
 		SendID:    m.SendID,
 		ThreadID:  m.ThreadID.String(),
 		Sender:    mapPeer(&m.From),
-		To:        mapPeer(m.To),
+		To:        nil, // Kept empty as per current requirement
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
 		Body:      m.Text,
 		Type:      "text",
 	}
 
-	// [MEDIA_ASSIGNMENT] Directly assign slices to explicit fields.
 	if len(m.Images) > 0 {
 		msg.Type = "image"
 		msg.Images = m.Images
 	}
 
 	if len(m.Documents) > 0 {
-		// If there are both images and documents, we prioritize 'document' type
-		// or keep it as 'image' based on your business logic preferences.
 		if msg.Type == "text" {
 			msg.Type = "document"
 		}

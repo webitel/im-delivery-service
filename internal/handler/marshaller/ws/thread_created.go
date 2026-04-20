@@ -26,11 +26,14 @@ func mapThread(t *model.Thread) *WSThread {
 		Type:      t.Type,
 	}
 
-	// [ITERATION] Map enriched members using the shared mapPeer logic.
+	// Mapping members with the same nested logic as in mapMessage
 	if len(t.Members) > 0 {
-		res.Members = make([]WSPeer, len(t.Members))
-		for i, p := range t.Members {
-			res.Members[i] = *mapPeer(&p)
+		res.Members = make([]WSPeer, 0, len(t.Members))
+		for i := range t.Members {
+			peerDTO := mapPeer(&t.Members[i])
+			if peerDTO != nil {
+				res.Members = append(res.Members, *peerDTO)
+			}
 		}
 	}
 

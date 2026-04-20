@@ -6,6 +6,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
+// mapPriority converts domain priority to Protobuf enum.
 func mapPriority(p event.EventPriority) impb.EventPriority {
 	switch p {
 	case event.PriorityLow:
@@ -19,11 +20,12 @@ func mapPriority(p event.EventPriority) impb.EventPriority {
 	}
 }
 
+// marshalPeer converts a single domain Peer to a Protobuf Peer.
 func marshalPeer(p *model.Peer) *impb.Peer {
-	res := &impb.Peer{}
 	if p == nil {
 		return nil
 	}
+	res := &impb.Peer{}
 	switch p.Type {
 	case model.PeerUser:
 		res.Kind = &impb.Peer_UserId{UserId: p.Sub}
@@ -38,20 +40,41 @@ func marshalPeer(p *model.Peer) *impb.Peer {
 	return res
 }
 
+// marshalMessagePayload converts the domain Message model to a gRPC server event.
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
-	msg := &impb.ThreadMessage{
-		Id: m.ID.String(), ThreadId: m.ThreadID.String(), Text: m.Text,
-		CreatedAt: m.CreatedAt, EditedAt: m.EditedAt,
-		From: marshalPeer(&m.From), To: marshalPeer(m.To),
+	// Map the slice of recipients from domain to PB
+	recipients := make([]*impb.Peer, 0, len(m.To))
+	for i := range m.To {
+		recipients = append(recipients, marshalPeer(&m.To[i]))
 	}
+
+	msg := &impb.ThreadMessage{
+		Id:        m.ID.String(),
+		ThreadId:  m.ThreadID.String(),
+		Text:      m.Text,
+		CreatedAt: m.CreatedAt,
+		EditedAt:  m.EditedAt,
+		From:      marshalPeer(&m.From),
+	}
+
+	// [CONTENT_TYPE_LOGIC]
 	if len(m.Images) > 0 {
 		msg.Type = impb.MessageType_IMAGE
-		msg.Content = &impb.ThreadMessage_Image{Image: &impb.Image{Id: m.Images[0].ID, Url: m.Images[0].URL}}
+		msg.Content = &impb.ThreadMessage_Image{
+			Image: &impb.Image{Id: m.Images[0].ID, Url: m.Images[0].URL},
+		}
 	} else if len(m.Documents) > 0 {
 		msg.Type = impb.MessageType_DOCUMENT
-		msg.Content = &impb.ThreadMessage_Document{Document: &impb.Document{Id: m.Documents[0].FileID, FileName: m.Documents[0].Name}}
+		msg.Content = &impb.ThreadMessage_Document{
+			Document: &impb.Document{Id: m.Documents[0].ID, FileName: m.Documents[0].FileName},
+		}
 	} else {
 		msg.Type = impb.MessageType_TEXT
 	}
-	return &impb.ServerEvent_MessageEvent{MessageEvent: &impb.NewMessageEvent{Message: msg}}
+
+	return &impb.ServerEvent_MessageEvent{
+		MessageEvent: &impb.NewMessageEvent{
+			Message: msg,
+		},
+	}
 }

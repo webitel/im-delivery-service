@@ -16,13 +16,14 @@ const (
 )
 
 type Peer struct {
-	ID     uuid.UUID `json:"id"`
-	Type   PeerType  `json:"type"`
-	Sub    string    `json:"sub,omitempty"`
-	Issuer string    `json:"issuer,omitempty"`
-	Name   string    `json:"name,omitempty"`
-	// [PROPERTY] IsBot indicates if the peer is a service/automated agent.
-	IsBot bool `json:"is_bot"`
+	ID       uuid.UUID `json:"id"`
+	Type     PeerType  `json:"type"`
+	Sub      string    `json:"sub,omitempty"`
+	Issuer   string    `json:"issuer,omitempty"`
+	Name     string    `json:"name,omitempty"`
+	IsBot    bool      `json:"is_bot"`
+	MemberID string    `json:"member_id,omitempty"`
+	Role     int32     `json:"role,omitempty"`
 }
 
 type PeerOption func(*Peer)

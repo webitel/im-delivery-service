@@ -1,9 +1,12 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -17,15 +20,18 @@ type EventDispatcher interface {
 
 type eventDispatcher struct {
 	publisher message.Publisher
+	logger    *slog.Logger // Ensure you pass a logger to the struct
 }
 
-// IsLeader implements [EventDispatcher].
+func NewEventDispatcher(pub message.Publisher, logger *slog.Logger) EventDispatcher {
+	return &eventDispatcher{
+		publisher: pub,
+		logger:    logger,
+	}
+}
+
 func (d *eventDispatcher) IsLeader() bool {
-	return true // Base dispatcher is always active; leadership gating is handled by the atomic proxy.
-}
-
-func NewEventDispatcher(pub message.Publisher) EventDispatcher {
-	return &eventDispatcher{publisher: pub}
+	return true
 }
 
 func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
@@ -38,9 +44,9 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	if !ok {
 		return nil
 	}
+
 	// [ROUTING_KEY] Resolve routing from payload.
 	routingKey := routable.RoutingKey()
-
 	if routingKey == "" {
 		return nil
 	}
@@ -48,6 +54,26 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	payload, err := json.Marshal(ev)
 	if err != nil {
 		return fmt.Errorf("dispatcher: marshal error: %w", err)
+	}
+
+	// [DEBUG_PRETTY_PRINT] Colorized output for outgoing RabbitMQ messages.
+	if d.logger != nil && d.logger.Enabled(ctx, slog.LevelDebug) {
+		var pretty bytes.Buffer
+		if err := json.Indent(&pretty, payload, "", "  "); err == nil {
+			// ANSI Escape Codes for professional terminal styling
+			const (
+				colorPurple = "\033[1;35m"
+				colorYellow = "\033[1;33m"
+				colorCyan   = "\033[0;36m"
+				colorReset  = "\033[0m"
+				colorGray   = "\033[0;90m"
+			)
+
+			fmt.Printf("\n%s>>> [OUTGOING] PUBLISHING TO RABBITMQ <<<%s\n", colorPurple, colorReset)
+			fmt.Printf("%sTarget Exchange/Key:%s %s%s%s\n", colorCyan, colorReset, colorYellow, routingKey, colorReset)
+			fmt.Printf("%sPayload:%s\n%s%s%s\n", colorCyan, colorReset, colorGray, pretty.String(), colorReset)
+			fmt.Printf("%s%s%s\n\n", colorPurple, strings.Repeat("-", 40), colorReset)
+		}
 	}
 
 	// [MESSAGE_ENVELOPE] Create AMQP message.

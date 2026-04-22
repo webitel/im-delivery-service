@@ -1,16 +1,17 @@
 import WsPeer from './WsPeer';
-import AnonymousSchema_20 from './AnonymousSchema_20';
+import AnonymousSchema_24 from './AnonymousSchema_24';
 class WsMessage {
   private _id?: string;
   private _sendId?: string;
   private _threadId?: string;
   private _sender?: WsPeer;
-  private _to?: WsPeer;
+  private _to?: WsPeer[];
   private _createdAt?: number;
   private _editedAt?: number;
   private _body?: string;
-  private _reservedType?: AnonymousSchema_20;
-  private _content?: Map<string, any>;
+  private _reservedType?: AnonymousSchema_24;
+  private _reservedImages?: Map<string, any>[];
+  private _documents?: Map<string, any>[];
   private _additionalProperties?: Map<string, any>;
 
   constructor(input: {
@@ -18,12 +19,13 @@ class WsMessage {
     sendId?: string,
     threadId?: string,
     sender?: WsPeer,
-    to?: WsPeer,
+    to?: WsPeer[],
     createdAt?: number,
     editedAt?: number,
     body?: string,
-    reservedType?: AnonymousSchema_20,
-    content?: Map<string, any>,
+    reservedType?: AnonymousSchema_24,
+    reservedImages?: Map<string, any>[],
+    documents?: Map<string, any>[],
     additionalProperties?: Map<string, any>,
   }) {
     this._id = input.id;
@@ -35,7 +37,8 @@ class WsMessage {
     this._editedAt = input.editedAt;
     this._body = input.body;
     this._reservedType = input.reservedType;
-    this._content = input.content;
+    this._reservedImages = input.reservedImages;
+    this._documents = input.documents;
     this._additionalProperties = input.additionalProperties;
   }
 
@@ -51,8 +54,8 @@ class WsMessage {
   get sender(): WsPeer | undefined { return this._sender; }
   set sender(sender: WsPeer | undefined) { this._sender = sender; }
 
-  get to(): WsPeer | undefined { return this._to; }
-  set to(to: WsPeer | undefined) { this._to = to; }
+  get to(): WsPeer[] | undefined { return this._to; }
+  set to(to: WsPeer[] | undefined) { this._to = to; }
 
   get createdAt(): number | undefined { return this._createdAt; }
   set createdAt(createdAt: number | undefined) { this._createdAt = createdAt; }
@@ -63,11 +66,14 @@ class WsMessage {
   get body(): string | undefined { return this._body; }
   set body(body: string | undefined) { this._body = body; }
 
-  get reservedType(): AnonymousSchema_20 | undefined { return this._reservedType; }
-  set reservedType(reservedType: AnonymousSchema_20 | undefined) { this._reservedType = reservedType; }
+  get reservedType(): AnonymousSchema_24 | undefined { return this._reservedType; }
+  set reservedType(reservedType: AnonymousSchema_24 | undefined) { this._reservedType = reservedType; }
 
-  get content(): Map<string, any> | undefined { return this._content; }
-  set content(content: Map<string, any> | undefined) { this._content = content; }
+  get reservedImages(): Map<string, any>[] | undefined { return this._reservedImages; }
+  set reservedImages(reservedImages: Map<string, any>[] | undefined) { this._reservedImages = reservedImages; }
+
+  get documents(): Map<string, any>[] | undefined { return this._documents; }
+  set documents(documents: Map<string, any>[] | undefined) { this._documents = documents; }
 
   get additionalProperties(): Map<string, any> | undefined { return this._additionalProperties; }
   set additionalProperties(additionalProperties: Map<string, any> | undefined) { this._additionalProperties = additionalProperties; }

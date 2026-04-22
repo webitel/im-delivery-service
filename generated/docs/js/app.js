@@ -100,47 +100,74 @@
                       "sender": {
                         "type": "object",
                         "properties": {
-                          "sub": {
+                          "id": {
                             "type": "string",
-                            "description": "Subject identifier (p.Sub)",
+                            "description": "Member identifier",
                             "x-parser-schema-id": "<anonymous-schema-12>"
                           },
-                          "iss": {
-                            "type": "string",
-                            "description": "Issuer (p.Issuer)",
-                            "x-parser-schema-id": "<anonymous-schema-13>"
+                          "contact": {
+                            "type": "object",
+                            "required": [
+                              "sub",
+                              "type"
+                            ],
+                            "properties": {
+                              "sub": {
+                                "type": "string",
+                                "description": "Subject identifier",
+                                "x-parser-schema-id": "<anonymous-schema-13>"
+                              },
+                              "iss": {
+                                "type": "string",
+                                "description": "Issuer",
+                                "x-parser-schema-id": "<anonymous-schema-14>"
+                              },
+                              "name": {
+                                "type": "string",
+                                "x-parser-schema-id": "<anonymous-schema-15>"
+                              },
+                              "username": {
+                                "type": "string",
+                                "x-parser-schema-id": "<anonymous-schema-16>"
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "Normalized type (e.g. user, bot, agent)",
+                                "x-parser-schema-id": "<anonymous-schema-17>"
+                              },
+                              "is_bot": {
+                                "type": "boolean",
+                                "x-parser-schema-id": "<anonymous-schema-18>"
+                              }
+                            },
+                            "x-parser-schema-id": "WSContact"
                           },
-                          "name": {
+                          "role": {
                             "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-14>"
-                          },
-                          "type": {
-                            "type": "string",
-                            "description": "Normalized type (e.g. user, bot, agent)",
-                            "x-parser-schema-id": "<anonymous-schema-15>"
-                          },
-                          "is_bot": {
-                            "type": "boolean",
-                            "x-parser-schema-id": "<anonymous-schema-16>"
+                            "description": "Role (e.g. member, admin)",
+                            "x-parser-schema-id": "<anonymous-schema-19>"
                           }
                         },
                         "x-parser-schema-id": "WSPeer"
                       },
-                      "to": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
+                      "to": {
+                        "type": "array",
+                        "items": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
+                        "x-parser-schema-id": "<anonymous-schema-20>"
+                      },
                       "created_at": {
                         "type": "integer",
                         "format": "int64",
-                        "x-parser-schema-id": "<anonymous-schema-17>"
+                        "x-parser-schema-id": "<anonymous-schema-21>"
                       },
                       "edited_at": {
                         "type": "integer",
                         "format": "int64",
-                        "x-parser-schema-id": "<anonymous-schema-18>"
+                        "x-parser-schema-id": "<anonymous-schema-22>"
                       },
                       "body": {
                         "type": "string",
-                        "description": "The main text content",
-                        "x-parser-schema-id": "<anonymous-schema-19>"
+                        "x-parser-schema-id": "<anonymous-schema-23>"
                       },
                       "type": {
                         "type": "string",
@@ -149,14 +176,25 @@
                           "image",
                           "document"
                         ],
-                        "description": "Discriminator for the content field",
-                        "x-parser-schema-id": "<anonymous-schema-20>"
+                        "x-parser-schema-id": "<anonymous-schema-24>"
                       },
-                      "content": {
-                        "type": "object",
-                        "additionalProperties": true,
-                        "description": "Media payload (image/document metadata)",
-                        "x-parser-schema-id": "<anonymous-schema-21>"
+                      "images": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "x-parser-schema-id": "<anonymous-schema-26>"
+                        },
+                        "x-parser-schema-id": "<anonymous-schema-25>"
+                      },
+                      "documents": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "x-parser-schema-id": "<anonymous-schema-28>"
+                        },
+                        "x-parser-schema-id": "<anonymous-schema-27>"
                       }
                     },
                     "x-parser-schema-id": "WSMessage"
@@ -167,29 +205,29 @@
                       "id": {
                         "type": "string",
                         "format": "uuid",
-                        "x-parser-schema-id": "<anonymous-schema-22>"
+                        "x-parser-schema-id": "<anonymous-schema-29>"
                       },
                       "domain_id": {
                         "type": "integer",
-                        "x-parser-schema-id": "<anonymous-schema-23>"
+                        "x-parser-schema-id": "<anonymous-schema-30>"
                       },
                       "created_at": {
                         "type": "integer",
                         "format": "int64",
-                        "x-parser-schema-id": "<anonymous-schema-24>"
+                        "x-parser-schema-id": "<anonymous-schema-31>"
                       },
                       "subject": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-25>"
+                        "x-parser-schema-id": "<anonymous-schema-32>"
                       },
                       "type": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-26>"
+                        "x-parser-schema-id": "<anonymous-schema-33>"
                       },
                       "members": {
                         "type": "array",
                         "items": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
-                        "x-parser-schema-id": "<anonymous-schema-27>"
+                        "x-parser-schema-id": "<anonymous-schema-34>"
                       }
                     },
                     "x-parser-schema-id": "WSThread"
@@ -199,11 +237,11 @@
                     "properties": {
                       "id": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-28>"
+                        "x-parser-schema-id": "<anonymous-schema-35>"
                       },
                       "status": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-29>"
+                        "x-parser-schema-id": "<anonymous-schema-36>"
                       }
                     },
                     "x-parser-schema-id": "AckPayload"
@@ -213,16 +251,16 @@
                     "properties": {
                       "code": {
                         "type": "integer",
-                        "x-parser-schema-id": "<anonymous-schema-30>"
+                        "x-parser-schema-id": "<anonymous-schema-37>"
                       },
                       "message": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-31>"
+                        "x-parser-schema-id": "<anonymous-schema-38>"
                       },
                       "details": {
                         "type": "object",
                         "additionalProperties": true,
-                        "x-parser-schema-id": "<anonymous-schema-32>"
+                        "x-parser-schema-id": "<anonymous-schema-39>"
                       }
                     },
                     "x-parser-schema-id": "ErrorPayload"
@@ -233,7 +271,7 @@
                       "timestamp": {
                         "type": "integer",
                         "format": "int64",
-                        "x-parser-schema-id": "<anonymous-schema-33>"
+                        "x-parser-schema-id": "<anonymous-schema-40>"
                       }
                     },
                     "x-parser-schema-id": "PingPayload"
@@ -273,6 +311,7 @@
       "AckPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.ack_event",
       "ErrorPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.error_event",
       "PingPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.ping_event",
+      "WSContact": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender.properties.contact",
       "WSPeer": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
       "WSMessage": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event",
       "WSThread": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.thread_created_event"

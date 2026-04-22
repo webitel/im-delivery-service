@@ -48,7 +48,6 @@ components:
       x-enumNames: ["unspecified", "high", "normal", "low"]
 
     # --- POLYMORPHIC PAYLOAD ---
-    # Keys synchronized with Go EventType.String() outputs
     EventPayload:
       type: object
       properties:
@@ -100,23 +99,39 @@ components:
       properties:
         timestamp: { type: integer, format: int64 }
 
-    # --- DATA MODELS ---
-    WSPeer:
+    # --- DATA MODELS (Updated to match Go structs) ---
+    
+    WSContact:
       type: object
+      required: [sub, type]
       properties:
         sub: 
           type: string
-          description: "Subject identifier (p.Sub)"
+          description: "Subject identifier"
         iss: 
           type: string
-          description: "Issuer (p.Issuer)"
+          description: "Issuer"
         name: 
+          type: string
+        username: 
           type: string
         type: 
           type: string
           description: "Normalized type (e.g. user, bot, agent)"
         is_bot: 
           type: boolean
+
+    WSPeer:
+      type: object
+      properties:
+        id: 
+          type: string
+          description: "Member identifier"
+        contact:
+          $ref: '#/components/schemas/WSContact'
+        role: 
+          type: string
+          description: "Role (e.g. member, admin)"
 
     WSMessage:
       type: object
@@ -132,7 +147,9 @@ components:
         sender: 
           $ref: '#/components/schemas/WSPeer'
         to: 
-          $ref: '#/components/schemas/WSPeer'
+          type: array
+          items:
+            $ref: '#/components/schemas/WSPeer'
         created_at: 
           type: integer
           format: int64
@@ -141,15 +158,19 @@ components:
           format: int64
         body: 
           type: string
-          description: "The main text content"
         type: 
           type: string
           enum: ["text", "image", "document"]
-          description: "Discriminator for the content field"
-        content:
-          type: object
-          additionalProperties: true
-          description: "Media payload (image/document metadata)"
+        images:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 
     WSThread:
       type: object

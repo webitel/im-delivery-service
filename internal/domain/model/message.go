@@ -55,6 +55,7 @@ type Document struct {
 	Name string `json:"name"`
 	Mime string `json:"mime"`
 	Size int64  `json:"size"`
+	URL  string `json:"url"`
 }
 
 type Image struct {

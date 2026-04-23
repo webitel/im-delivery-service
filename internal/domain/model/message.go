@@ -44,22 +44,22 @@ func (m *Message) NotificationBody() string {
 	}
 
 	if len(m.Documents) > 0 {
-		return m.Documents[0].FileName
+		return m.Documents[0].Name
 	}
 
 	return "Sent a message"
 }
 
 type Document struct {
-	ID       string `json:"id"`
-	FileName string `json:"file_name"`
-	MimeType string `json:"mime_type"`
-	Size     int64  `json:"size"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Mime string `json:"mime"`
+	Size int64  `json:"size"`
 }
 
 type Image struct {
-	ID       string `json:"id"`
-	FileName string `json:"file_name"`
-	MimeType string `json:"mime_type"`
-	URL      string `json:"url"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Mime string `json:"mime"`
+	URL  string `json:"url"`
 }

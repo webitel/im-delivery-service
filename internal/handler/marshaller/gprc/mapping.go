@@ -66,7 +66,7 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	} else if len(m.Documents) > 0 {
 		msg.Type = impb.MessageType_DOCUMENT
 		msg.Content = &impb.ThreadMessage_Document{
-			Document: &impb.Document{Id: m.Documents[0].ID, FileName: m.Documents[0].FileName},
+			Document: &impb.Document{Id: m.Documents[0].ID, FileName: m.Documents[0].Name},
 		}
 	} else {
 		msg.Type = impb.MessageType_TEXT

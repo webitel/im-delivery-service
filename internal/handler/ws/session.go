@@ -40,14 +40,16 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 		return
 	}
 
-	// [3] Validate the credentials received via JSON
+	md := metadata.Pairs("x-webitel-access", req.Token)
+	if req.Client != "" {
+		md.Set("x-webitel-client", req.Client)
+	}
+
 	authCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	auth, err := h.auther.Inspect(metadata.NewIncomingContext(authCtx, metadata.Pairs(
-		"x-webitel-access", req.Token,
-		"x-webitel-client", req.Client,
-	)))
+	// Inspect the token (and optional client ID) via the authentication service
+	auth, err := h.auther.Inspect(metadata.NewIncomingContext(authCtx, md))
 	if err != nil {
 		st, _ := status.FromError(err)
 		h.log.Error("ws: late-auth inspection failed", slog.String("err", st.Message()))

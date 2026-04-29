@@ -41,7 +41,10 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 		}
 
 		// [3] Fast-track: Token is present, validate it immediately.
-		md := metadata.Pairs("x-webitel-access", token, "x-webitel-client", clientID)
+		md := metadata.Pairs("x-webitel-access", token)
+		if clientID != "" {
+			md.Set("x-webitel-client", clientID)
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 

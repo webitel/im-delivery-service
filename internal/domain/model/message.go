@@ -1,24 +1,29 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 )
 
 type Message struct {
-	ID        uuid.UUID      `json:"id"`
-	SendID    string         `json:"send_id"`
-	ThreadID  uuid.UUID      `json:"thread_id"`
-	DomainID  int64          `json:"domain_id"`
-	From      Peer           `json:"from"`
-	To        []Peer         `json:"to"`
-	Text      string         `json:"text"`
-	CreatedAt int64          `json:"created_at"`
-	EditedAt  int64          `json:"updated_at,omitempty"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
-	Documents []*Document    `json:"documents,omitempty"`
-	Images    []*Image       `json:"images,omitempty"`
+	ID          uuid.UUID       `json:"id"`
+	SendID      string          `json:"send_id"`
+	ThreadID    uuid.UUID       `json:"thread_id"`
+	DomainID    int64           `json:"domain_id"`
+	From        Peer            `json:"from"`
+	To          []Peer          `json:"to"`
+	Text        string          `json:"text"`
+	CreatedAt   int64           `json:"created_at"`
+	EditedAt    int64           `json:"updated_at,omitempty"`
+	Metadata    map[string]any  `json:"metadata,omitempty"`
+	Documents   []*Document     `json:"documents,omitempty"`
+	Images      []*Image        `json:"images,omitempty"`
+	Interactive json.RawMessage `json:"interactive,omitempty"`
+	Location    *Location       `json:"location,omitempty"`
+	Contact     *Contact        `json:"contact,omitempty"`
+	System      *System         `json:"system,omitempty"`
 }
 
 func (m *Message) RoutingKey() string {
@@ -63,4 +68,22 @@ type Image struct {
 	Name string `json:"name"`
 	Mime string `json:"mime"`
 	URL  string `json:"url"`
+}
+
+type Location struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Address   *string `json:"address,omitempty"`
+	Name      *string `json:"name,omitempty"`
+}
+
+type Contact struct {
+	Name  *string `json:"name,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+	Email *string `json:"email,omitempty"`
+}
+
+type System struct {
+	Type     string         `json:"type"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }

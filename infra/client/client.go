@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/webitel/im-delivery-service/infra/client/interceptors"
 	infratls "github.com/webitel/im-delivery-service/infra/tls"
@@ -13,6 +14,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 // New initializes a go-kit RPC client with Discovery and OPTIONAL Circuit Breaker.
@@ -46,6 +48,13 @@ func New[T any](
 		rpc.WithDialOptions(options...),
 		// [RETRY] Built-in transport-level retries (works regardless of breaker)
 		rpc.WithRetry(rpc.DefaultRetryConfig()),
+		rpc.WithKeepalive(
+			keepalive.ClientParameters{
+				Time:                10 * time.Minute,
+				Timeout:             20 * time.Second,
+				PermitWithoutStream: false,
+			},
+		),
 	)
 	if err != nil {
 		return nil, err

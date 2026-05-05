@@ -1,6 +1,8 @@
 package payload
 
 import (
+	"encoding/json"
+	"maps"
 	"strconv"
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -24,16 +26,21 @@ type Recipient struct {
 
 // MessageCreatedV1 is the top-level structure for the version 1 message event.
 type MessageCreatedV1 struct {
-	MessageID  string      `json:"message_id"`
-	ThreadID   string      `json:"thread_id"`
-	DomainID   int32       `json:"domain_id"`
-	From       Peer        `json:"from"`
-	To         []Recipient `json:"to"`
-	Body       string      `json:"body"`
-	OccurredAt string      `json:"occurred_at"`
-	SendID     string      `json:"send_id"`
-	Images     []Image     `json:"images"`
-	Documents  []Document  `json:"documents"`
+	MessageID   string          `json:"message_id"`
+	ThreadID    string          `json:"thread_id"`
+	DomainID    int32           `json:"domain_id"`
+	From        Peer            `json:"from"`
+	To          []Recipient     `json:"to"`
+	Body        string          `json:"body"`
+	OccurredAt  string          `json:"occurred_at"`
+	SendID      string          `json:"send_id"`
+	Images      []Image         `json:"images"`
+	Documents   []Document      `json:"documents"`
+	Interactive json.RawMessage `json:"interactive,omitempty"`
+	Location    *Location       `json:"location,omitempty"`
+	Contact     *Contact        `json:"contact,omitempty"`
+	Metadata    map[string]any  `json:"metadata,omitempty"`
+	System      *System         `json:"system,omitempty"`
 }
 
 // ToDomain converts the AMQP payload into the internal domain model.
@@ -48,13 +55,17 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		CreatedAt: util.SafeParseRFC3339(d.OccurredAt),
 		Images:    d.mapImages(),
 		Documents: d.mapDocs(),
-		Metadata:  make(map[string]any),
+		Metadata:  d.Metadata,
 		// Populate the sender with provided contact/member details.
 		From: model.Peer{
 			ID:       util.SafeParseUUID(d.From.ContactID),
 			MemberID: d.From.MemberID,
 			Role:     int32(d.From.Role),
 		},
+		Interactive: d.Interactive,
+		Location:    d.Location.AsModel(),
+		Contact:     d.Contact.AsModel(),
+		System:      d.System.AsModel(),
 	}
 
 	// Map all recipients into the domain model.
@@ -112,4 +123,57 @@ type Document struct {
 	Name   string `json:"name"`
 	Size   int64  `json:"size"`
 	URL    string `json:"url"`
+}
+
+type Location struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Address   *string `json:"address,omitempty"`
+	Name      *string `json:"name,omitempty"`
+}
+
+func (location *Location) AsModel() *model.Location {
+	if location == nil {
+		return nil
+	}
+
+	return &model.Location{
+		Latitude:  location.Latitude,
+		Longitude: location.Longitude,
+		Address:   location.Address,
+		Name:      location.Name,
+	}
+}
+
+type Contact struct {
+	Name  *string `json:"name,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+	Email *string `json:"email,omitempty"`
+}
+
+func (contact *Contact) AsModel() *model.Contact {
+	if contact == nil {
+		return nil
+	}
+	return &model.Contact{
+		Name:  contact.Name,
+		Phone: contact.Phone,
+		Email: contact.Email,
+	}
+}
+
+type System struct {
+	Type     string         `json:"type"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func (system *System) AsModel() *model.System {
+	if system == nil {
+		return nil
+	}
+
+	return &model.System{
+		Type:     system.Type,
+		Metadata: maps.Clone(system.Metadata),
+	}
 }

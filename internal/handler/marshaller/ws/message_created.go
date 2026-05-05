@@ -1,6 +1,7 @@
 package wsmarshaller
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -24,17 +25,22 @@ type WSPeer struct {
 }
 
 type WSMessage struct {
-	ID        string            `json:"id"`
-	SendID    string            `json:"send_id"`
-	ThreadID  string            `json:"thread_id"`
-	Sender    *WSPeer           `json:"sender"`
-	To        []*WSPeer         `json:"to,omitempty"`
-	CreatedAt int64             `json:"created_at"`
-	EditedAt  int64             `json:"edited_at,omitempty"`
-	Body      string            `json:"body"`
-	Type      string            `json:"type"`
-	Images    []*model.Image    `json:"images,omitempty"`
-	Documents []*model.Document `json:"documents,omitempty"`
+	ID          string            `json:"id"`
+	SendID      string            `json:"send_id"`
+	ThreadID    string            `json:"thread_id"`
+	Sender      *WSPeer           `json:"sender"`
+	To          []*WSPeer         `json:"to,omitempty"`
+	CreatedAt   int64             `json:"created_at"`
+	EditedAt    int64             `json:"edited_at,omitempty"`
+	Body        string            `json:"body"`
+	Type        string            `json:"type"`
+	Images      []*model.Image    `json:"images,omitempty"`
+	Documents   []*model.Document `json:"documents,omitempty"`
+	Interactive json.RawMessage   `json:"interactive,omitempty"`
+	Contact     *model.Contact    `json:"contact,omitempty"`
+	Location    *model.Location   `json:"location,omitempty"`
+	System      *model.System     `json:"system,omitempty"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
 }
 
 // mapPeer converts internal model.Peer to the nested WSPeer structure.
@@ -69,6 +75,10 @@ func mapMessage(m *model.Message) *WSMessage {
 		EditedAt:  m.EditedAt,
 		Body:      m.Text,
 		Type:      "text",
+		Contact:   m.Contact,
+		Location:  m.Location,
+		Metadata:  m.Metadata,
+		System:    m.System,
 	}
 
 	if len(m.Images) > 0 {
@@ -81,6 +91,21 @@ func mapMessage(m *model.Message) *WSMessage {
 			msg.Type = "document"
 		}
 		msg.Documents = m.Documents
+	}
+
+	if m.Interactive != nil {
+		msg.Type = "interactive"
+		msg.Interactive = m.Interactive
+	}
+
+	if m.Location != nil {
+		msg.Type = "location"
+	}
+	if m.Contact != nil {
+		msg.Type = "contact"
+	}
+	if m.System != nil {
+		msg.Type = "system"
 	}
 
 	return msg

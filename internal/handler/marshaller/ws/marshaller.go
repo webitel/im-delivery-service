@@ -53,6 +53,13 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 			res.Payload["variable_set_event"] = mapVariables(p)
 		}
 
+	case *model.MemberEvent:
+		if ev.GetKind() == event.MemberLeft {
+			res.Payload[EventMemberLeft.String()] = p
+		} else {
+			res.Payload[EventMemberAdded.String()] = p
+		}
+
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.
 		res.Payload[ev.GetKind().String()] = p

@@ -15,11 +15,13 @@ func _() {
 	_ = x[EventAck-4]
 	_ = x[EventError-5]
 	_ = x[EventPing-6]
+	_ = x[EventMemberAdded-7]
+	_ = x[EventMemberLeft-8]
 }
 
-const _EventType_name = "connected_eventdisconnected_eventmessage_eventthread_created_eventack_eventerror_eventping_event"
+const _EventType_name = "connected_eventdisconnected_eventmessage_eventthread_created_eventack_eventerror_eventping_eventmember_added_eventmember_left_event"
 
-var _EventType_index = [...]uint8{0, 15, 33, 46, 66, 75, 86, 96}
+var _EventType_index = [...]uint8{0, 15, 33, 46, 66, 75, 86, 96, 114, 131}
 
 func (i EventType) String() string {
 	if i < 0 || i >= EventType(len(_EventType_index)-1) {

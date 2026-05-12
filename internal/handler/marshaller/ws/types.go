@@ -28,6 +28,8 @@ const (
 	EventAck                            // ack_event
 	EventError                          // error_event
 	EventPing                           // ping_event
+	EventMemberAdded                    // member_added_event
+	EventMemberLeft                     // member_left_event
 )
 
 // [ENVELOPE] ServerEvent is the top-level WebSocket JSON container.

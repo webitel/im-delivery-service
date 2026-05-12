@@ -12,4 +12,6 @@ const (
 	MessageRead                            // [BUSINESS]
 	VariableSet                            // [BUSINESS]
 	VariableFlush                          // [BUSINESS]
+	MemberAdded                            // [BUSINESS]
+	MemberLeft                             // [BUSINESS]
 )

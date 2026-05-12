@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -92,15 +93,18 @@ func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error)
 			Kind event.EventKind `json:"kind"`
 		}
 		if err := json.Unmarshal(data, &meta); err != nil {
+			slog.Error("scheduler: meta unmarshal failed", "err", err, "data", string(data))
 			continue
 		}
 
 		ev := event.NewEnvelopeForKind(meta.Kind)
 		if ev == nil {
+			slog.Error("scheduler: unknown event kind", "kind", meta.Kind)
 			continue
 		}
 
 		if err := json.Unmarshal(data, ev); err != nil {
+			slog.Error("scheduler: event unmarshal failed", "kind", meta.Kind, "err", err, "data", string(data))
 			continue
 		}
 		events = append(events, ev)

@@ -87,6 +87,18 @@ func NewSystemEvent[T any](
 	return e
 }
 
+// [NEW_MEMBER_EVENT] Factory for member lifecycle events (added/left).
+func NewMemberEvent(m *model.MemberEvent, targetID uuid.UUID, kind EventKind) Eventer {
+	return &Envelope[*model.MemberEvent]{
+		ID:         uuid.New(),
+		Payload:    m,
+		UserID:     targetID,
+		Kind:       kind,
+		Priority:   PriorityNormal,
+		OccurredAt: time.Now().UnixMilli(),
+	}
+}
+
 // [NEW_READ_EVENT] Optimized factory for message read confirmations.
 func NewReadEvent(eventID, userID uuid.UUID) Eventer {
 	return &Envelope[*model.MessageReadPayload]{

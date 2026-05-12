@@ -27,6 +27,8 @@ const (
 	TopicDeviceLogout     = "updates.device.logout.#"
 	TopicVariablesSet     = "im_thread.#.variables.set.#"
 	TopicVariablesFlush   = "im_thread.#.variables.flush.#"
+	TopicMemberAdded      = "im_thread.*.member.*.joined.v1"
+	TopicMemberLeft       = "im_thread.*.member.*.left.v1"
 
 	// Queues
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -124,6 +126,18 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicVariablesFlush,
 			Handler:  Bind(h, h.OnVariablesFlushV1),
+		},
+		{
+			Name:     "ON_MEMBER_ADDED",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicMemberAdded,
+			Handler:  Bind(h, h.OnMemberAddedV1),
+		},
+		{
+			Name:     "ON_MEMBER_LEFT",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicMemberLeft,
+			Handler:  Bind(h, h.OnMemberLeftV1),
 		},
 	}
 

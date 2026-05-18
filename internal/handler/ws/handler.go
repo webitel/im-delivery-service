@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	"github.com/webitel/im-delivery-service/internal/service"
@@ -64,6 +65,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			slog.String("remote", remote),
 			slog.Any("err", err),
 		)
+
 		return
 	}
 
@@ -74,6 +76,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			slog.String("remote", remote),
 		)
 		h.initSession(conn, auth)
+
 		return
 	}
 

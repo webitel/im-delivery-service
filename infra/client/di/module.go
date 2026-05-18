@@ -3,10 +3,11 @@ package webiteldi
 import (
 	"context"
 
+	"go.uber.org/fx"
+
 	imadmin "github.com/webitel/im-delivery-service/infra/client/im-admin"
 	imauth "github.com/webitel/im-delivery-service/infra/client/im-auth"
 	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
-	"go.uber.org/fx"
 )
 
 var Module = fx.Module(

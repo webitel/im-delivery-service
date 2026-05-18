@@ -48,6 +48,7 @@ func (bi *BreakerInterceptor) UnaryClientInterceptor() grpc.UnaryClientIntercept
 					}
 				}
 			}
+
 			return nil, invokerErr
 		})
 

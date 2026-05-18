@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru/v2"
+
 	contactv1 "github.com/webitel/im-delivery-service/gen/go/contact/v1"
 	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -24,6 +25,7 @@ type ContactEnricher struct {
 
 func NewContactEnricher(client *imcontact.Client, logger *slog.Logger) *ContactEnricher {
 	cache, _ := lru.New[uuid.UUID, model.Peer](10000)
+
 	return &ContactEnricher{
 		client: client,
 		cache:  cache,
@@ -89,6 +91,7 @@ func (e *ContactEnricher) fetch(ctx context.Context, domainID int32, missing map
 	})
 	if err != nil {
 		e.logger.Error("CONTACT_FETCH_FAILED", "err", err)
+
 		return
 	}
 
@@ -121,12 +124,13 @@ func (e *ContactEnricher) toPeer(c *contactv1.Contact) model.Peer {
 	}
 
 	return model.Peer{
-		ID:     uuid.MustParse(c.GetId()),
-		Type:   e.parseType(c.GetType()),
-		Name:   name,
-		Sub:    c.GetSubject(),
-		Issuer: c.GetIssId(),
-		IsBot:  c.GetIsBot(),
+		ID:          uuid.MustParse(c.GetId()),
+		Type:        e.parseType(c.GetType()),
+		ContactType: c.GetType(),
+		Name:        name,
+		Sub:         c.GetSubject(),
+		Issuer:      c.GetIssId(),
+		IsBot:       c.GetIsBot(),
 	}
 }
 

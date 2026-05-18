@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"google.golang.org/grpc"
+
+	"github.com/webitel/webitel-go-kit/infra/discovery"
+	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
+
 	contactv1 "github.com/webitel/im-delivery-service/gen/go/contact/v1"
 	webitel "github.com/webitel/im-delivery-service/infra/client"
 	infratls "github.com/webitel/im-delivery-service/infra/tls"
-	"github.com/webitel/webitel-go-kit/infra/discovery"
-	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
-	"google.golang.org/grpc"
 )
 
 const ServiceName string = "im-contact-service"
@@ -49,7 +51,9 @@ func (c *Client) SearchContact(ctx context.Context, req *contactv1.SearchContact
 		c.logger.Debug("CONTACTS.SEARCH_CONTACT", slog.Any("req", req))
 
 		var err error
+
 		resp, err = api.SearchContact(ctx, req)
+
 		return err
 	})
 
@@ -61,5 +65,6 @@ func (c *Client) Close() error {
 	if c.rpc != nil {
 		return c.rpc.Close()
 	}
+
 	return nil
 }

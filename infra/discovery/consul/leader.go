@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+
 	"github.com/webitel/im-delivery-service/config"
 )
 
@@ -47,7 +48,7 @@ type LeaderElector struct {
 	nodeID string
 }
 
-func NewLeaderElector(consulAddr string, nodeID string, log *slog.Logger) (*LeaderElector, error) {
+func NewLeaderElector(consulAddr, nodeID string, log *slog.Logger) (*LeaderElector, error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = consulAddr
 
@@ -73,7 +74,8 @@ func (le *LeaderElector) Run(ctx context.Context, onStart func(ctx context.Conte
 	for {
 		select {
 		case <-ctx.Done():
-			le.log.Info("stopping leader election: context cancelled")
+			le.log.Info("stopping leader election: context canceled")
+
 			return
 		default:
 			// [ELECTION_LOOP]
@@ -90,6 +92,7 @@ func (le *LeaderElector) attemptLeadership(ctx context.Context, onStart func(ctx
 	if err != nil {
 		le.log.Error("failed to create session", "err", err)
 		le.wait(ctx, errCooldown)
+
 		return
 	}
 
@@ -101,12 +104,14 @@ func (le *LeaderElector) attemptLeadership(ctx context.Context, onStart func(ctx
 	if err != nil {
 		le.log.Error("error during lock acquisition", "err", err)
 		le.wait(ctx, errCooldown)
+
 		return
 	}
 
 	if !acquired {
 		le.log.Debug("leader lock held by another instance")
 		le.wait(ctx, retryInterval)
+
 		return
 	}
 
@@ -144,6 +149,7 @@ func (le *LeaderElector) createSession() (string, error) {
 		Behavior: api.SessionBehaviorRelease, // Release the lock if session expires
 	}
 	sessionID, _, err := le.client.Session().Create(entry, nil)
+
 	return sessionID, err
 }
 
@@ -154,6 +160,7 @@ func (le *LeaderElector) acquireLock(sessionID string) (bool, error) {
 		Session: sessionID,
 	}
 	acquired, _, err := le.client.KV().Acquire(kv, nil)
+
 	return acquired, err
 }
 
@@ -170,6 +177,7 @@ func (le *LeaderElector) monitorLeadership(ctx context.Context, sessionID string
 			pair, _, err := le.client.KV().Get(le.key, nil)
 			if err != nil || pair == nil || pair.Session != sessionID {
 				le.log.Debug("leadership check failed or session changed")
+
 				return
 			}
 		}

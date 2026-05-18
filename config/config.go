@@ -96,6 +96,7 @@ func LoadConfig() (*Config, error) {
 	configFile := viper.GetString("config_file")
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
+
 		if err := viper.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
@@ -106,15 +107,18 @@ func LoadConfig() (*Config, error) {
 			newCfg := &Config{}
 			if err := viper.Unmarshal(newCfg); err != nil {
 				log.Printf("Reload error: unable to decode: %v", err)
+
 				return
 			}
 
 			if err := newCfg.validate(); err != nil {
 				log.Printf("Reload error: invalid config: %v", err)
+
 				return
 			}
 
 			*cfg = *newCfg
+
 			log.Println("Config reloaded successfully")
 		})
 
@@ -217,12 +221,15 @@ func validateConnectionConfig(conn ConnectionConfig) error {
 		if conn.TLS.CA == "" {
 			return fmt.Errorf("config: service.conn.ca is required when verify_certs is true")
 		}
+
 		if conn.TLS.Cert == "" {
 			return fmt.Errorf("config: service.conn.cert is required when verify_certs is true")
 		}
+
 		if conn.TLS.Key == "" {
 			return fmt.Errorf("config: service.conn.key is required when verify_certs is true")
 		}
 	}
+
 	return nil
 }

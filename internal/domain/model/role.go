@@ -3,12 +3,15 @@ package model
 // ThreadRole defines the participation level in a chat thread.
 type ThreadRole int32
 
+// WARNING: due to unmatched logic between proto
+// and thread-service implementation of roles
+// we need to swap RoleOwner<->RoleSupervisor
 const (
-	RoleUnspecified ThreadRole = iota // 0
-	RoleMember                        // 1
-	RoleAdmin                         // 2
-	RoleOwner                         // 3
-	RoleSupervisor                    // 4
+	RoleUnspecified ThreadRole = iota
+	RoleMember
+	RoleAdmin
+	RoleSupervisor
+	RoleOwner
 )
 
 // String returns the human-readable representation of the role.
@@ -33,5 +36,6 @@ func ParseRole(v int32) ThreadRole {
 	if v < 0 || v > 4 {
 		return RoleUnspecified
 	}
+
 	return ThreadRole(v)
 }

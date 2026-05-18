@@ -12,21 +12,23 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/lmittmann/tint"
 	"github.com/redis/go-redis/v9"
-	"github.com/webitel/im-delivery-service/config"
-	"github.com/webitel/im-delivery-service/infra/pubsub"
-	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
-	"github.com/webitel/im-delivery-service/infra/pubsub/factory/amqp"
-	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"github.com/webitel/webitel-go-kit/infra/discovery"
-	_ "github.com/webitel/webitel-go-kit/infra/discovery/consul"
-	otelsdk "github.com/webitel/webitel-go-kit/infra/otel/sdk"
-	"github.com/webitel/webitel-go-kit/infra/profiler"
-	"github.com/webitel/webitel-go-kit/pkg/logger"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.38.0"
 	"go.uber.org/fx"
 
+	"github.com/webitel/webitel-go-kit/infra/discovery"
+	otelsdk "github.com/webitel/webitel-go-kit/infra/otel/sdk"
+	"github.com/webitel/webitel-go-kit/infra/profiler"
+	"github.com/webitel/webitel-go-kit/pkg/logger"
+
+	"github.com/webitel/im-delivery-service/config"
+	"github.com/webitel/im-delivery-service/infra/pubsub"
+	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
+	"github.com/webitel/im-delivery-service/infra/pubsub/factory/amqp"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
+
+	_ "github.com/webitel/webitel-go-kit/infra/discovery/consul"
 	_ "github.com/webitel/webitel-go-kit/infra/otel/sdk/log/otlp"
 	_ "github.com/webitel/webitel-go-kit/infra/otel/sdk/log/stdout"
 	_ "github.com/webitel/webitel-go-kit/infra/otel/sdk/metric/otlp"
@@ -64,6 +66,7 @@ func ProvideLogger(cfg *config.Config, lc fx.Lifecycle) (*slog.Logger, error) {
 				NoColor:    false,
 			})
 		}
+
 		handlers = append(handlers, h)
 	}
 
@@ -86,6 +89,7 @@ func ProvideLogger(cfg *config.Config, lc fx.Lifecycle) (*slog.Logger, error) {
 		} else {
 			h = slog.NewTextHandler(f, opts)
 		}
+
 		handlers = append(handlers, h)
 	}
 
@@ -160,6 +164,7 @@ func (h *multiHandler) Enabled(ctx context.Context, level slog.Level) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -169,6 +174,7 @@ func (h *multiHandler) Handle(ctx context.Context, r slog.Record) error {
 			_ = hh.Handle(ctx, r)
 		}
 	}
+
 	return nil
 }
 
@@ -177,6 +183,7 @@ func (h *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	for i, hh := range h.handlers {
 		newHandlers[i] = hh.WithAttrs(attrs)
 	}
+
 	return &multiHandler{handlers: newHandlers}
 }
 
@@ -185,6 +192,7 @@ func (h *multiHandler) WithGroup(name string) slog.Handler {
 	for i, hh := range h.handlers {
 		newHandlers[i] = hh.WithGroup(name)
 	}
+
 	return &multiHandler{handlers: newHandlers}
 }
 
@@ -219,12 +227,14 @@ func ProvideSD(cfg *config.Config, log *slog.Logger, lc fx.Lifecycle) (discovery
 			if err := provider.Register(ctx, si); err != nil {
 				return err
 			}
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			if err := provider.Deregister(ctx, si); err != nil {
 				return err
 			}
+
 			return nil
 		},
 	})
@@ -254,6 +264,7 @@ func ProvidePubSub(cfg *config.Config, l *slog.Logger, lc fx.Lifecycle) (pubsub.
 	if err != nil {
 		return nil, err
 	}
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
@@ -261,6 +272,7 @@ func ProvidePubSub(cfg *config.Config, l *slog.Logger, lc fx.Lifecycle) (pubsub.
 					l.Error("watermill router failed", slog.Any("error", err))
 				}
 			}()
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -283,13 +295,17 @@ func ProvideRedis(cfg *config.Config, lc fx.Lifecycle, l *slog.Logger) (*redis.C
 			err := rdb.Ping(ctx).Err()
 			if err != nil {
 				l.Error("redis connection failed", slog.Any("error", err))
+
 				return err
 			}
+
 			l.Info("redis connected", slog.String("addr", cfg.Redis.Addr))
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			l.Info("closing redis connection")
+
 			return rdb.Close()
 		},
 	})

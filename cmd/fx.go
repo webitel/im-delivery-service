@@ -1,6 +1,11 @@
 package cmd
 
 import (
+	"go.uber.org/fx"
+
+	"github.com/webitel/webitel-go-kit/infra/discovery"
+	"github.com/webitel/webitel-go-kit/infra/profiler"
+
 	"github.com/webitel/im-delivery-service/config"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
@@ -14,9 +19,6 @@ import (
 	wshandler "github.com/webitel/im-delivery-service/internal/handler/ws"
 	servicedi "github.com/webitel/im-delivery-service/internal/service/di"
 	redisdi "github.com/webitel/im-delivery-service/internal/store/redis"
-	"github.com/webitel/webitel-go-kit/infra/discovery"
-	"github.com/webitel/webitel-go-kit/infra/profiler"
-	"go.uber.org/fx"
 )
 
 // NewApp assembles the application dependency graph and manages its lifecycle.

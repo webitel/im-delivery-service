@@ -6,6 +6,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-amqp/v3/pkg/amqp"
 	"github.com/ThreeDotsLabs/watermill/message"
+
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
 )
 
@@ -90,5 +91,6 @@ func (f *Factory) BuildPublisher(pubConfig *factory.PublisherConfig) (message.Pu
 			},
 		},
 	}
+
 	return amqp.NewPublisher(conf, f.logger)
 }

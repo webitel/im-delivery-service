@@ -2,7 +2,6 @@ package wsmarshaller
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
@@ -57,7 +56,7 @@ func mapPeer(p *model.Peer) *WSPeer {
 			Iss:      p.Issuer,
 			Name:     p.Name,
 			Username: p.Name, // Using name as username as fallback
-			Type:     strings.ToLower(strings.TrimPrefix(p.Type.String(), "Peer")),
+			Type:     p.ContactType,
 			IsBot:    p.IsBot, // Assigned inside the contact object
 		},
 	}
@@ -90,6 +89,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		if msg.Type == "text" {
 			msg.Type = "document"
 		}
+
 		msg.Documents = m.Documents
 	}
 
@@ -101,9 +101,11 @@ func mapMessage(m *model.Message) *WSMessage {
 	if m.Location != nil {
 		msg.Type = "location"
 	}
+
 	if m.Contact != nil {
 		msg.Type = "contact"
 	}
+
 	if m.System != nil {
 		msg.Type = "system"
 	}

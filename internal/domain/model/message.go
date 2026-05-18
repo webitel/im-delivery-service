@@ -35,6 +35,7 @@ func (m *Message) NotificationTitle() string {
 	if m.From.Name != "" {
 		return m.From.Name
 	}
+
 	return "New Message"
 }
 

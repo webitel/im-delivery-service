@@ -6,15 +6,17 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/webitel/im-delivery-service/infra/client/interceptors"
-	infratls "github.com/webitel/im-delivery-service/infra/tls"
-	ds "github.com/webitel/webitel-go-kit/infra/discovery"
-	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
-	"github.com/webitel/webitel-go-kit/infra/transport/gRPC/resolver/discovery"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+
+	ds "github.com/webitel/webitel-go-kit/infra/discovery"
+	rpc "github.com/webitel/webitel-go-kit/infra/transport/gRPC"
+	"github.com/webitel/webitel-go-kit/infra/transport/gRPC/resolver/discovery"
+
+	"github.com/webitel/im-delivery-service/infra/client/interceptors"
+	infratls "github.com/webitel/im-delivery-service/infra/tls"
 )
 
 // New initializes a go-kit RPC client with Discovery and OPTIONAL Circuit Breaker.

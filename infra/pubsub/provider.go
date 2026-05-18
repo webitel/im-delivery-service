@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ThreeDotsLabs/watermill/message"
+
 	"github.com/webitel/im-delivery-service/infra/pubsub/factory"
 )
 
@@ -21,9 +22,11 @@ func NewDefaultProvider(router *message.Router, factory factory.Factory) (Provid
 	if router == nil {
 		return nil, errors.New("router is required")
 	}
+
 	if factory == nil {
 		return nil, errors.New("factory is required")
 	}
+
 	return &DefaultProvider{
 		router:  router,
 		factory: factory,

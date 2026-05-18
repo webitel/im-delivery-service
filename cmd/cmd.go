@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/urfave/cli/v2"
+
 	"github.com/webitel/im-delivery-service/config"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
@@ -52,6 +53,7 @@ func serverCmd() *cli.Command {
 			<-stop
 
 			slog.Info("Shutting down...")
+
 			return app.Stop(context.Background())
 		},
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul/api"
 
 	"github.com/webitel/im-delivery-service/config"
+	discovery "github.com/webitel/webitel-go-kit/infra/discovery"
 )
 
 type Elector interface {
@@ -66,7 +67,7 @@ func NewLeaderElector(consulAddr, nodeID string, log *slog.Logger) (*LeaderElect
 }
 
 func ProvideLeaderElector(cfg *config.Config, log *slog.Logger) (*LeaderElector, error) {
-	return NewLeaderElector(cfg.Consul.Addr, cfg.Service.ID, log)
+	return NewLeaderElector(cfg.Consul.Addr, discovery.GenerateInstanceID("im-delivery-service"), log)
 }
 
 // Run blocks and continuously tries to acquire leadership

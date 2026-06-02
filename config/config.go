@@ -29,7 +29,6 @@ type DeliveryConfig struct {
 }
 
 type ServiceConfig struct {
-	ID         string             `mapstructure:"id"`
 	Addr       string             `mapstructure:"addr"`
 	HTTPAddr   string             `mapstructure:"http_addr"`
 	Connection appconfig.GRPCConn `mapstructure:"conn"`
@@ -77,25 +76,15 @@ func LoadConfig() (*Config, error) {
 }
 
 func registerServiceFlags() {
-	pflag.String("service.id", "", "Service instance ID (required)")
 	pflag.String("service.addr", "localhost:8080", "gRPC listen address")
 	pflag.String("service.http_addr", ":8081", "HTTP/WS listen address")
-	pflag.Bool("service.conn.verify_certs", true, "Verify TLS certificates on outbound gRPC connections")
-	pflag.String("service.conn.ca", "", "CA certificate path")
-	pflag.String("service.conn.cert", "", "Server certificate path")
-	pflag.String("service.conn.key", "", "Server certificate key path")
-	pflag.String("service.conn.client.ca", "", "Client CA certificate path")
-	pflag.String("service.conn.client.cert", "", "Client certificate path")
-	pflag.String("service.conn.client.key", "", "Client certificate key path")
+	appconfig.RegisterGRPCConnFlags(pflag.CommandLine, "service.conn", true)
 
 	pflag.Bool("delivery.enable_push", false, "Enable push notifications if delivery fails")
 	pflag.Duration("delivery.ack_timeout", 10*time.Second, "Timeout to wait for client ACK before pushing")
 }
 
 func (c *Config) validate() error {
-	if c.Service.ID == "" {
-		return fmt.Errorf("config: service.id is required (use --service.id or SERVICE_ID env)")
-	}
 	if c.Service.Addr == "" {
 		return fmt.Errorf("config: service.addr is required")
 	}

@@ -19,7 +19,7 @@ require (
 	github.com/sideshow/apns2 v0.25.0
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/pflag v1.0.10
-	github.com/spf13/viper v1.21.0
+	github.com/spf13/viper v1.21.0 // indirect
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/webitel/webitel-go-kit/infra/profiler v0.0.0-20260323001146-8a6a55d94da8
 	github.com/webitel/webitel-go-kit/infra/transport v0.0.0-20260120140602-6f20efe1524e
@@ -144,3 +144,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57
 	google.golang.org/protobuf v1.36.11
 )
+
+require github.com/webitel/webitel-go-kit/appconfig v0.0.0-20260602123706-4e69c07a5ba7

@@ -32,7 +32,7 @@ var Module = fx.Module("grpc_server",
 		sessionManager service.SessionManager,
 		tls *tls.Config,
 	) (*Server, error) {
-		srv, err := New(conf.Service.Address, logger, auther, tls, sessionManager)
+		srv, err := New(conf.Service.Addr, logger, auther, tls, sessionManager)
 		if err != nil {
 			return nil, err
 		}

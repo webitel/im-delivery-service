@@ -200,7 +200,7 @@ func ProvideSD(cfg *config.Config, log *slog.Logger, lc fx.Lifecycle) (discovery
 	provider, err := discovery.DefaultFactory.CreateProvider(
 		discovery.ProviderConsul,
 		log,
-		cfg.Consul.Address,
+		cfg.Consul.Addr,
 		discovery.WithHeartbeat[discovery.DiscoveryProvider](true),
 		discovery.WithTimeout[discovery.DiscoveryProvider](time.Second*30),
 	)
@@ -219,7 +219,7 @@ func ProvideSD(cfg *config.Config, log *slog.Logger, lc fx.Lifecycle) (discovery
 			"branch":         model.Branch,
 			"buildTimestamp": model.BuildTimestamp,
 		}
-		si.Endpoints = []string{(&url.URL{Scheme: "grpc", Host: cfg.Service.Address}).String()}
+		si.Endpoints = []string{(&url.URL{Scheme: "grpc", Host: cfg.Service.Addr}).String()}
 	}
 
 	lc.Append(fx.Hook{
@@ -316,7 +316,7 @@ func ProvideRedis(cfg *config.Config, lc fx.Lifecycle, l *slog.Logger) (*redis.C
 func ProvideProfiler(cfg *config.Config, l *slog.Logger) (profiler.Config, logger.Logger) {
 	return profiler.Config{
 		Addr:                 cfg.Profiler.Addr,
-		MutexProfileFraction: cfg.Profiler.MutexProfileFraction,
-		BlockProfileRate:     cfg.Profiler.BlockProfileRate,
+		MutexProfileFraction: cfg.Profiler.MutexFraction,
+		BlockProfileRate:     cfg.Profiler.BlockRate,
 	}, logger.NewSlog(l)
 }

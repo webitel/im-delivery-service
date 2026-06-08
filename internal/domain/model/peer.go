@@ -25,6 +25,7 @@ type Peer struct {
 	IsBot       bool      `json:"is_bot"`
 	MemberID    string    `json:"member_id,omitempty"`
 	Role        int32     `json:"role,omitempty"`
+	DomainID    int       `json:"domain_id,omitempty"`
 }
 
 type PeerOption func(*Peer)
@@ -44,6 +45,8 @@ func WithBot(isBot bool) PeerOption {
 		p.IsBot = isBot
 	}
 }
+
+func WithDomainID(domainID int) PeerOption { return func(p *Peer) { p.DomainID = domainID } }
 
 func NewPeer(id uuid.UUID, pType PeerType, opts ...PeerOption) Peer {
 	p := Peer{ID: id, Type: pType}

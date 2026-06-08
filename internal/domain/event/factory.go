@@ -129,3 +129,13 @@ func NewVariableEvent(
 		OccurredAt: time.Now().UnixMilli(),
 	}
 }
+
+func NewInteractiveCallbackEvent(payload *model.InteractiveCallback) Eventer {
+	return &Envelope[*model.InteractiveCallback]{
+		ID:         uuid.New(),
+		Payload:    payload,
+		UserID:     payload.ReactedBy.ID,
+		Priority:   PriorityLow,
+		OccurredAt: time.Now().UTC().UnixMilli(),
+	}
+}

@@ -20,15 +20,16 @@ const (
 	SystemEventsExchange  = "im_system.events"
 
 	// Routing Keys
-	TopicMessageCreated   = "im_message.#.message.created.v1"
-	TopicThreadCreated    = "im_thread.#.thread.created.v1"
-	TopicDeviceRegister   = "updates.device.register.#"
-	TopicDeviceUnregister = "updates.device.unregister.#"
-	TopicDeviceLogout     = "updates.device.logout.#"
-	TopicVariablesSet     = "im_thread.#.variables.set.#"
-	TopicVariablesFlush   = "im_thread.#.variables.flush.#"
-	TopicMemberAdded      = "im_thread.*.member.*.joined.v1"
-	TopicMemberLeft       = "im_thread.*.member.*.left.v1"
+	TopicMessageCreated      = "im_message.#.message.created.v1"
+	TopicThreadCreated       = "im_thread.#.thread.created.v1"
+	TopicDeviceRegister      = "updates.device.register.#"
+	TopicDeviceUnregister    = "updates.device.unregister.#"
+	TopicDeviceLogout        = "updates.device.logout.#"
+	TopicVariablesSet        = "im_thread.#.variables.set.#"
+	TopicVariablesFlush      = "im_thread.#.variables.flush.#"
+	TopicMemberAdded         = "im_thread.*.member.*.joined.v1"
+	TopicMemberLeft          = "im_thread.*.member.*.left.v1"
+	TopicInteractiveCallbacl = "im_message.*.interactive_callback.#"
 
 	// Queues
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -138,6 +139,12 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicMemberLeft,
 			Handler:  Bind(h, h.OnMemberLeftV1),
+		},
+		{
+			Name:     "ON_INTERACTIVE_CALLBACK",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicInteractiveCallbacl,
+			Handler:  Bind(h, h.OnInteractiveCallbackReactedV1),
 		},
 	}
 

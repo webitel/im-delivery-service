@@ -10,6 +10,7 @@ type InteractiveCallback struct {
 	ReactedAt    string `json:"reacted_at"`
 	DomainID     int    `json:"domain_id"`
 	ThreadID     string `json:"thread_id"`
+	Receiver     Peer   `json:"receiver"`
 }
 
 func (c *InteractiveCallback) RoutingKey() string {

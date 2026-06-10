@@ -17,6 +17,8 @@ type InteractiveCallbackV1 struct {
 	ButtonCode   string    `json:"button_code"`
 	CallbackData string    `json:"callback_data"`
 	ReactedAt    string    `json:"reacted_at"`
+	DomainID     int       `json:"domain_id"`
+	ThreadID     string    `json:"thread_id"`
 }
 
 func (c *InteractiveCallbackV1) ToDomain() (*model.InteractiveCallback, error) {
@@ -42,5 +44,7 @@ func (c *InteractiveCallbackV1) ToDomain() (*model.InteractiveCallback, error) {
 		ButtonCode:   c.ButtonCode,
 		CallbackData: c.CallbackData,
 		ReactedAt:    c.ReactedAt,
+		DomainID:     c.DomainID,
+		ThreadID:     c.ThreadID,
 	}, nil
 }

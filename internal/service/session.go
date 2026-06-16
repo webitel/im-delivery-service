@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	"github.com/webitel/im-delivery-service/internal/store"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [SESSION_MANAGER] Interface for handling physical connection lifecycle.
@@ -42,7 +43,7 @@ func (s *SessionService) Attach(ctx context.Context, uid uuid.UUID, deviceID str
 	// We use the provided context to respect the connection handshake timeout.
 	if err := s.presence.Online(ctx, uid, conn.GetID(), deviceID); err != nil {
 		s.log.Error("PRESENCE_ONLINE_FAILED",
-			slog.Any("err", err),
+			slog.Any(semconv.ErrorKey, err),
 			slog.String("uid", uid.String()),
 		)
 		return nil, err
@@ -68,7 +69,7 @@ func (s *SessionService) Detach(ctx context.Context, uid, cid uuid.UUID) {
 		defer cancel()
 		if err := s.presence.Offline(detachCtx, uid, cid); err != nil {
 			s.log.Error("PRESENCE_OFFLINE_SYNC_FAILED",
-				slog.Any("err", err),
+				slog.Any(semconv.ErrorKey, err),
 				slog.String("cid", cid.String()),
 			)
 		}

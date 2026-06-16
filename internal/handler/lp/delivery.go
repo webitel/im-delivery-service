@@ -11,6 +11,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
 	"github.com/webitel/im-delivery-service/internal/service"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 type LPHandler struct {
@@ -85,7 +86,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	// [SERIALIZATION] Use the batch marshaller interface.
 	val, err := h.marshaller.MarshalBatch(events)
 	if err != nil {
-		h.logger.Error("LP_MARSHALL_FAILED", slog.Any("err", err))
+		h.logger.Error("LP_MARSHALL_FAILED", slog.Any(semconv.ErrorKey, err))
 		http.Error(w, "internal serialization error", http.StatusInternalServerError)
 		return
 	}

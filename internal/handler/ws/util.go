@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [TERMINATE] Gracefully terminates the connection using model.DisconnectedPayload.
@@ -67,14 +68,14 @@ func (h *WSHandler) terminate(c *websocket.Conn, wsCode int, reason string) {
 func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) {
 	raw, err := h.marshaller.Marshal(ev)
 	if err != nil {
-		log.Error("ws: marshal failed", slog.Any("err", err))
+		log.Error("ws: marshal failed", slog.Any(semconv.ErrorKey, err))
 		return
 	}
 
 	if data, ok := raw.([]byte); ok {
 		_ = c.SetWriteDeadline(time.Now().Add(writeWait))
 		if err := c.WriteMessage(websocket.TextMessage, data); err != nil {
-			log.Warn("ws: socket write failed", slog.Any("err", err))
+			log.Warn("ws: socket write failed", slog.Any(semconv.ErrorKey, err))
 		}
 	}
 }

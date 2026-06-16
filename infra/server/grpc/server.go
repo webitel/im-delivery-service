@@ -16,6 +16,7 @@ import (
 	"github.com/webitel/im-delivery-service/infra/tls"
 	"github.com/webitel/im-delivery-service/internal/service"
 	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
@@ -44,7 +45,7 @@ var Module = fx.Module("grpc_server",
 					// Run the server in a separate goroutine to allow FX to finish initialization.
 					logger.Info(fmt.Sprintf("listen grpc %s:%d", srv.Host(), srv.Port()))
 					if err := srv.Listen(); err != nil {
-						logger.Error("grpc server error", "err", err)
+						logger.Error("grpc server error", semconv.ErrorKey, err)
 					}
 				}()
 				return nil
@@ -53,7 +54,7 @@ var Module = fx.Module("grpc_server",
 				// [GRACEFUL_EXIT] DRAIN SESSIONS
 				// Stop accepting new connections and wait for active streams to flush.
 				if err := srv.Shutdown(); err != nil {
-					logger.Error("error stopping grpc server", "err", err.Error())
+					logger.Error("error stopping grpc server", semconv.ErrorKey, err.Error())
 					return err
 				}
 				return nil

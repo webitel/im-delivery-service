@@ -7,6 +7,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [ON_VARIABLES_SET] Entry point for variable updates.
@@ -31,7 +32,7 @@ func (h *MessageHandler) handleVariables(raw *payload.VariablesV1, action string
 	for _, m := range raw.Members {
 		memberID, err := uuid.Parse(m)
 		if err != nil {
-			h.logger.Warn("failed_to_parse_member_id", "id", m, "error", err)
+			h.logger.Warn("failed_to_parse_member_id", "id", m, semconv.ErrorKey, err)
 			continue
 		}
 

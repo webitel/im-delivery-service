@@ -10,6 +10,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [DOMAIN_HANDLER] Defines a generic function that processes a payload into multiple events.
@@ -29,8 +30,8 @@ func (h *MessageHandler) Dispatch(ctx context.Context, events []event.Eventer) {
 			if err := h.dist.Publish(ctx, ev); err != nil {
 				h.logger.Error(
 					"GLOBAL_DISPATCH_FAILED",
-					"err", err,
-					"user_id", ev.GetUserID(),
+					semconv.ErrorKey, err,
+					semconv.UserIDKey, ev.GetUserID(),
 					"kind", ev.GetKind(),
 				)
 			}
@@ -43,13 +44,13 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 	return func(msg *message.Message) error {
 		defer func() {
 			if r := recover(); r != nil {
-				h.logger.Error("PANIC_RECOVERED", "err", r, "stack", string(debug.Stack()))
+				h.logger.Error("PANIC_RECOVERED", semconv.ErrorKey, r, "stack", string(debug.Stack()))
 			}
 		}()
 
 		payload := new(T)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
-			h.logger.Error("payload_unmarshal_failed", "err", err, "raw", string(msg.Payload))
+			h.logger.Error("payload_unmarshal_failed", semconv.ErrorKey, err, "raw", string(msg.Payload))
 			return nil // ACK invalid payloads
 		}
 

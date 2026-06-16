@@ -14,6 +14,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/store"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [INTERFACE_GUARD]
@@ -75,7 +76,7 @@ func NewPushHandler(
 		pusher:         pusher,
 		leader:         leader,
 		cb:             cb,
-		log:            log.With("component", "push_handler"),
+		log:            log.With(semconv.ComponentKey, "push_handler"),
 		timeout:        cfg.Delivery.AckTimeout,
 	}
 }
@@ -103,7 +104,7 @@ func (h *PushHandler) processPendingTasks(ctx context.Context) {
 	// [UNIFIED_FETCH] PullReady now returns full events and cleans Redis.
 	events, err := h.scheduler.PullReady(ctx)
 	if err != nil {
-		h.log.Error("PULL_FAILED", slog.Any("err", err))
+		h.log.Error("PULL_FAILED", slog.Any(semconv.ErrorKey, err))
 		return
 	}
 
@@ -189,7 +190,7 @@ func (h *PushHandler) ship(ctx context.Context, ev event.Eventer, targets []mode
 			h.log.Error("SHIP_FAILED",
 				slog.String("device", target.ID),
 				slog.String("eid", ev.GetID()),
-				slog.Any("err", err),
+				slog.Any(semconv.ErrorKey, err),
 			)
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"github.com/webitel/im-delivery-service/infra/push/webhook"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 const (
@@ -28,7 +29,7 @@ type Provider struct {
 
 func NewProvider(log *slog.Logger) *Provider {
 	return &Provider{
-		log:      log.With("component", "push.fcm"),
+		log:      log.With(semconv.ComponentKey, "push.fcm"),
 		registry: newClientRegistry(),
 	}
 }
@@ -61,7 +62,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			p.log.Debug("DELEGATING_TO_PROXY", slog.String("url", dev.PushConfig.Proxy))
 			proxy := webhook.GetOrCreate[*messaging.Message](dev.PushConfig.Proxy)
 			if err := proxy.Send(ctx, msg); err != nil {
-				p.log.Error("PROXY_DISPATCH_FAILED", slog.Any("error", err))
+				p.log.Error("PROXY_DISPATCH_FAILED", slog.Any(semconv.ErrorKey, err))
 			}
 			continue
 		}
@@ -72,7 +73,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 		if err != nil {
 			p.log.Error("CLIENT_RESOLUTION_FAILED",
 				slog.String("app_id", dev.AppID),
-				slog.Any("error", err))
+				slog.Any(semconv.ErrorKey, err))
 			continue
 		}
 
@@ -83,7 +84,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 		if err != nil {
 			p.log.Error("FCM_DISPATCH_FAILED",
 				slog.String("token", dev.PushToken),
-				slog.Any("error", err))
+				slog.Any(semconv.ErrorKey, err))
 			continue
 		}
 

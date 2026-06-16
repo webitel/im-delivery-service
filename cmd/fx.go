@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 
 	"github.com/webitel/webitel-go-kit/infra/discovery"
 	"github.com/webitel/webitel-go-kit/infra/profiler"
+	"github.com/webitel/webitel-go-kit/pkg/depenlog"
+	"github.com/webitel/webitel-go-kit/pkg/logger"
 
 	"github.com/webitel/im-delivery-service/config"
 	webiteldi "github.com/webitel/im-delivery-service/infra/client/di"
@@ -24,6 +27,8 @@ import (
 // NewApp assembles the application dependency graph and manages its lifecycle.
 func NewApp(cfg *config.Config) *fx.App {
 	return fx.New(
+		fx.WithLogger(func(l logger.Logger) fxevent.Logger { return depenlog.FxLogger(l) }),
+
 		// [CORE] Essential application-wide dependencies
 		fx.Provide(
 			func() *config.Config { return cfg },

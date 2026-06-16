@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // Provider defines the universal contract for all push delivery channels (FCM, APNs, etc.).
@@ -33,7 +34,7 @@ func NewMultiProvider(log *slog.Logger, drivers ...Provider) *MultiProvider {
 
 	return &MultiProvider{
 		drivers: active,
-		log:     log.With("component", "push_multi_provider"),
+		log:     log.With(semconv.ComponentKey, "push_multi_provider"),
 	}
 }
 
@@ -51,8 +52,8 @@ func (m *MultiProvider) Send(ctx context.Context, req *model.PushRequest) error 
 		if err := d.Send(ctx, req); err != nil {
 			m.log.Error("failed to send push via driver",
 				slog.String("driver", d.Name()),
-				slog.String("user_id", req.UserID),
-				slog.Any("error", err),
+				slog.String(semconv.UserIDKey, req.UserID),
+				slog.Any(semconv.ErrorKey, err),
 			)
 			// Continue to the next driver even if one fails
 			continue
@@ -60,7 +61,7 @@ func (m *MultiProvider) Send(ctx context.Context, req *model.PushRequest) error 
 
 		m.log.Debug("push sent successfully",
 			slog.String("driver", d.Name()),
-			slog.String("user_id", req.UserID),
+			slog.String(semconv.UserIDKey, req.UserID),
 		)
 	}
 	return nil
@@ -76,7 +77,7 @@ func (m *MultiProvider) Dismiss(ctx context.Context, req *model.PushRequest) err
 		if err := d.Dismiss(ctx, req); err != nil {
 			m.log.Warn("failed to dismiss push via driver",
 				slog.String("driver", d.Name()),
-				slog.Any("error", err),
+				slog.Any(semconv.ErrorKey, err),
 			)
 		}
 	}

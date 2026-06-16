@@ -10,6 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 const (
@@ -93,7 +94,7 @@ func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error)
 			Kind event.EventKind `json:"kind"`
 		}
 		if err := json.Unmarshal(data, &meta); err != nil {
-			slog.Error("scheduler: meta unmarshal failed", "err", err, "data", string(data))
+			slog.Error("scheduler: meta unmarshal failed", semconv.ErrorKey, err, "data", string(data))
 			continue
 		}
 
@@ -104,7 +105,7 @@ func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error)
 		}
 
 		if err := json.Unmarshal(data, ev); err != nil {
-			slog.Error("scheduler: event unmarshal failed", "kind", meta.Kind, "err", err, "data", string(data))
+			slog.Error("scheduler: event unmarshal failed", "kind", meta.Kind, semconv.ErrorKey, err, "data", string(data))
 			continue
 		}
 		events = append(events, ev)

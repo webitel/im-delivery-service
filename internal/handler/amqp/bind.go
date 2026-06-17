@@ -47,17 +47,18 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 			}
 		}()
 
+		ctx := event.ContextWithMetadata(msg.Context(), msg.Metadata)
+
 		payload := new(T)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
 			h.logger.Error("payload_unmarshal_failed", "err", err, "raw", string(msg.Payload))
-			return nil // ACK invalid payloads
+			return nil
 		}
 
 		if h.logger.Enabled(msg.Context(), slog.LevelDebug) {
 			var pretty bytes.Buffer
 			payloadType := fmt.Sprintf("%T", *payload)
 
-			// ANSI Escape Codes for colors
 			const (
 				colorBlue  = "\033[1;34m"
 				colorCyan  = "\033[0;36m"
@@ -66,7 +67,6 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 			)
 
 			if err := json.Indent(&pretty, msg.Payload, "", "  "); err == nil {
-				// We use colors to distinguish the debug block from regular logs
 				fmt.Printf("\n%s--- EVENT RECEIVED ---%s\n", colorBlue, colorReset)
 				fmt.Printf("%sType:%s    %s\n", colorCyan, colorReset, payloadType)
 				fmt.Printf("%sPayload:%s\n%s%s%s\n", colorCyan, colorReset, colorGray, pretty.String(), colorReset)
@@ -76,12 +76,12 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 			}
 		}
 
-		events, err := fn(msg.Context(), payload)
+		events, err := fn(ctx, payload)
 		if err != nil {
-			return err // NACK for retries
+			return err
 		}
 
-		h.Dispatch(msg.Context(), events)
+		h.Dispatch(ctx, events)
 		return nil
 	}
 }

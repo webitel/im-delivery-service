@@ -21,15 +21,16 @@ type EventType int32
 
 const (
 	// [TYPES] These comments define the exact string key in the JSON output.
-	EventConnected     EventType = iota // connected_event
-	EventDisconnected                   // disconnected_event
-	EventMessage                        // message_event
-	EventThreadCreated                  // thread_created_event
-	EventAck                            // ack_event
-	EventError                          // error_event
-	EventPing                           // ping_event
-	EventMemberAdded                    // member_added_event
-	EventMemberLeft                     // member_left_event
+	EventConnected           EventType = iota // connected_event
+	EventDisconnected                         // disconnected_event
+	EventMessage                              // message_event
+	EventThreadCreated                        // thread_created_event
+	EventAck                                  // ack_event
+	EventError                                // error_event
+	EventPing                                 // ping_event
+	EventMemberAdded                          // member_added_event
+	EventMemberLeft                           // member_left_event
+	EventInteractiveCallback                  // interactive_callback
 )
 
 // [ENVELOPE] ServerEvent is the top-level WebSocket JSON container.

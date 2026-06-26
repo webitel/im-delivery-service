@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 
 	"github.com/ThreeDotsLabs/watermill/message"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -52,11 +53,13 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 		payload := new(T)
 		if err := json.Unmarshal(msg.Payload, payload); err != nil {
 			h.logger.Error("payload_unmarshal_failed", "err", err, "raw", string(msg.Payload))
+
 			return nil
 		}
 
 		if h.logger.Enabled(msg.Context(), slog.LevelDebug) {
 			var pretty bytes.Buffer
+
 			payloadType := fmt.Sprintf("%T", *payload)
 
 			const (
@@ -82,6 +85,7 @@ func Bind[T any](h *MessageHandler, fn DomainHandler[T]) message.NoPublishHandle
 		}
 
 		h.Dispatch(ctx, events)
+
 		return nil
 	}
 }

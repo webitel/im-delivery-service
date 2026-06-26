@@ -92,6 +92,7 @@ func (d *MessageCreatedV1) mapImages() []*model.Image {
 			URL:  img.URL,
 		})
 	}
+
 	return res
 }
 
@@ -107,6 +108,7 @@ func (d *MessageCreatedV1) mapDocs() []*model.Document {
 			URL:  doc.URL,
 		})
 	}
+
 	return res
 }
 
@@ -155,6 +157,7 @@ func (contact *Contact) AsModel() *model.Contact {
 	if contact == nil {
 		return nil
 	}
+
 	return &model.Contact{
 		Name:  contact.Name,
 		Phone: contact.Phone,

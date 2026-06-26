@@ -32,6 +32,7 @@ func (k *Kind) UnmarshalJSON(data []byte) error {
 	default:
 		*k = 0
 	}
+
 	return nil
 }
 

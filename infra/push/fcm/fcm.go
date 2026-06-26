@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/messaging"
+
 	"github.com/webitel/im-delivery-service/infra/push/webhook"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
@@ -59,10 +60,12 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 		// If Proxy URL is defined, bypass direct Firebase dispatch.
 		if dev.PushConfig.Proxy != "" {
 			p.log.Debug("DELEGATING_TO_PROXY", slog.String("url", dev.PushConfig.Proxy))
+
 			proxy := webhook.GetOrCreate[*messaging.Message](dev.PushConfig.Proxy)
 			if err := proxy.Send(ctx, msg); err != nil {
 				p.log.Error("PROXY_DISPATCH_FAILED", slog.Any("error", err))
 			}
+
 			continue
 		}
 
@@ -73,6 +76,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			p.log.Error("CLIENT_RESOLUTION_FAILED",
 				slog.String("app_id", dev.AppID),
 				slog.Any("error", err))
+
 			continue
 		}
 
@@ -84,11 +88,13 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			p.log.Error("FCM_DISPATCH_FAILED",
 				slog.String("token", dev.PushToken),
 				slog.Any("error", err))
+
 			continue
 		}
 
 		p.log.Info("PUSH_SENT", slog.String("msg_id", msgID), slog.String("app", dev.AppID))
 	}
+
 	return nil
 }
 
@@ -110,6 +116,7 @@ func (p *Provider) buildFCMMessage(dev model.Device, req *model.PushRequest, isD
 		if m.Data == nil {
 			m.Data = make(map[string]string)
 		}
+
 		m.Data["action"] = "CANCEL"
 		m.Data["collapse_id"] = req.CollapseID
 	} else {

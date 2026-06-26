@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
@@ -32,6 +33,7 @@ func (h *MessageHandler) handleVariables(raw *payload.VariablesV1, action string
 		memberID, err := uuid.Parse(m)
 		if err != nil {
 			h.logger.Warn("failed_to_parse_member_id", "id", m, "error", err)
+
 			continue
 		}
 

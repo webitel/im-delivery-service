@@ -11,6 +11,7 @@ func SafeParseUUID(s string) uuid.UUID {
 	if err != nil {
 		return uuid.Nil
 	}
+
 	return val
 }
 
@@ -19,5 +20,6 @@ func SafeParseRFC3339(s string) int64 {
 	if err != nil {
 		return time.Now().UnixMilli()
 	}
+
 	return t.UnixMilli()
 }

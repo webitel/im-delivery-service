@@ -5,6 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
@@ -12,8 +15,6 @@ import (
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var _ impb.DeliveryServer = (*DeliveryHandler)(nil)
@@ -51,6 +52,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			slog.String("contact_id", auth.ContactID),
 			slog.Any("err", err),
 		)
+
 		return status.Error(codes.InvalidArgument, "invalid user id format")
 	}
 
@@ -71,6 +73,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			slog.Any("err", err),
 			slog.String("device_id", auth.Devices[0].ID),
 		)
+
 		return status.Error(codes.Internal, "failed to establish session presence")
 	}
 
@@ -98,10 +101,11 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		event.WithPriority[*model.ConnectedPayload](event.PriorityNormal),
 	)
 
-	// [MARSHALLING]
+	// [MARSHALING]
 	val, err := d.marshaller.Marshal(welcomeEv)
 	if err != nil {
 		l.Error("[STREAM] handshake mapping failed", slog.Any("err", err))
+
 		return status.Error(codes.Internal, "mapping error")
 	}
 
@@ -109,10 +113,12 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	if pb, ok := val.(*impb.ServerEvent); ok {
 		if err := stream.Send(pb); err != nil {
 			l.Error("[STREAM] handshake delivery failed", slog.Any("err", err))
+
 			return err
 		}
 	} else {
 		l.Error("[STREAM] marshaller returned invalid type", slog.String("got", fmt.Sprintf("%T", val)))
+
 		return status.Error(codes.Internal, "unexpected data type")
 	}
 
@@ -124,6 +130,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// [GHOST_CLEANUP]
 			// Triggers on client disconnect, timeout, or KeepAlive failure.
 			l.Info("[STREAM] client terminated connection", slog.Any("reason", stream.Context().Err()))
+
 			return nil
 
 		case ev, ok := <-conn.Recv():
@@ -155,7 +162,8 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// gRPC handles internal flow control and HTTP/2 framing.
 			val, err := d.marshaller.Marshal(ev)
 			if err != nil {
-				l.Error("[STREAM] marshalling error", slog.Any("err", err))
+				l.Error("[STREAM] marshaling error", slog.Any("err", err))
+
 				continue
 			}
 
@@ -163,10 +171,12 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			if pb, ok := val.(*impb.ServerEvent); ok {
 				if err := stream.Send(pb); err != nil {
 					l.Error("[STREAM] transmission error", slog.Any("err", err))
+
 					return status.Error(codes.DataLoss, "stream_transmission_failed")
 				}
 			} else {
 				l.Error("[STREAM] type mismatch", slog.String("got", fmt.Sprintf("%T", val)))
+
 				continue
 			}
 

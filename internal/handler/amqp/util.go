@@ -10,12 +10,14 @@ func (h *MessageHandler) filter(senderIDStr string, all []uuid.UUID) (uuid.UUID,
 	if h.leader.IsLeader() {
 		return sID, all
 	}
+
 	res := make([]uuid.UUID, 0, len(all))
 	for _, id := range all {
 		if id == sID || h.hub.Connected(id) {
 			res = append(res, id)
 		}
 	}
+
 	return sID, res
 }
 
@@ -27,5 +29,6 @@ func toUUIDs(src []string) []uuid.UUID {
 			res = append(res, id)
 		}
 	}
+
 	return res
 }

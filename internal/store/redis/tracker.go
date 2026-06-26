@@ -32,6 +32,7 @@ func (t *RedisTracker) Ack(ctx context.Context, eid, cid uuid.UUID, ttl time.Dur
 	pipe.Expire(ctx, key, ttl)
 
 	_, err := pipe.Exec(ctx)
+
 	return err
 }
 
@@ -52,11 +53,13 @@ func (t *RedisTracker) GetAckedSessions(ctx context.Context, eid uuid.UUID) ([]u
 			acked = append(acked, id)
 		}
 	}
+
 	return acked, nil
 }
 
 // [CLEANUP] Explicitly removes the tracking set once the push logic is completed.
 func (t *RedisTracker) Remove(ctx context.Context, eid uuid.UUID) error {
 	key := fmt.Sprintf(prefixAckSet, eid)
+
 	return t.rdb.Del(ctx, key).Err()
 }

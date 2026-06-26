@@ -41,5 +41,6 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	}
 
 	ev.SetCached(res)
+
 	return res, nil
 }

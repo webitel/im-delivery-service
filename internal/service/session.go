@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	"github.com/webitel/im-delivery-service/internal/store"
 )
@@ -45,6 +46,7 @@ func (s *SessionService) Attach(ctx context.Context, uid uuid.UUID, deviceID str
 			slog.Any("err", err),
 			slog.String("uid", uid.String()),
 		)
+
 		return nil, err
 	}
 
@@ -66,6 +68,7 @@ func (s *SessionService) Detach(ctx context.Context, uid, cid uuid.UUID) {
 	go func() {
 		detachCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
 		if err := s.presence.Offline(detachCtx, uid, cid); err != nil {
 			s.log.Error("PRESENCE_OFFLINE_SYNC_FAILED",
 				slog.Any("err", err),

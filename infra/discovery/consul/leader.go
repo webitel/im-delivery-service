@@ -9,8 +9,9 @@ import (
 
 	"github.com/hashicorp/consul/api"
 
-	"github.com/webitel/im-delivery-service/config"
 	discovery "github.com/webitel/webitel-go-kit/infra/discovery"
+
+	"github.com/webitel/im-delivery-service/config"
 )
 
 type Elector interface {

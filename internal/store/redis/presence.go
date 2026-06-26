@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
@@ -50,6 +51,7 @@ func (p *RedisPresence) Online(ctx context.Context, uid, cid uuid.UUID, deviceID
 	}
 
 	_, err := pipe.Exec(ctx)
+
 	return err
 }
 
@@ -59,6 +61,7 @@ func (p *RedisPresence) Offline(ctx context.Context, uid, cid uuid.UUID) error {
 	pipe.SRem(ctx, fmt.Sprintf(prefixPresence, uid), cid.String())
 	pipe.HDel(ctx, fmt.Sprintf(prefixSessions, uid), cid.String())
 	_, err := pipe.Exec(ctx)
+
 	return err
 }
 
@@ -80,6 +83,7 @@ func (p *RedisPresence) ActiveSessions(ctx context.Context, uid uuid.UUID) ([]uu
 			uuids = append(uuids, id)
 		}
 	}
+
 	return uuids, nil
 }
 
@@ -110,6 +114,7 @@ func (p *RedisPresence) UserDevices(ctx context.Context, uid uuid.UUID) (*[]mode
 		if err := json.Unmarshal([]byte(val), &d); err != nil {
 			continue
 		}
+
 		devices = append(devices, d)
 	}
 
@@ -128,6 +133,7 @@ func (p *RedisPresence) SyncDevices(ctx context.Context, uid uuid.UUID, devices 
 		if d.ID == "" {
 			continue
 		}
+
 		data, _ := json.Marshal(d)
 		fields[d.ID] = data
 	}
@@ -136,5 +142,6 @@ func (p *RedisPresence) SyncDevices(ctx context.Context, uid uuid.UUID, devices 
 	pipe.Del(ctx, key) // Clear existing cache to ensure consistency
 	pipe.HSet(ctx, key, fields)
 	_, err := pipe.Exec(ctx)
+
 	return err
 }

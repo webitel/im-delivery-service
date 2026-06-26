@@ -8,10 +8,6 @@ import (
 )
 
 func (h *MessageHandler) OnInteractiveCallbackReactedV1(ctx context.Context, raw *payload.InteractiveCallbackV1) ([]event.Eventer, error) {
-	if !h.leader.IsLeader() {
-		return []event.Eventer{}, nil
-	}
-
 	domainModel, err := raw.ToDomain()
 	if err != nil {
 		return nil, err

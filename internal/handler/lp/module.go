@@ -2,8 +2,9 @@ package lp
 
 import (
 	"github.com/go-chi/chi/v5"
-	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
 	"go.uber.org/fx"
+
+	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
 )
 
 // Module defines the lifecycle and dependencies for the Long Polling transport layer.

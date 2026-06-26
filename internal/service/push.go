@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sony/gobreaker"
+
 	"github.com/webitel/im-delivery-service/config"
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
@@ -89,6 +90,7 @@ func (h *PushHandler) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			h.wg.Wait()
+
 			return
 		case <-ticker.C:
 			if h.leader.IsLeader() {
@@ -104,6 +106,7 @@ func (h *PushHandler) processPendingTasks(ctx context.Context) {
 	events, err := h.scheduler.PullReady(ctx)
 	if err != nil {
 		h.log.Error("PULL_FAILED", slog.Any("err", err))
+
 		return
 	}
 
@@ -111,6 +114,7 @@ func (h *PushHandler) processPendingTasks(ctx context.Context) {
 		h.wg.Add(1)
 		go func(e event.Eventer) {
 			defer h.wg.Done()
+
 			h.dispatch(e)
 		}(ev)
 	}
@@ -143,10 +147,11 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 	acked, _ := h.tracker.GetAckedSessions(ctx, eid)
 
 	if len(acked) > 0 {
-		h.log.Info("PUSH_CANCELLED_BY_ACK",
+		h.log.Info("PUSH_CANCELED_BY_ACK",
 			slog.String("eid", eid.String()),
 			slog.Int("sessions_count", len(acked)))
 		_ = h.tracker.Remove(ctx, eid)
+
 		return
 	}
 
@@ -154,6 +159,7 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 	devices, err := h.deviceProvider.GetDevices(ctx, uid)
 	if err != nil || len(devices) == 0 {
 		_ = h.tracker.Remove(ctx, eid)
+
 		return
 	}
 
@@ -202,6 +208,7 @@ func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model
 	}
 
 	ackedMap := make(map[string]struct{})
+
 	for _, cid := range acked {
 		if devID, err := h.presenceStore.GetSessionDevice(ctx, uid, cid); err == nil && devID != "" {
 			ackedMap[devID] = struct{}{}
@@ -209,11 +216,13 @@ func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model
 	}
 
 	filtered := make([]model.Device, 0)
+
 	for _, d := range devices {
 		if _, seen := ackedMap[d.ID]; !seen {
 			filtered = append(filtered, d)
 		}
 	}
+
 	return filtered
 }
 

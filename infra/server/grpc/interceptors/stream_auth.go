@@ -3,11 +3,12 @@ package grpcinterceptors
 import (
 	"context"
 
-	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"github.com/webitel/im-delivery-service/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 type contextKey string
@@ -22,6 +23,7 @@ func NewStreamAuthInterceptor(auther service.Auther) grpc.StreamServerIntercepto
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		// [PRE_AUTH] Validate identity before allowing the stream to open
 		ctx := ss.Context()
+
 		auth, err := auther.Inspect(ctx)
 		if err != nil {
 			return status.Errorf(codes.Unauthenticated, "authentication failed: %v", err)
@@ -44,6 +46,7 @@ func NewStreamAuthInterceptor(auther service.Auther) grpc.StreamServerIntercepto
 // wrappedStream is a thin wrapper to inject a new context into a gRPC stream.
 type wrappedStream struct {
 	grpc.ServerStream
+
 	ctx context.Context
 }
 
@@ -54,5 +57,6 @@ func (w *wrappedStream) Context() context.Context {
 // GetAuthContact is a helper to extract the identity from context safely.
 func GetAuthContact(ctx context.Context) (*model.AuthContact, bool) {
 	auth, ok := ctx.Value(AuthContextKey).(*model.AuthContact)
+
 	return auth, ok
 }

@@ -28,17 +28,20 @@ func (h *MessageHandler) OnDeviceLogoutV1(ctx context.Context, raw *payload.Devi
 func (h *MessageHandler) syncUserDevices(ctx context.Context, raw *payload.DeviceConfigurationUpdate, eventType string) error {
 	if raw.Authorization == nil || raw.Authorization.Contact == nil {
 		h.logger.Debug("AUTH_EVENT_IGNORED_EMPTY_CONTACT", "event", eventType)
+
 		return nil
 	}
 
 	uid, err := uuid.Parse(raw.Authorization.Contact.ID)
 	if err != nil {
 		h.logger.Error("AUTH_EVENT_INVALID_UID", "err", err, "event", eventType)
+
 		return nil
 	}
 
 	h.logger.Info("AUTH_SYNC_TRIGGERED", slog.String("uid", uid.String()), slog.String("reason", eventType))
 
 	_, err = h.deviceProvider.Sync(ctx, uid)
+
 	return err
 }

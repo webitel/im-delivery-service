@@ -8,6 +8,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/google/uuid"
+
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	"github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
@@ -170,6 +171,7 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 	}
 
 	h.logger.Info("amqp_pipelines_ready", "node_id", nodeID, "count", len(pipelines))
+
 	return nil
 }
 

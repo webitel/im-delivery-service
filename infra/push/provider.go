@@ -63,6 +63,7 @@ func (m *MultiProvider) Send(ctx context.Context, req *model.PushRequest) error 
 			slog.String("user_id", req.UserID),
 		)
 	}
+
 	return nil
 }
 
@@ -80,5 +81,6 @@ func (m *MultiProvider) Dismiss(ctx context.Context, req *model.PushRequest) err
 			)
 		}
 	}
+
 	return nil
 }

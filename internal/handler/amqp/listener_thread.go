@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
@@ -13,6 +14,7 @@ import (
 func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, raw *payload.ThreadCreatedV1) ([]event.Eventer, error) {
 	// 1. Extract Contact IDs for enrichment (names, types, etc.)
 	memberIDs := toUUIDs(extractMemberIDs(raw.Members))
+
 	var targets []uuid.UUID
 
 	// Determine who needs to receive this event on this node
@@ -32,6 +34,7 @@ func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, raw *payload.Thr
 	peers, err := h.enricher.Resolve(ctx, raw.DomainID, memberIDs...)
 	if err != nil {
 		h.logger.Error("failed to enrich thread members", "error", err)
+
 		return nil, err
 	}
 
@@ -81,5 +84,6 @@ func extractMemberIDs(members []payload.ThreadMember) []string {
 			res = append(res, m.ContactID)
 		}
 	}
+
 	return res
 }

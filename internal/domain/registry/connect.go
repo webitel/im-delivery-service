@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -119,6 +120,7 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 	// If the incoming event is low priority, drop it immediately to save buffer for high priority
 	if ev.GetPriority() <= event.PriorityLow {
 		atomic.AddUint64(&c.droppedCount, 1)
+
 		return false
 	}
 
@@ -129,6 +131,7 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 		if oldEv.GetPriority() < ev.GetPriority() {
 			// Successfully replaced lower priority event with a higher one
 			c.sendCh <- ev
+
 			return true
 		}
 		// If the existing event was also high priority, put it back (best effort)
@@ -142,6 +145,7 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 	}
 
 	atomic.AddUint64(&c.droppedCount, 1)
+
 	return false
 }
 

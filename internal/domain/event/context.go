@@ -10,5 +10,6 @@ func ContextWithMetadata(ctx context.Context, metadata map[string]string) contex
 
 func TryGetMetadataFromContext(ctx context.Context) (map[string]string, bool) {
 	md, ok := ctx.Value(metadataKey{}).(map[string]string)
+
 	return md, ok
 }

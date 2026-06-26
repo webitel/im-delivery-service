@@ -10,6 +10,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -80,7 +81,7 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	msg.SetContext(ctx)
 
 	if metadata, ok := event.TryGetMetadataFromContext(ctx); ok {
-		for k, v := range metadata { //TODO: add headers validating to skip unnecessary
+		for k, v := range metadata { // TODO: add headers validating to skip unnecessary
 			msg.Metadata.Set(k, v)
 		}
 	}

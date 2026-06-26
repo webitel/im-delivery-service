@@ -20,6 +20,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 		// [1] Extraction
 		hToken := r.Header.Get("x-webitel-access")
 		qToken := r.URL.Query().Get("x-webitel-access")
+
 		clientID := r.Header.Get("x-webitel-client")
 		if clientID == "" {
 			clientID = r.URL.Query().Get("x-webitel-client")
@@ -37,6 +38,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 			h.log.Debug("ws: no token in headers, allowing upgrade for late-binding auth",
 				slog.String("remote", r.RemoteAddr))
 			next.ServeHTTP(w, r)
+
 			return
 		}
 
@@ -45,6 +47,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 		if clientID != "" {
 			md.Set("x-webitel-client", clientID)
 		}
+
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 
@@ -64,6 +67,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 			default:
 				http.Error(w, "503 Service Unavailable", http.StatusServiceUnavailable)
 			}
+
 			return
 		}
 

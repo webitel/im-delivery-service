@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -48,6 +49,7 @@ func (s *RedisScheduler) Schedule(ctx context.Context, ev event.Eventer, delay t
 	})
 
 	_, err = pipe.Exec(ctx)
+
 	return err
 }
 
@@ -86,6 +88,7 @@ func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error)
 		if raw == nil {
 			continue
 		}
+
 		data := []byte(raw.(string))
 
 		// [POLYMORPHIC_RESTORE] Detect kind and create concrete struct.
@@ -94,19 +97,23 @@ func (s *RedisScheduler) PullReady(ctx context.Context) ([]event.Eventer, error)
 		}
 		if err := json.Unmarshal(data, &meta); err != nil {
 			slog.Error("scheduler: meta unmarshal failed", "err", err, "data", string(data))
+
 			continue
 		}
 
 		ev := event.NewEnvelopeForKind(meta.Kind)
 		if ev == nil {
 			slog.Error("scheduler: unknown event kind", "kind", meta.Kind)
+
 			continue
 		}
 
 		if err := json.Unmarshal(data, ev); err != nil {
 			slog.Error("scheduler: event unmarshal failed", "kind", meta.Kind, "err", err, "data", string(data))
+
 			continue
 		}
+
 		events = append(events, ev)
 	}
 

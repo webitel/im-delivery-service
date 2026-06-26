@@ -17,16 +17,17 @@ func _() {
 	_ = x[VariableFlush-7]
 	_ = x[MemberAdded-8]
 	_ = x[MemberLeft-9]
+	_ = x[InteractiveCallback-10]
 }
 
-const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeft"
+const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeftInteractiveCallback"
 
-var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109}
+var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109, 128}
 
 func (i EventKind) String() string {
-	i -= 1
-	if i < 0 || i >= EventKind(len(_EventKind_index)-1) {
-		return "EventKind(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_EventKind_index)-1 {
+		return "EventKind(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _EventKind_name[_EventKind_index[i]:_EventKind_index[i+1]]
+	return _EventKind_name[_EventKind_index[idx]:_EventKind_index[idx+1]]
 }

@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"golang.org/x/sys/cpu"
+
+	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
 // Interface guard
@@ -46,6 +47,7 @@ type hubConfig struct {
 // shard represents a logical partition of the user registry.
 type shard struct {
 	sync.RWMutex
+
 	// [REGISTRY] Map of UserID to their dedicated delivery Cell (Actor).
 	cells map[uuid.UUID]*Cell
 	// Modern CPUs load data into L1/L2 caches in fixed-size blocks (Cache Lines),
@@ -86,6 +88,7 @@ func NewHub(opts ...Option) *Hub {
 
 	// [BACKGROUND_PROCESS] Start the resource reclamation routine.
 	go h.runEvictor()
+
 	return h
 }
 
@@ -116,6 +119,7 @@ func (h *Hub) Register(conn Connector) {
 	s := h.getShard(userID)
 
 	s.Lock()
+
 	cell, ok := s.cells[userID]
 	if !ok {
 		// [ACTOR_CREATION] Initialize a new isolated delivery unit for the user.
@@ -158,6 +162,7 @@ func (h *Hub) runEvictor() {
 // performEviction executes the [RECLAMATION] logic shard-by-shard.
 func (h *Hub) performEviction() {
 	reaped := 0
+
 	for i := range shardCount {
 		s := h.shards[i]
 
@@ -167,6 +172,7 @@ func (h *Hub) performEviction() {
 			if cell.IsIdle(h.config.idleTimeout) {
 				cell.Stop() // Terminate Actor goroutine
 				delete(s.cells, id)
+
 				reaped++
 			}
 		}

@@ -7,8 +7,9 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/webitel/im-delivery-service/config"
 	"github.com/webitel/webitel-go-kit/appconfig"
+
+	"github.com/webitel/im-delivery-service/config"
 )
 
 var Module = fx.Module("tls",
@@ -31,6 +32,7 @@ func ProvideTLSConfig(cfg *config.Config) (*Config, error) {
 	if !connConfig.VerifyCerts {
 		conf.Server = nil
 		conf.Client = nil
+
 		return conf, nil
 	}
 
@@ -57,6 +59,7 @@ func Load(connConfig appconfig.TLS, authType tls.ClientAuthType) (*tls.Config, e
 	if err != nil {
 		return nil, err
 	}
+
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 

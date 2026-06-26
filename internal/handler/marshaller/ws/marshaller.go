@@ -59,6 +59,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		} else {
 			res.Payload[EventMemberAdded.String()] = p
 		}
+	case *model.InteractiveCallback:
+		res.Payload[EventInteractiveCallback.String()] = p
 
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.

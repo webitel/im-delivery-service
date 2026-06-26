@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/webitel/im-delivery-service/internal/service"
 	"go.uber.org/fx"
+
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 // Module defines the service-layer dependency injection tree.
@@ -85,6 +86,7 @@ var Module = fx.Module(
 			OnStart: func(ctx context.Context) error {
 				// Launch the push notification polling loop in a dedicated goroutine.
 				go ph.Start(context.Background())
+
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -92,6 +94,7 @@ var Module = fx.Module(
 				if s, ok := o.(interface{ Close() error }); ok {
 					return s.Close()
 				}
+
 				return nil
 			},
 		})

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
@@ -23,6 +24,7 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	peers, err := h.enricher.Resolve(ctx, raw.DomainID, participantIDs...)
 	if err != nil {
 		h.logger.Error("failed to enrich peer data", "error", err)
+
 		return nil, err
 	}
 
@@ -54,6 +56,7 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 
 	// Prepare the full list of recipients (everyone except the sender) for Echo/System context.
 	allRecipients := make([]model.Peer, 0)
+
 	for _, id := range participantIDs {
 		if id != senderID {
 			if p, ok := peerMap[id]; ok {
@@ -119,6 +122,7 @@ func (h *MessageHandler) extractParticipants(raw *payload.MessageCreatedV1) (uui
 			}
 		}
 	}
+
 	return sID, res
 }
 
@@ -131,10 +135,12 @@ func (h *MessageHandler) computeLocalTargets(senderID uuid.UUID, all []uuid.UUID
 
 	// Non-leader nodes only process participants currently connected to their local WebSocket hub.
 	res := make([]uuid.UUID, 0)
+
 	for _, id := range all {
 		if id == senderID || h.hub.Connected(id) {
 			res = append(res, id)
 		}
 	}
+
 	return res
 }

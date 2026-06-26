@@ -11,16 +11,18 @@ import (
 
 	"buf.build/go/protovalidate"
 	validatemiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/protovalidate"
-	"github.com/webitel/im-delivery-service/config"
-	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
-	"github.com/webitel/im-delivery-service/infra/tls"
-	"github.com/webitel/im-delivery-service/internal/service"
-	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+
+	intrcp "github.com/webitel/webitel-go-kit/pkg/interceptors"
+
+	"github.com/webitel/im-delivery-service/config"
+	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
+	"github.com/webitel/im-delivery-service/infra/tls"
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 var Module = fx.Module("grpc_server",
@@ -43,10 +45,12 @@ var Module = fx.Module("grpc_server",
 					// [LIFECYCLE] NON-BLOCKING START
 					// Run the server in a separate goroutine to allow FX to finish initialization.
 					logger.Info(fmt.Sprintf("listen grpc %s:%d", srv.Host(), srv.Port()))
+
 					if err := srv.Listen(); err != nil {
 						logger.Error("grpc server error", "err", err)
 					}
 				}()
+
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -54,8 +58,10 @@ var Module = fx.Module("grpc_server",
 				// Stop accepting new connections and wait for active streams to flush.
 				if err := srv.Shutdown(); err != nil {
 					logger.Error("error stopping grpc server", "err", err.Error())
+
 					return err
 				}
+
 				return nil
 			},
 		})
@@ -66,6 +72,7 @@ var Module = fx.Module("grpc_server",
 
 type Server struct {
 	*grpc.Server
+
 	Addr           string
 	host           string
 	port           int
@@ -156,6 +163,7 @@ func New(addr string, log *slog.Logger, auther service.Auther, tls *tls.Config, 
 	if err != nil {
 		return nil, err
 	}
+
 	port, _ := strconv.Atoi(p)
 
 	if h == "::" {
@@ -223,6 +231,7 @@ func publicAddr() string {
 	if err != nil {
 		return ""
 	}
+
 	for _, i := range interfaces {
 		addresses, err := i.Addrs()
 		if err != nil {
@@ -231,6 +240,7 @@ func publicAddr() string {
 
 		for _, addr := range addresses {
 			var ip net.IP
+
 			switch v := addr.(type) {
 			case *net.IPNet:
 				ip = v.IP

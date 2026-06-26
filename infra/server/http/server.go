@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/webitel/im-delivery-service/config"
 	"go.uber.org/fx"
+
+	"github.com/webitel/im-delivery-service/config"
 )
 
 var Module = fx.Module("http-server",
@@ -29,10 +30,12 @@ func Start(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Co
 					log.Error("HTTP_SERVER_CRASHED", slog.Any("err", err))
 				}
 			}()
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			log.Info("HTTP_SERVER_STOPPING")
+
 			return srv.Shutdown(ctx)
 		},
 	})

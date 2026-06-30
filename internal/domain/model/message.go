@@ -7,6 +7,16 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	MessageTypeText        = "text"
+	MessageTypeImage       = "image"
+	MessageTypeDocument    = "document"
+	MessageTypeInteractive = "interactive"
+	MessageTypeLocation    = "location"
+	MessageTypeContact     = "contact"
+	MessageTypeSystem      = "system"
+)
+
 type Message struct {
 	ID          uuid.UUID       `json:"id"`
 	SendID      string          `json:"send_id"`
@@ -32,30 +42,30 @@ func (m *Message) RoutingKey() string {
 }
 
 func (m *Message) DeriveType() string {
-	t := "text"
+	t := MessageTypeText
 
 	if len(m.Images) > 0 {
-		t = "image"
+		t = MessageTypeImage
 	}
 
-	if len(m.Documents) > 0 && t == "text" {
-		t = "document"
+	if len(m.Documents) > 0 && t == MessageTypeText {
+		t = MessageTypeDocument
 	}
 
 	if m.Interactive != nil {
-		t = "interactive"
+		t = MessageTypeInteractive
 	}
 
 	if m.Location != nil {
-		t = "location"
+		t = MessageTypeLocation
 	}
 
 	if m.Contact != nil {
-		t = "contact"
+		t = MessageTypeContact
 	}
 
 	if m.System != nil {
-		t = "system"
+		t = MessageTypeSystem
 	}
 
 	return t

@@ -15,6 +15,7 @@ type Message struct {
 	From        Peer            `json:"from"`
 	To          []Peer          `json:"to"`
 	Text        string          `json:"text"`
+	Type        string          `json:"type"`
 	CreatedAt   int64           `json:"created_at"`
 	EditedAt    int64           `json:"updated_at,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
@@ -28,6 +29,36 @@ type Message struct {
 
 func (m *Message) RoutingKey() string {
 	return fmt.Sprintf("im_delivery.v1.%d.message.created", m.DomainID)
+}
+
+func (m *Message) DeriveType() string {
+	t := "text"
+
+	if len(m.Images) > 0 {
+		t = "image"
+	}
+
+	if len(m.Documents) > 0 && t == "text" {
+		t = "document"
+	}
+
+	if m.Interactive != nil {
+		t = "interactive"
+	}
+
+	if m.Location != nil {
+		t = "location"
+	}
+
+	if m.Contact != nil {
+		t = "contact"
+	}
+
+	if m.System != nil {
+		t = "system"
+	}
+
+	return t
 }
 
 // NotificationTitle returns a friendly display name for push notifications.

@@ -78,6 +78,8 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		})
 	}
 
+	msg.Type = msg.DeriveType()
+
 	return msg
 }
 

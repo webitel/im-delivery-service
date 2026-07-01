@@ -7,16 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	MessageTypeText        = "text"
-	MessageTypeImage       = "image"
-	MessageTypeDocument    = "document"
-	MessageTypeInteractive = "interactive"
-	MessageTypeLocation    = "location"
-	MessageTypeContact     = "contact"
-	MessageTypeSystem      = "system"
-)
-
 type Message struct {
 	ID          uuid.UUID       `json:"id"`
 	SendID      string          `json:"send_id"`
@@ -39,36 +29,6 @@ type Message struct {
 
 func (m *Message) RoutingKey() string {
 	return fmt.Sprintf("im_delivery.v1.%d.message.created", m.DomainID)
-}
-
-func (m *Message) DeriveType() string {
-	t := MessageTypeText
-
-	if len(m.Images) > 0 {
-		t = MessageTypeImage
-	}
-
-	if len(m.Documents) > 0 && t == MessageTypeText {
-		t = MessageTypeDocument
-	}
-
-	if m.Interactive != nil {
-		t = MessageTypeInteractive
-	}
-
-	if m.Location != nil {
-		t = MessageTypeLocation
-	}
-
-	if m.Contact != nil {
-		t = MessageTypeContact
-	}
-
-	if m.System != nil {
-		t = MessageTypeSystem
-	}
-
-	return t
 }
 
 // NotificationTitle returns a friendly display name for push notifications.

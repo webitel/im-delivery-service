@@ -6,6 +6,7 @@ import (
 
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/payload"
+
 	"github.com/webitel/im-delivery-service/infra/push/webhook"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/webitel-go-kit/pkg/semconv"
@@ -49,10 +50,12 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 		// [2. DEBUG_PROXY]
 		if dev.PushConfig.Proxy != "" {
 			p.log.Debug("PROXY_REDIRECT", slog.String("url", dev.PushConfig.Proxy))
+
 			proxy := webhook.GetOrCreate[*apns2.Notification](dev.PushConfig.Proxy)
 			if err := proxy.Send(ctx, notification); err != nil {
 				p.log.Error("PROXY_ERROR", slog.Any(semconv.ErrorKey, err))
 			}
+
 			continue
 		}
 
@@ -85,6 +88,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			p.log.Info("PUSH_DELIVERED", slog.String("id", res.ApnsID))
 		}
 	}
+
 	return nil
 }
 
@@ -123,5 +127,6 @@ func (p *Provider) buildAPNSNotification(dev model.Device, req *model.PushReques
 	}
 
 	n.Payload = pl
+
 	return n
 }

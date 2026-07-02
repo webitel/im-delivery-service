@@ -32,6 +32,7 @@ type MessageCreatedV1 struct {
 	From        Peer            `json:"from"`
 	To          []Recipient     `json:"to"`
 	Body        string          `json:"body"`
+	Type        string          `json:"type"`
 	OccurredAt  string          `json:"occurred_at"`
 	SendID      string          `json:"send_id"`
 	Images      []Image         `json:"images"`
@@ -56,6 +57,7 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		Images:    d.mapImages(),
 		Documents: d.mapDocs(),
 		Metadata:  d.Metadata,
+		Type:      d.Type,
 		// Populate the sender with provided contact/member details.
 		From: model.Peer{
 			ID:       util.SafeParseUUID(d.From.ContactID),
@@ -92,6 +94,7 @@ func (d *MessageCreatedV1) mapImages() []*model.Image {
 			URL:  img.URL,
 		})
 	}
+
 	return res
 }
 
@@ -107,6 +110,7 @@ func (d *MessageCreatedV1) mapDocs() []*model.Document {
 			URL:  doc.URL,
 		})
 	}
+
 	return res
 }
 
@@ -155,6 +159,7 @@ func (contact *Contact) AsModel() *model.Contact {
 	if contact == nil {
 		return nil
 	}
+
 	return &model.Contact{
 		Name:  contact.Name,
 		Phone: contact.Phone,

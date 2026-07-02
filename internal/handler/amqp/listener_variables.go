@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"

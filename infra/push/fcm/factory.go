@@ -28,6 +28,7 @@ func (r *clientRegistry) resolve(ctx context.Context, appID string, creds []byte
 	r.mu.RLock()
 	client, ok := r.clients[appID]
 	r.mu.RUnlock()
+
 	if ok {
 		return client, nil
 	}
@@ -57,5 +58,6 @@ func (r *clientRegistry) resolve(ctx context.Context, appID string, creds []byte
 	}
 
 	r.clients[appID] = newClient
+
 	return newClient, nil
 }

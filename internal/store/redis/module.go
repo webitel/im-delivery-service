@@ -2,8 +2,9 @@ package redis
 
 import (
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/webitel/im-delivery-service/internal/store"
 	"go.uber.org/fx"
+
+	"github.com/webitel/im-delivery-service/internal/store"
 )
 
 var Module = fx.Options(

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -72,6 +73,7 @@ func NewCell(userID uuid.UUID, bufferSize int) *Cell {
 		lastActivityUnix: time.Now().Unix(),
 	}
 	go c.loop()
+
 	return c
 }
 
@@ -91,11 +93,13 @@ func (c *Cell) IsIdle(timeout time.Duration) bool {
 	}
 
 	lastActivity := time.Unix(atomic.LoadInt64(&c.lastActivityUnix), 0)
+
 	return time.Since(lastActivity) > timeout
 }
 
 func (c *Cell) Push(ev event.Eventer) bool {
 	c.touch()
+
 	select {
 	case c.mailbox <- ev:
 		return true
@@ -118,6 +122,7 @@ func (c *Cell) Detach(connID uuid.UUID) bool {
 	isEmpty := len(c.sessions) == 0
 	c.mu.Unlock()
 	c.touch()
+
 	return isEmpty
 }
 
@@ -143,6 +148,7 @@ func (c *Cell) loop() {
 					goto wait
 				}
 			}
+
 		wait:
 		}
 	}
@@ -168,6 +174,7 @@ func (c *Cell) Stop() {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	for id, conn := range c.sessions {
 		conn.Close()
 		delete(c.sessions, id)

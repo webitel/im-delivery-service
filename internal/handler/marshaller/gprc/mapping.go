@@ -25,7 +25,9 @@ func marshalPeer(p *model.Peer) *impb.Peer {
 	if p == nil {
 		return nil
 	}
+
 	res := &impb.Peer{}
+
 	switch p.Type {
 	case model.PeerUser:
 		res.Kind = &impb.Peer_UserId{UserId: p.Sub}
@@ -34,9 +36,11 @@ func marshalPeer(p *model.Peer) *impb.Peer {
 	case model.PeerChannel:
 		res.Kind = &impb.Peer_ChannelId{ChannelId: p.Sub}
 	}
+
 	if p.IsEnriched() {
 		res.Identity = &impb.Identity{Issuer: p.Issuer, Name: p.Name}
 	}
+
 	return res
 }
 

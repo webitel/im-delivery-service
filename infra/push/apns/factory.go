@@ -25,6 +25,7 @@ func (r *clientRegistry) resolve(appID string, p8Key []byte, keyID, teamID strin
 	r.mu.RLock()
 	client, ok := r.clients[appID]
 	r.mu.RUnlock()
+
 	if ok {
 		return client, nil
 	}
@@ -56,5 +57,6 @@ func (r *clientRegistry) resolve(appID string, p8Key []byte, keyID, teamID strin
 	newClient := apns2.NewTokenClient(t).Production()
 
 	r.clients[appID] = newClient
+
 	return newClient, nil
 }

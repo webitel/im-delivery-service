@@ -6,6 +6,8 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"go.uber.org/fx"
+
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	pubsubadapter "github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
@@ -28,6 +30,7 @@ func (a *atomicDispatcher) Publish(ctx context.Context, ev event.Eventer) error 
 		// [FOLLOWER] Standby nodes silently ignore outgoing events to prevent duplicates.
 		return nil
 	}
+
 	return a.base.Publish(ctx, ev)
 }
 
@@ -36,6 +39,7 @@ func (a *atomicDispatcher) Publisher() message.Publisher {
 	if !a.awarer.IsLeader() {
 		return nil
 	}
+
 	return a.base.Publisher()
 }
 
@@ -113,6 +117,7 @@ var Module = fx.Module("amqp-handler",
 						p.Logger.Info("LEADER_PROMOTED: enabling event delivery")
 						// [SYNC] Set global status to true, enabling the atomicDispatcher
 						p.Status.Set(true)
+
 						return nil
 					},
 					func() {
@@ -121,13 +126,16 @@ var Module = fx.Module("amqp-handler",
 						p.Status.Set(false)
 					},
 				)
+
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
 				cancelMain()
+
 				return p.Router.Close()
 			},
 		})
+
 		return nil
 	}),
 )

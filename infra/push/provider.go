@@ -64,6 +64,7 @@ func (m *MultiProvider) Send(ctx context.Context, req *model.PushRequest) error 
 			slog.String(semconv.UserIDKey, req.UserID),
 		)
 	}
+
 	return nil
 }
 
@@ -81,5 +82,6 @@ func (m *MultiProvider) Dismiss(ctx context.Context, req *model.PushRequest) err
 			)
 		}
 	}
+
 	return nil
 }

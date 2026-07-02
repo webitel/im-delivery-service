@@ -65,14 +65,16 @@ func formatNotification(kind string, meta map[string]string) (title, body string
 
 		// Body now contains only the message content, truncated for safety.
 		body = truncate(rawText, MaxBodyLength)
-		return
+
+		return title, body
 
 	case "ThreadCreated":
 		// [FORMAT] Title: "New Conversation", Body: "Ihor Ihor started a new chat"
 		title = "New Conversation"
 		text := fmt.Sprintf("%s started a new chat", sender)
 		body = truncate(text, MaxBodyLength)
-		return
+
+		return title, body
 
 	default:
 		// Generic fallback for system or unknown events.
@@ -89,5 +91,6 @@ func truncate(s string, max int) string {
 
 	// Slice by runes to maintain character integrity.
 	runes := []rune(s)
+
 	return string(runes[:max]) + "..."
 }

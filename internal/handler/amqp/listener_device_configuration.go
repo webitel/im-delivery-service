@@ -29,6 +29,7 @@ func (h *MessageHandler) OnDeviceLogoutV1(ctx context.Context, raw *payload.Devi
 func (h *MessageHandler) syncUserDevices(ctx context.Context, raw *payload.DeviceConfigurationUpdate, eventType string) error {
 	if raw.Authorization == nil || raw.Authorization.Contact == nil {
 		h.logger.Debug("AUTH_EVENT_IGNORED_EMPTY_CONTACT", "event", eventType)
+
 		return nil
 	}
 
@@ -41,5 +42,6 @@ func (h *MessageHandler) syncUserDevices(ctx context.Context, raw *payload.Devic
 	h.logger.Info("AUTH_SYNC_TRIGGERED", slog.String("uid", uid.String()), slog.String("reason", eventType))
 
 	_, err = h.deviceProvider.Sync(ctx, uid)
+
 	return err
 }

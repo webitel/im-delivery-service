@@ -4,9 +4,10 @@ package ws
 import (
 	"net/http"
 
+	"go.uber.org/fx"
+
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller" // Import the interface package
 	wsmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/ws"
-	"go.uber.org/fx"
 )
 
 var Module = fx.Module("delivery-ws",

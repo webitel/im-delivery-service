@@ -13,6 +13,8 @@ import (
 	"github.com/webitel/webitel-go-kit/pkg/logger"
 	"github.com/webitel/webitel-go-kit/pkg/semconv"
 
+	"go.uber.org/fx"
+
 	"github.com/webitel/im-delivery-service/config"
 )
 
@@ -46,10 +48,12 @@ func Start(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, kit logger.Log
 					log.Error("HTTP_SERVER_CRASHED", slog.Any(semconv.ErrorKey, err))
 				}
 			}()
+
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			log.Info("HTTP_SERVER_STOPPING")
+
 			return srv.Shutdown(ctx)
 		},
 	})

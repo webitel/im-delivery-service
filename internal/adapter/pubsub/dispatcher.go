@@ -10,6 +10,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 )
 
@@ -20,7 +21,7 @@ type EventDispatcher interface {
 
 type eventDispatcher struct {
 	publisher message.Publisher
-	logger    *slog.Logger // Ensure you pass a logger to the struct
+	logger    *slog.Logger
 }
 
 func NewEventDispatcher(pub message.Publisher, logger *slog.Logger) EventDispatcher {
@@ -30,9 +31,8 @@ func NewEventDispatcher(pub message.Publisher, logger *slog.Logger) EventDispatc
 	}
 }
 
-func (d *eventDispatcher) IsLeader() bool {
-	return true
-}
+func (d *eventDispatcher) IsLeader() bool               { return true }
+func (d *eventDispatcher) Publisher() message.Publisher { return d.publisher }
 
 func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	if ev == nil {
@@ -80,11 +80,15 @@ func (d *eventDispatcher) Publish(ctx context.Context, ev event.Eventer) error {
 	msg := message.NewMessage(watermill.NewUUID(), payload)
 	msg.SetContext(ctx)
 
+	if metadata, ok := event.TryGetMetadataFromContext(ctx); ok {
+		for k, v := range metadata { // TODO: add headers validating to skip unnecessary
+			msg.Metadata.Set(k, v)
+		}
+	}
+
 	if err := d.publisher.Publish(routingKey, msg); err != nil {
 		return fmt.Errorf("dispatcher: publish failed: %w", err)
 	}
 
 	return nil
 }
-
-func (d *eventDispatcher) Publisher() message.Publisher { return d.publisher }

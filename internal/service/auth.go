@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/metadata"
+
 	authv1 "github.com/webitel/im-delivery-service/gen/go/auth/v1"
 	imauth "github.com/webitel/im-delivery-service/infra/client/im-auth"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
-	"google.golang.org/grpc/metadata"
 )
 
 var _ Auther = (*AuthService)(nil)
@@ -45,15 +46,15 @@ func (s *AuthService) Inspect(ctx context.Context) (*model.AuthContact, error) {
 	}
 
 	return &model.AuthContact{
-		DC:        auth.Dc,
-		ContactID: auth.Contact.Id,
-		Sub:       auth.Contact.Sub,
-		Iss:       auth.Contact.Iss,
-		Name:      auth.Contact.Name,
+		DC:        auth.GetDc(),
+		ContactID: auth.GetContact().GetId(),
+		Sub:       auth.GetContact().GetSub(),
+		Iss:       auth.GetContact().GetIss(),
+		Name:      auth.GetContact().GetName(),
 		Devices: []model.Device{{
-			ID:       auth.Device.Id,
-			Platform: auth.Device.App.Os,
-			AppID:  auth.Device.App.Name,
+			ID:       auth.GetDevice().GetId(),
+			Platform: auth.GetDevice().GetApp().GetOs(),
+			AppID:    auth.GetDevice().GetApp().GetName(),
 		}},
 	}, nil
 }

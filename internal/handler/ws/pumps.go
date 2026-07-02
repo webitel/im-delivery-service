@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 )
@@ -20,11 +21,14 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 
 	conn.SetPongHandler(func(string) error {
 		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
+
 			_ = h.presenceManager.Heartbeat(ctx, uid, cid)
 		}()
+
 		return nil
 	})
 
@@ -38,6 +42,7 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 		}
 
 		ctx := context.Background()
+
 		switch req.Type {
 		case "ack":
 			_ = h.orchestrator.Ack(ctx, req.EID, cid)
@@ -57,7 +62,10 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 		case <-ctx.Done():
 			return
 		case ev, ok := <-sub.Recv():
-			if !ok { return }
+			if !ok {
+				return
+			}
+
 			h.send(c, ev, log)
 		case <-t.C:
 			_ = c.SetWriteDeadline(time.Now().Add(writeWait))

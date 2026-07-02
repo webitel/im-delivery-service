@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
@@ -35,6 +36,7 @@ func NewMessageEvent(
 	for _, apply := range opts {
 		apply(e)
 	}
+
 	return e
 }
 
@@ -61,6 +63,7 @@ func NewThreadEvent(
 	for _, apply := range opts {
 		apply(e)
 	}
+
 	return e
 }
 
@@ -84,6 +87,7 @@ func NewSystemEvent[T any](
 	for _, apply := range opts {
 		apply(e)
 	}
+
 	return e
 }
 
@@ -137,5 +141,6 @@ func NewInteractiveCallbackEvent(payload *model.InteractiveCallback) Eventer {
 		UserID:     payload.ReactedBy.ID,
 		Priority:   PriorityLow,
 		OccurredAt: time.Now().UTC().UnixMilli(),
+		Kind:       InteractiveCallback,
 	}
 }

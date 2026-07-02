@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/fx"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/registry"
 	"github.com/webitel/im-delivery-service/internal/store"
-	"go.uber.org/fx"
 )
 
 // --- Contracts ---
@@ -37,6 +38,7 @@ var _ Orchestrator = (*EventOrchestrator)(nil)
 
 type OrchestratorParams struct {
 	fx.In
+
 	Hub        registry.Hubber
 	Tracker    store.DeliveryTracker
 	Handlers   []EventHandler `group:"event_handlers"` // [AUTO_DISCOVERY]
@@ -77,6 +79,7 @@ func NewEventOrchestrator(p OrchestratorParams) *EventOrchestrator {
 	}
 
 	o.bootstrap(workerCount)
+
 	return o
 }
 
@@ -122,6 +125,7 @@ func (o *EventOrchestrator) bootstrap(n int) {
 		o.wg.Add(1)
 		go func(id int) {
 			defer o.wg.Done()
+
 			for t := range o.queue {
 				o.consume(t, id)
 			}
@@ -143,8 +147,10 @@ func (o *EventOrchestrator) consume(t task, workerID int) {
 				if rh, ok := h.(DismissHandler); ok {
 					rh.HandleDismiss(t.ctx, t.ev)
 				}
+
 				return
 			}
+
 			h.Handle(t.ctx, t.ev)
 		}()
 	}
@@ -155,5 +161,6 @@ func (o *EventOrchestrator) Close() error {
 	o.log.Info("ORCHESTRATOR_DRAINING_QUEUE")
 	close(o.queue)
 	o.wg.Wait()
+
 	return nil
 }

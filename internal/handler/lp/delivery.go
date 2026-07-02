@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	lpmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/lp"
@@ -36,10 +37,12 @@ func NewLPHandler(
 func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	// [IDENTITY_EXTRACTION]
 	userIDStr := chi.URLParam(r, "userID")
+
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		h.logger.Warn("LP_INVALID_USER_ID", slog.String("raw_id", userIDStr))
 		http.Error(w, "invalid user id", http.StatusBadRequest)
+
 		return
 	}
 
@@ -60,12 +63,14 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 
 	case <-time.After(30 * time.Second):
 		w.WriteHeader(http.StatusNoContent)
+
 		return
 
 	case ev, ok := <-conn.Recv():
 		if !ok {
 			return
 		}
+
 		events = append(events, ev)
 
 		// [BATCHING] Proactively drain the buffer to reduce HTTP roundtrips.
@@ -76,6 +81,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 				if !nextOk {
 					break drainLoop
 				}
+
 				events = append(events, nextEv)
 			default:
 				break drainLoop
@@ -88,6 +94,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("LP_MARSHALL_FAILED", slog.Any(semconv.ErrorKey, err))
 		http.Error(w, "internal serialization error", http.StatusInternalServerError)
+
 		return
 	}
 
@@ -96,6 +103,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		h.logger.Error("LP_TYPE_MISMATCH", slog.Any("received", val))
 		http.Error(w, "unexpected data format", http.StatusInternalServerError)
+
 		return
 	}
 

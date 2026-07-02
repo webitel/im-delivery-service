@@ -19,8 +19,9 @@ const _EventPriority_name = "unspecifiedhighnormallow"
 var _EventPriority_index = [...]uint8{0, 11, 15, 21, 24}
 
 func (i EventPriority) String() string {
-	if i < 0 || i >= EventPriority(len(_EventPriority_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_EventPriority_index)-1 {
 		return "EventPriority(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _EventPriority_name[_EventPriority_index[i]:_EventPriority_index[i+1]]
+	return _EventPriority_name[_EventPriority_index[idx]:_EventPriority_index[idx+1]]
 }

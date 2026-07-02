@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/webitel-go-kit/pkg/semconv"
@@ -57,6 +58,7 @@ func (h *WSHandler) terminate(c *websocket.Conn, wsCode int, reason string) {
 	// [7] Physical connection closure.
 	time.AfterFunc(150*time.Millisecond, func() {
 		_ = c.Close()
+
 		h.log.Debug("ws: connection terminated",
 			slog.Int("http_code", payload.Code),
 			slog.String("status", payload.Status),
@@ -64,7 +66,7 @@ func (h *WSHandler) terminate(c *websocket.Conn, wsCode int, reason string) {
 	})
 }
 
-// [SEND] Standard marshalling and transmission logic.
+// [SEND] Standard marshaling and transmission logic.
 func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) {
 	raw, err := h.marshaller.Marshal(ev)
 	if err != nil {

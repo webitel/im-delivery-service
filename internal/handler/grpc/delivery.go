@@ -5,6 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	grpcinterceptors "github.com/webitel/im-delivery-service/infra/server/grpc/interceptors"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
@@ -52,6 +55,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			slog.String("contact_id", auth.ContactID),
 			slog.Any(semconv.ErrorKey, err),
 		)
+
 		return status.Error(codes.InvalidArgument, "invalid user id format")
 	}
 
@@ -72,6 +76,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			slog.Any(semconv.ErrorKey, err),
 			slog.String("device_id", auth.Devices[0].ID),
 		)
+
 		return status.Error(codes.Internal, "failed to establish session presence")
 	}
 
@@ -99,7 +104,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		event.WithPriority[*model.ConnectedPayload](event.PriorityNormal),
 	)
 
-	// [MARSHALLING]
+	// [MARSHALING]
 	val, err := d.marshaller.Marshal(welcomeEv)
 	if err != nil {
 		l.Error("[STREAM] handshake mapping failed", slog.Any(semconv.ErrorKey, err))
@@ -114,6 +119,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		}
 	} else {
 		l.Error("[STREAM] marshaller returned invalid type", slog.String("got", fmt.Sprintf("%T", val)))
+
 		return status.Error(codes.Internal, "unexpected data type")
 	}
 
@@ -125,6 +131,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// [GHOST_CLEANUP]
 			// Triggers on client disconnect, timeout, or KeepAlive failure.
 			l.Info("[STREAM] client terminated connection", slog.Any("reason", stream.Context().Err()))
+
 			return nil
 
 		case ev, ok := <-conn.Recv():
@@ -168,6 +175,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 				}
 			} else {
 				l.Error("[STREAM] type mismatch", slog.String("got", fmt.Sprintf("%T", val)))
+
 				continue
 			}
 

@@ -13,6 +13,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 // [WAIT_AUTH_FRAME] Now waits 5s if only client_id was provided in headers.
@@ -23,6 +26,7 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 			slog.String("uid", auth.ContactID),
 			slog.String("remote", c.RemoteAddr().String()))
 		h.initSession(c, auth)
+
 		return
 	}
 
@@ -38,6 +42,7 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	if err := c.ReadJSON(&req); err != nil {
 		h.log.Warn("ws: auth payload timeout or invalid", slog.Any(semconv.ErrorKey, err))
 		h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
+
 		return
 	}
 
@@ -61,6 +66,7 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 		default:
 			h.terminate(c, 1011, "500_internal_server_error")
 		}
+
 		return
 	}
 
@@ -78,6 +84,7 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 		h.log.Error("ws: session attach failed", slog.Any(semconv.ErrorKey, err))
 		h.terminate(c, 1011, "SESSION_ATTACH_ERROR")
 		cancel()
+
 		return
 	}
 
@@ -86,11 +93,14 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 
 	defer func() {
 		cancel()
+
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cleanupCancel()
+
 		h.sessionManager.Detach(cleanupCtx, uid, cid)
 		_ = h.presenceManager.Offline(cleanupCtx, uid, cid)
 		_ = c.Close()
+
 		log.Info("ws: session terminated")
 	}()
 
@@ -101,5 +111,6 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 	})
 
 	go h.readPump(c, uid, cid)
+
 	h.writePump(sessionCtx, c, sub, log)
 }

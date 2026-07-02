@@ -26,6 +26,7 @@ var Module = fx.Module("registry",
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
 				h.Shutdown() // [GRACEFUL_SHUTDOWN] Stop all Actor goroutines
+
 				return nil
 			},
 		})

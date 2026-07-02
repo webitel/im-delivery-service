@@ -3,11 +3,12 @@ package push
 import (
 	"log/slog"
 
+	"go.uber.org/fx"
+
 	"github.com/webitel/im-delivery-service/infra/push"
 	"github.com/webitel/im-delivery-service/infra/push/apns"
 	"github.com/webitel/im-delivery-service/infra/push/fcm"
 	"github.com/webitel/im-delivery-service/internal/service"
-	"go.uber.org/fx"
 )
 
 // [PUSH_INFRASTRUCTURE_MODULE]

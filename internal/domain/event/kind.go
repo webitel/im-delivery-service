@@ -14,4 +14,5 @@ const (
 	VariableFlush                          // [BUSINESS]
 	MemberAdded                            // [BUSINESS]
 	MemberLeft                             // [BUSINESS]
+	InteractiveCallback
 )

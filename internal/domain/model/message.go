@@ -15,6 +15,7 @@ type Message struct {
 	From        Peer            `json:"from"`
 	To          []Peer          `json:"to"`
 	Text        string          `json:"text"`
+	Type        string          `json:"type"`
 	CreatedAt   int64           `json:"created_at"`
 	EditedAt    int64           `json:"updated_at,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`

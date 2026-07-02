@@ -7,6 +7,8 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+
 	adminv1 "github.com/webitel/im-delivery-service/gen/go/admin/v1"
 	authv1 "github.com/webitel/im-delivery-service/gen/go/auth/v1"
 	imadmin "github.com/webitel/im-delivery-service/infra/client/im-admin"
@@ -65,6 +67,7 @@ func (s *DeviceService) Sync(ctx context.Context, userID uuid.UUID) ([]model.Dev
 
 	if len(devices) == 0 {
 		_ = s.cache.SyncDevices(ctx, userID, nil)
+
 		return nil, nil
 	}
 
@@ -105,17 +108,19 @@ func (s *DeviceService) enrich(ctx context.Context, devices []model.Device) []mo
 		app, ok := memo[appID]
 		if !ok {
 			res, err := s.admin.SearchApps(ctx, &adminv1.SearchAppRequest{Id: appID})
-			if err != nil || res == nil || len(res.Data) == 0 {
+			if err != nil || res == nil || len(res.GetData()) == 0 {
 				continue
 			}
-			app = res.Data[0]
+
+			app = res.GetData()[0]
 			memo[appID] = app
 		}
 
-		if app.Service != nil && app.Service.PushService != nil {
-			s.apply(&devices[i], app.Service.PushService)
+		if app.GetService() != nil && app.GetService().GetPushService() != nil {
+			s.apply(&devices[i], app.GetService().GetPushService())
 		}
 	}
+
 	return devices
 }
 
@@ -124,12 +129,13 @@ func (s *DeviceService) apply(d *model.Device, ps *adminv1.PUSHServiceClient) {
 	switch d.PushType {
 	case ProviderFCM:
 		if fcm := ps.GetFcm(); fcm != nil {
-			d.PushConfig.Proxy = fcm.Proxy
-			d.PushConfig.Credentials = fcm.Account
+			d.PushConfig.Proxy = fcm.GetProxy()
+			d.PushConfig.Credentials = fcm.GetAccount()
 		}
 	case ProviderAPNS:
 		if apn := ps.GetApn(); apn != nil {
 			d.PushConfig.Proxy = apn.GetProxy()
+
 			d.PushConfig.Topic = apn.GetTopic()
 			if token := apn.GetToken(); token != nil {
 				d.PushConfig.Credentials = token.GetAuthKey()
@@ -139,8 +145,8 @@ func (s *DeviceService) apply(d *model.Device, ps *adminv1.PUSHServiceClient) {
 		}
 	case ProviderWEB:
 		if web := ps.GetWeb(); web != nil {
-			d.PushConfig.Proxy = web.Proxy
-			d.PushConfig.Credentials = web.Token
+			d.PushConfig.Proxy = web.GetProxy()
+			d.PushConfig.Credentials = web.GetToken()
 		}
 	}
 }
@@ -151,15 +157,15 @@ func (s *DeviceService) toDomain(src *authv1.AuthorizationList) []model.Device {
 		return nil
 	}
 
-	dst := make([]model.Device, 0, len(src.Data))
-	for _, a := range src.Data {
-		if a.Device == nil || a.Device.Push == nil {
+	dst := make([]model.Device, 0, len(src.GetData()))
+	for _, a := range src.GetData() {
+		if a.GetDevice() == nil || a.GetDevice().GetPush() == nil {
 			continue
 		}
 
-		device := model.Device{ID: a.Device.Id, AppID: a.AppId}
+		device := model.Device{ID: a.GetDevice().GetId(), AppID: a.GetAppId()}
 
-		switch t := a.Device.Push.Token.(type) {
+		switch t := a.GetDevice().GetPush().GetToken().(type) {
 		case *authv1.PUSHSubscription_Fcm:
 			device.PushType, device.PushToken, device.Platform = ProviderFCM, t.Fcm, model.PlatformAndroid
 		case *authv1.PUSHSubscription_Apn:
@@ -175,5 +181,6 @@ func (s *DeviceService) toDomain(src *authv1.AuthorizationList) []model.Device {
 			dst = append(dst, device)
 		}
 	}
+
 	return dst
 }

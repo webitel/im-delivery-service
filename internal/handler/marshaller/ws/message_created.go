@@ -73,7 +73,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
 		Body:      m.Text,
-		Type:      "text",
+		Type:      m.Type,
 		Contact:   m.Contact,
 		Location:  m.Location,
 		Metadata:  m.Metadata,
@@ -81,33 +81,15 @@ func mapMessage(m *model.Message) *WSMessage {
 	}
 
 	if len(m.Images) > 0 {
-		msg.Type = "image"
 		msg.Images = m.Images
 	}
 
 	if len(m.Documents) > 0 {
-		if msg.Type == "text" {
-			msg.Type = "document"
-		}
-
 		msg.Documents = m.Documents
 	}
 
 	if m.Interactive != nil {
-		msg.Type = "interactive"
 		msg.Interactive = m.Interactive
-	}
-
-	if m.Location != nil {
-		msg.Type = "location"
-	}
-
-	if m.Contact != nil {
-		msg.Type = "contact"
-	}
-
-	if m.System != nil {
-		msg.Type = "system"
 	}
 
 	return msg

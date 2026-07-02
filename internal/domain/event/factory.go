@@ -144,3 +144,20 @@ func NewInteractiveCallbackEvent(payload *model.InteractiveCallback) Eventer {
 		Kind:       InteractiveCallback,
 	}
 }
+
+func NewBotControlReleasedEvent(b *model.BotControlReleased) Eventer {
+	occurredAt := b.OccurredAt
+	if occurredAt == 0 {
+		occurredAt = time.Now().UnixMilli()
+	}
+
+	return &Envelope[*model.BotControlReleased]{
+		ID:         uuid.New(),
+		Payload:    b,
+		UserID:     b.MemberID,
+		DomainID:   b.DomainID,
+		Kind:       BotControlReleased,
+		Priority:   PriorityLow,
+		OccurredAt: occurredAt,
+	}
+}

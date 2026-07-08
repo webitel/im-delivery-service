@@ -7,6 +7,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -37,7 +40,7 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	}
 
 	if err := c.ReadJSON(&req); err != nil {
-		h.log.Warn("ws: auth payload timeout or invalid", slog.Any("err", err))
+		h.log.Warn("ws: auth payload timeout or invalid", slog.Any(semconv.ErrorKey, err))
 		h.terminate(c, websocket.ClosePolicyViolation, "401_unauthorized")
 
 		return
@@ -55,7 +58,7 @@ func (h *WSHandler) waitAuthFrame(ctx context.Context, c *websocket.Conn) {
 	auth, err := h.auther.Inspect(metadata.NewIncomingContext(authCtx, md))
 	if err != nil {
 		st, _ := status.FromError(err)
-		h.log.Error("ws: late-auth inspection failed", slog.String("err", st.Message()))
+		h.log.Error("ws: late-auth inspection failed", slog.String(semconv.ErrorKey, st.Message()))
 
 		switch st.Code() {
 		case codes.Unauthenticated, codes.InvalidArgument, codes.Unknown:
@@ -78,7 +81,7 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 
 	sub, err := h.sessionManager.Attach(sessionCtx, uid, auth.Devices[0].ID)
 	if err != nil {
-		h.log.Error("ws: session attach failed", slog.Any("err", err))
+		h.log.Error("ws: session attach failed", slog.Any(semconv.ErrorKey, err))
 		h.terminate(c, 1011, "SESSION_ATTACH_ERROR")
 		cancel()
 

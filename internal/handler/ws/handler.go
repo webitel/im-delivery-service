@@ -11,6 +11,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	"github.com/webitel/im-delivery-service/internal/service"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 const (
@@ -40,7 +41,7 @@ func NewWSHandler(
 	marshaller marshaller.EventMarshaller,
 ) *WSHandler {
 	return &WSHandler{
-		log:             log.With("component", "ws_handler"),
+		log:             log.With(semconv.ComponentKey, "ws_handler"),
 		sessionManager:  sessionManager,
 		orchestrator:    orchestrator,
 		presenceManager: presence,
@@ -63,7 +64,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error("ws: upgrade failed",
 			slog.String("remote", remote),
-			slog.Any("err", err),
+			slog.Any(semconv.ErrorKey, err),
 		)
 
 		return
@@ -72,7 +73,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// [1] Check if middleware already resolved the user.
 	if auth, ok := r.Context().Value(authInfoKey).(*model.AuthContact); ok {
 		h.log.Info("ws: using fast-track auth from middleware",
-			slog.String("user_id", auth.ContactID),
+			slog.String(semconv.UserIDKey, auth.ContactID),
 			slog.String("remote", remote),
 		)
 		h.initSession(conn, auth)

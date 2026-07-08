@@ -15,6 +15,9 @@ import (
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
 	grpcmarshaller "github.com/webitel/im-delivery-service/internal/handler/marshaller/gprc"
 	"github.com/webitel/im-delivery-service/internal/service"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var _ impb.DeliveryServer = (*DeliveryHandler)(nil)
@@ -50,7 +53,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	if err != nil {
 		d.logger.Error("[AUTH] failed to parse contact identity",
 			slog.String("contact_id", auth.ContactID),
-			slog.Any("err", err),
+			slog.Any(semconv.ErrorKey, err),
 		)
 
 		return status.Error(codes.InvalidArgument, "invalid user id format")
@@ -58,7 +61,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 
 	// Create a stream-scoped logger to track this specific connection
 	l := d.logger.With(
-		slog.String("user_id", userID.String()),
+		slog.String(semconv.UserIDKey, userID.String()),
 		slog.String("session_id", uuid.NewString()),
 	)
 
@@ -70,7 +73,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	conn, err := d.sessionManager.Attach(stream.Context(), userID, auth.Devices[0].ID)
 	if err != nil {
 		l.Error("[STREAM] failed to attach session",
-			slog.Any("err", err),
+			slog.Any(semconv.ErrorKey, err),
 			slog.String("device_id", auth.Devices[0].ID),
 		)
 
@@ -104,16 +107,14 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	// [MARSHALING]
 	val, err := d.marshaller.Marshal(welcomeEv)
 	if err != nil {
-		l.Error("[STREAM] handshake mapping failed", slog.Any("err", err))
-
+		l.Error("[STREAM] handshake mapping failed", slog.Any(semconv.ErrorKey, err))
 		return status.Error(codes.Internal, "mapping error")
 	}
 
 	// [ASSERTION] Ensure it's a Proto message
 	if pb, ok := val.(*impb.ServerEvent); ok {
 		if err := stream.Send(pb); err != nil {
-			l.Error("[STREAM] handshake delivery failed", slog.Any("err", err))
-
+			l.Error("[STREAM] handshake delivery failed", slog.Any(semconv.ErrorKey, err))
 			return err
 		}
 	} else {
@@ -162,16 +163,14 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// gRPC handles internal flow control and HTTP/2 framing.
 			val, err := d.marshaller.Marshal(ev)
 			if err != nil {
-				l.Error("[STREAM] marshaling error", slog.Any("err", err))
-
+				l.Error("[STREAM] marshalling error", slog.Any(semconv.ErrorKey, err))
 				continue
 			}
 
 			// [ASSERT & SEND]
 			if pb, ok := val.(*impb.ServerEvent); ok {
 				if err := stream.Send(pb); err != nil {
-					l.Error("[STREAM] transmission error", slog.Any("err", err))
-
+					l.Error("[STREAM] transmission error", slog.Any(semconv.ErrorKey, err))
 					return status.Error(codes.DataLoss, "stream_transmission_failed")
 				}
 			} else {

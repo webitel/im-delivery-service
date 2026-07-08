@@ -8,6 +8,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // OnMessageCreatedV1 handles message fan-out with contextual recipient lists.
@@ -23,8 +24,7 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	// Resolve ALL participant metadata (names, types) from storage/cache.
 	peers, err := h.enricher.Resolve(ctx, raw.DomainID, participantIDs...)
 	if err != nil {
-		h.logger.Error("failed to enrich peer data", "error", err)
-
+		h.logger.Error("failed to enrich peer data", semconv.ErrorKey, err)
 		return nil, err
 	}
 

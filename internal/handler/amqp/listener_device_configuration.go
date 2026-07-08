@@ -8,6 +8,7 @@ import (
 
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // [ON_DEVICE_REGISTERED_V1] Handles new push token registration.
@@ -34,8 +35,7 @@ func (h *MessageHandler) syncUserDevices(ctx context.Context, raw *payload.Devic
 
 	uid, err := uuid.Parse(raw.Authorization.Contact.ID)
 	if err != nil {
-		h.logger.Error("AUTH_EVENT_INVALID_UID", "err", err, "event", eventType)
-
+		h.logger.Error("AUTH_EVENT_INVALID_UID", semconv.ErrorKey, err, "event", eventType)
 		return nil
 	}
 

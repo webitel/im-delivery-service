@@ -9,6 +9,7 @@ import (
 
 	"github.com/webitel/im-delivery-service/infra/push/webhook"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 const Name = "apn"
@@ -21,7 +22,7 @@ type Provider struct {
 
 func NewProvider(log *slog.Logger) *Provider {
 	return &Provider{
-		log:      log.With("component", "push.apns"),
+		log:      log.With(semconv.ComponentKey, "push.apns"),
 		registry: newClientRegistry(),
 	}
 }
@@ -52,7 +53,7 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 
 			proxy := webhook.GetOrCreate[*apns2.Notification](dev.PushConfig.Proxy)
 			if err := proxy.Send(ctx, notification); err != nil {
-				p.log.Error("PROXY_ERROR", slog.Any("error", err))
+				p.log.Error("PROXY_ERROR", slog.Any(semconv.ErrorKey, err))
 			}
 
 			continue
@@ -66,16 +67,14 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			dev.PushConfig.TeamID,
 		)
 		if err != nil {
-			p.log.Error("CLIENT_RESOLUTION_FAILED", slog.Any("error", err))
-
+			p.log.Error("CLIENT_RESOLUTION_FAILED", slog.Any(semconv.ErrorKey, err))
 			continue
 		}
 
 		// [4. DISPATCH]
 		res, err := client.PushWithContext(ctx, notification)
 		if err != nil {
-			p.log.Error("TRANSPORT_ERROR", slog.Any("error", err))
-
+			p.log.Error("TRANSPORT_ERROR", slog.Any(semconv.ErrorKey, err))
 			continue
 		}
 

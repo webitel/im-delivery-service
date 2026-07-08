@@ -11,6 +11,8 @@ import (
 	leader "github.com/webitel/im-delivery-service/infra/discovery/consul"
 	pubsubadapter "github.com/webitel/im-delivery-service/internal/adapter/pubsub"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
+	"go.uber.org/fx"
 )
 
 // [CONSTANTS] Global infrastructure settings
@@ -105,7 +107,7 @@ var Module = fx.Module("amqp-handler",
 				// [WORKER] Start the background message consumer
 				go func() {
 					if err := p.Router.Run(mainCtx); err != nil {
-						p.Logger.Error("AMQP_ROUTER_STOPPED", slog.Any("err", err))
+						p.Logger.Error("AMQP_ROUTER_STOPPED", slog.Any(semconv.ErrorKey, err))
 					}
 				}()
 

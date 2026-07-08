@@ -15,6 +15,8 @@ import (
 	imauth "github.com/webitel/im-delivery-service/infra/client/im-auth"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/store"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const (
@@ -42,7 +44,7 @@ func NewDeviceService(cache store.PresenceStore, auth *imauth.Client, admin *ima
 		cache: cache,
 		auth:  auth,
 		admin: admin,
-		log:   log.With("component", "device_service"),
+		log:   log.With(semconv.ComponentKey, "device_service"),
 	}
 }
 
@@ -74,7 +76,7 @@ func (s *DeviceService) Sync(ctx context.Context, userID uuid.UUID) ([]model.Dev
 
 	// 3. Update cache
 	if err := s.cache.SyncDevices(ctx, userID, enriched); err != nil {
-		s.log.Error("cache_sync_failed", slog.String("user_id", userID.String()), slog.Any("err", err))
+		s.log.Error("cache_sync_failed", slog.String(semconv.UserIDKey, userID.String()), slog.Any(semconv.ErrorKey, err))
 	}
 
 	return enriched, nil

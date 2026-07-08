@@ -8,6 +8,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 // OnThreadCreatedV1 handles thread creation. Resolves full UI state for targets.
@@ -33,8 +34,7 @@ func (h *MessageHandler) OnThreadCreatedV1(ctx context.Context, raw *payload.Thr
 	// 2. Resolve basic peer metadata (Name, Type, Sub) from storage/cache
 	peers, err := h.enricher.Resolve(ctx, raw.DomainID, memberIDs...)
 	if err != nil {
-		h.logger.Error("failed to enrich thread members", "error", err)
-
+		h.logger.Error("failed to enrich thread members", semconv.ErrorKey, err)
 		return nil, err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -56,7 +57,7 @@ func (h *WSHandler) AuthenticationMiddleware(next http.Handler) http.Handler {
 			st, _ := status.FromError(err)
 			h.log.Error("ws: handshake auth failed",
 				slog.String("remote", r.RemoteAddr),
-				slog.String("err", st.Message()),
+				slog.String(semconv.ErrorKey, st.Message()),
 			)
 
 			switch st.Code() {

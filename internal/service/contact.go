@@ -11,6 +11,7 @@ import (
 	contactv1 "github.com/webitel/im-delivery-service/gen/go/contact/v1"
 	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/webitel-go-kit/pkg/semconv"
 )
 
 type Contacter interface {
@@ -90,7 +91,7 @@ func (e *ContactEnricher) fetch(ctx context.Context, domainID int32, missing map
 		Size:     int32(len(searchIDs)),
 	})
 	if err != nil {
-		e.logger.Error("CONTACT_FETCH_FAILED", "err", err)
+		e.logger.Error("CONTACT_FETCH_FAILED", semconv.ErrorKey, err)
 
 		return
 	}

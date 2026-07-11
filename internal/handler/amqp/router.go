@@ -22,6 +22,7 @@ const (
 
 	// Routing Keys
 	TopicMessageCreated      = "im_message.#.message.created.v1"
+	TopicMessageEdited       = "im_message.#.message.edited.v1"
 	TopicThreadCreated       = "im_thread.#.thread.created.v1"
 	TopicDeviceRegister      = "updates.device.register.#"
 	TopicDeviceUnregister    = "updates.device.unregister.#"
@@ -92,6 +93,12 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicMessageCreated,
 			Handler:  Bind(h, h.OnMessageCreatedV1),
+		},
+		{
+			Name:     "ON_MESSAGE_EDITED",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicMessageEdited,
+			Handler:  Bind(h, h.OnMessageEditedV1),
 		},
 		{
 			Name:     "ON_THREAD_CREATED",

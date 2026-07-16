@@ -42,6 +42,35 @@ type MessageCreatedV1 struct {
 	Contact     *Contact        `json:"contact,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
 	System      *System         `json:"system,omitempty"`
+	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
+}
+
+type ReplyTo struct {
+	MessageID      string  `json:"message_id"`
+	SenderID       string  `json:"sender_id"`
+	Type           string  `json:"type"`
+	Body           string  `json:"body"`
+	CreatedAt      int64   `json:"created_at"`
+	AttachmentKind *string `json:"attachment_kind,omitempty"`
+	AttachmentName *string `json:"attachment_name,omitempty"`
+	AttachmentMime *string `json:"attachment_mime,omitempty"`
+}
+
+func (replyTo *ReplyTo) AsModel() *model.ReplyTo {
+	if replyTo == nil {
+		return nil
+	}
+
+	return &model.ReplyTo{
+		MessageID:      util.SafeParseUUID(replyTo.MessageID),
+		SenderID:       util.SafeParseUUID(replyTo.SenderID),
+		Type:           replyTo.Type,
+		Body:           replyTo.Body,
+		CreatedAt:      replyTo.CreatedAt,
+		AttachmentKind: replyTo.AttachmentKind,
+		AttachmentName: replyTo.AttachmentName,
+		AttachmentMime: replyTo.AttachmentMime,
+	}
 }
 
 // ToDomain converts the AMQP payload into the internal domain model.
@@ -68,6 +97,7 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		Location:    d.Location.AsModel(),
 		Contact:     d.Contact.AsModel(),
 		System:      d.System.AsModel(),
+		ReplyTo:     d.ReplyTo.AsModel(),
 	}
 
 	// Map all recipients into the domain model.

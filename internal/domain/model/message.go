@@ -25,6 +25,18 @@ type Message struct {
 	Location    *Location       `json:"location,omitempty"`
 	Contact     *Contact        `json:"contact,omitempty"`
 	System      *System         `json:"system,omitempty"`
+	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
+}
+
+type ReplyTo struct {
+	MessageID      uuid.UUID `json:"message_id"`
+	SenderID       uuid.UUID `json:"sender_id"`
+	Type           string    `json:"type"`
+	Body           string    `json:"body"`
+	CreatedAt      int64     `json:"created_at"`
+	AttachmentKind *string   `json:"attachment_kind,omitempty"`
+	AttachmentName *string   `json:"attachment_name,omitempty"`
+	AttachmentMime *string   `json:"attachment_mime,omitempty"`
 }
 
 func (m *Message) RoutingKey() string {

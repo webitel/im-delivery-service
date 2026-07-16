@@ -40,6 +40,33 @@ func NewMessageEvent(
 	return e
 }
 
+// [NEW_MESSAGE_EDITED_EVENT] Factory for message edits. Unlike a new message,
+// an edit updates an already-delivered message in place (clients match by ID),
+// so it is not pushed as a notification (CanPush=false) and its timestamp is the
+// edit time.
+func NewMessageEditedEvent(
+	msg *model.Message,
+	targetID uuid.UUID,
+	opts ...Option[*model.Message],
+) Eventer {
+	e := &Envelope[*model.Message]{
+		ID:         uuid.New(),
+		Payload:    msg,
+		UserID:     targetID,
+		DomainID:   msg.DomainID,
+		Kind:       MessageEdited,
+		Priority:   PriorityHigh,
+		OccurredAt: msg.EditedAt,
+		CanPush:    false,
+	}
+
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	return e
+}
+
 // [NEW_THREAD_EVENT] Factory for room/thread lifecycle events.
 func NewThreadEvent(
 	thread *model.Thread,

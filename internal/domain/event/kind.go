@@ -15,4 +15,5 @@ const (
 	MemberAdded                              // [BUSINESS]
 	MemberLeft                               // [BUSINESS]
 	InteractiveCallback                      // [BUSINESS]
+	MessageEdited                            // [BUSINESS]
 )

@@ -44,6 +44,34 @@ func marshalPeer(p *model.Peer) *impb.Peer {
 	return res
 }
 
+func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
+	if r == nil {
+		return nil
+	}
+
+	quoted := &impb.QuotedMessage{
+		Id:        r.MessageID.String(),
+		SenderId:  r.SenderID.String(),
+		Type:      r.Type,
+		Body:      r.Body,
+		CreatedAt: r.CreatedAt,
+	}
+
+	if r.AttachmentKind != nil {
+		quoted.AttachmentKind = *r.AttachmentKind
+	}
+
+	if r.AttachmentName != nil {
+		quoted.AttachmentName = *r.AttachmentName
+	}
+
+	if r.AttachmentMime != nil {
+		quoted.AttachmentMime = *r.AttachmentMime
+	}
+
+	return quoted
+}
+
 // marshalMessagePayload converts the domain Message model to a gRPC server event.
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	// Map the slice of recipients from domain to PB
@@ -59,6 +87,7 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
 		From:      marshalPeer(&m.From),
+		ReplyTo:   marshalReplyTo(m.ReplyTo),
 	}
 
 	// [CONTENT_TYPE_LOGIC]

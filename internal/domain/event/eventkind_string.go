@@ -19,16 +19,17 @@ func _() {
 	_ = x[MemberLeft-9]
 	_ = x[InteractiveCallback-10]
 	_ = x[MessageEdited-11]
+	_ = x[MessageStatusChanged-12]
 }
 
-const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeftInteractiveCallbackMessageEdited"
+const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeftInteractiveCallbackMessageEditedMessageStatusChanged"
 
-var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109, 128, 141}
+var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109, 128, 141, 161}
 
 func (i EventKind) String() string {
-	idx := int(i) - 1
-	if i < 1 || idx >= len(_EventKind_index)-1 {
-		return "EventKind(" + strconv.FormatInt(int64(i), 10) + ")"
+	i -= 1
+	if i < 0 || i >= EventKind(len(_EventKind_index)-1) {
+		return "EventKind(" + strconv.FormatInt(int64(i+1), 10) + ")"
 	}
-	return _EventKind_name[_EventKind_index[idx]:_EventKind_index[idx+1]]
+	return _EventKind_name[_EventKind_index[i]:_EventKind_index[i+1]]
 }

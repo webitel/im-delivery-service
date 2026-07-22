@@ -84,7 +84,6 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/webitel/webitel-go-kit/pkg/errors v0.0.0-20251222125635-d60448d23a82 // indirect
 	github.com/webitel/wlog v0.0.0-20250325101442-de4f125c1ec7 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.17.0 // indirect
@@ -145,4 +144,7 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
-require github.com/webitel/webitel-go-kit/appconfig v0.0.0-20260602143553-df89d5e34680
+require (
+	github.com/webitel/webitel-go-kit/appconfig v0.0.0-20260602143553-df89d5e34680
+	github.com/webitel/webitel-go-kit/pkg/errors v0.0.0-20251222125635-d60448d23a82
+)

@@ -118,6 +118,30 @@ func NewSystemEvent[T any](
 	return e
 }
 
+// [NEW_MESSAGE_STATUS_EVENT] Factory for per-recipient delivery status
+// change notifications. Not pushable: status marks only matter to clients
+// that render the chat in real time.
+func NewMessageStatusEvent(
+	update *model.MessageStatusUpdate,
+	targetID uuid.UUID,
+	domainID int64,
+) Eventer {
+	occurredAt := update.OccurredAt
+	if occurredAt <= 0 {
+		occurredAt = time.Now().UnixMilli()
+	}
+
+	return &Envelope[*model.MessageStatusUpdate]{
+		ID:         uuid.New(),
+		Payload:    update,
+		UserID:     targetID,
+		DomainID:   domainID,
+		Kind:       MessageStatusChanged,
+		Priority:   PriorityNormal,
+		OccurredAt: occurredAt,
+	}
+}
+
 // [NEW_MEMBER_EVENT] Factory for member lifecycle events (added/left).
 func NewMemberEvent(m *model.MemberEvent, targetID uuid.UUID, kind EventKind) Eventer {
 	return &Envelope[*model.MemberEvent]{

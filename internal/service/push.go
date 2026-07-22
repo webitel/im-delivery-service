@@ -44,6 +44,7 @@ type PushHandler struct {
 	presenceStore  store.PresenceStore
 	pusher         PushProvider
 	leader         leader.LeaderAwarer
+	confirmer      DeliveryConfirmer
 	cb             *gobreaker.CircuitBreaker
 	log            *slog.Logger
 	timeout        time.Duration
@@ -57,6 +58,7 @@ func NewPushHandler(
 	presenceStore store.PresenceStore,
 	pusher PushProvider,
 	leader leader.LeaderAwarer,
+	confirmer DeliveryConfirmer,
 	cfg *config.Config,
 	log *slog.Logger,
 ) *PushHandler {
@@ -75,6 +77,7 @@ func NewPushHandler(
 		presenceStore:  presenceStore,
 		pusher:         pusher,
 		leader:         leader,
+		confirmer:      confirmer,
 		cb:             cb,
 		log:            log.With("component", "push_handler"),
 		timeout:        cfg.Delivery.AckTimeout,
@@ -175,6 +178,8 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 
 // [SHIP] Executes individual push sends through the circuit breaker.
 func (h *PushHandler) ship(ctx context.Context, ev event.Eventer, targets []model.Device) {
+	delivered := false
+
 	for _, target := range targets {
 		req := &model.PushRequest{
 			Devices: []model.Device{target},
@@ -197,6 +202,18 @@ func (h *PushHandler) ship(ctx context.Context, ev event.Eventer, targets []mode
 				slog.String("eid", ev.GetID()),
 				slog.Any("err", err),
 			)
+
+			continue
+		}
+
+		delivered = true
+	}
+
+	// [STATUS_REPORT] A push accepted by APNs/FCM counts as delivery to the
+	// offline recipient; report it once per event, best-effort.
+	if delivered && h.confirmer != nil {
+		if eid, err := uuid.Parse(ev.GetID()); err == nil {
+			h.confirmer.ConfirmDelivered(ctx, eid, viaPush)
 		}
 	}
 }

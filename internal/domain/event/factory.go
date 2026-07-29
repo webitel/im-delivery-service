@@ -67,6 +67,31 @@ func NewMessageEditedEvent(
 	return e
 }
 
+// [NEW_MESSAGE_DELETED_EVENT] Factory for message deletions. Clients match the
+// message by ID and remove it, so it is not pushed as a notification.
+func NewMessageDeletedEvent(
+	msg *model.MessageDeleted,
+	targetID uuid.UUID,
+	opts ...Option[*model.MessageDeleted],
+) Eventer {
+	e := &Envelope[*model.MessageDeleted]{
+		ID:         uuid.New(),
+		Payload:    msg,
+		UserID:     targetID,
+		DomainID:   msg.DomainID,
+		Kind:       MessageDeleted,
+		Priority:   PriorityHigh,
+		OccurredAt: msg.DeletedAt,
+		CanPush:    false,
+	}
+
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	return e
+}
+
 // [NEW_THREAD_EVENT] Factory for room/thread lifecycle events.
 func NewThreadEvent(
 	thread *model.Thread,

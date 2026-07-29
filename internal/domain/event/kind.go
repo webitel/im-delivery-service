@@ -17,4 +17,5 @@ const (
 	InteractiveCallback                       // [BUSINESS]
 	MessageEdited                             // [BUSINESS]
 	MessageStatusChanged                      // [BUSINESS]
+	MessageDeleted                            // [BUSINESS]
 )

@@ -72,6 +72,17 @@ func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
 	return quoted
 }
 
+func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_MessageDeletedEvent {
+	return &impb.ServerEvent_MessageDeletedEvent{
+		MessageDeletedEvent: &impb.MessageDeletedEvent{
+			Id:        m.ID.String(),
+			ThreadId:  m.ThreadID.String(),
+			DeletedBy: marshalPeer(&m.DeletedBy),
+			DeletedAt: m.DeletedAt,
+		},
+	}
+}
+
 // marshalMessagePayload converts the domain Message model to a gRPC server event.
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	// Map the slice of recipients from domain to PB

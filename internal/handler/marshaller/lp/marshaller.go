@@ -44,6 +44,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	switch ev.GetPayload().(type) {
 	case *model.Message:
 		lp.Type = "message_created"
+	case *model.MessageDeleted:
+		lp.Type = "message_deleted"
 	case *model.ConnectedPayload:
 		lp.Type = "system_connected"
 	case *model.DisconnectedPayload:

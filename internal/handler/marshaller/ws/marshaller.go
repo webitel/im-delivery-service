@@ -65,6 +65,9 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	case *model.MessageStatusUpdate:
 		res.Payload[EventMessageStatus.String()] = p
 
+	case *model.MessageDeleted:
+		res.Payload[EventMessageDeleted.String()] = p
+
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.
 		res.Payload[ev.GetKind().String()] = p

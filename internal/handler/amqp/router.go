@@ -34,6 +34,7 @@ const (
 	TopicMemberAdded         = "im_thread.*.member.*.joined.v1"
 	TopicMemberLeft          = "im_thread.*.member.*.left.v1"
 	TopicInteractiveCallbacl = "im_message.*.interactive_callback.#"
+	TopicTyping              = "im_message.#.typing.v1"
 
 	// Queues
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -167,6 +168,12 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicInteractiveCallbacl,
 			Handler:  Bind(h, h.OnInteractiveCallbackReactedV1),
+		},
+		{
+			Name:     "ON_TYPING",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicTyping,
+			Handler:  Bind(h, h.OnTypingV1),
 		},
 	}
 

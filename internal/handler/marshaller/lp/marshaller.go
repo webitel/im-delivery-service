@@ -50,6 +50,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		lp.Type = "system_connected"
 	case *model.DisconnectedPayload:
 		lp.Type = "system_disconnected"
+	case *model.Typing:
+		lp.Type = "typing_event"
 	default:
 		lp.Type = ev.GetKind().String()
 	}

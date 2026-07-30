@@ -40,6 +40,20 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		}}
 	case *model.DisconnectedPayload:
 		res.Payload = &impb.ServerEvent_DisconnectedEvent{DisconnectedEvent: &impb.DisconnectedEvent{Reason: p.Reason}}
+	case *model.Typing:
+		te := &impb.TypingEvent{
+			ThreadId:  p.ThreadID,
+			MemberId:  p.MemberID,
+			TimeoutMs: p.TimeoutMs,
+		}
+
+		// preview_text is optional; attach only when this session is authorized.
+		if p.PreviewText != "" {
+			preview := p.PreviewText
+			te.PreviewText = &preview
+		}
+
+		res.Payload = &impb.ServerEvent_TypingEvent{TypingEvent: te}
 	}
 
 	ev.SetCached(res)

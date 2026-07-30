@@ -321,6 +321,7 @@ type ServerEvent struct {
 	//	*ServerEvent_PingEvent
 	//	*ServerEvent_MessageStatusEvent
 	//	*ServerEvent_MessageDeletedEvent
+	//	*ServerEvent_TypingEvent
 	Payload isServerEvent_Payload `protobuf_oneof:"payload"`
 }
 
@@ -440,6 +441,13 @@ func (x *ServerEvent) GetMessageDeletedEvent() *MessageDeletedEvent {
 	return nil
 }
 
+func (x *ServerEvent) GetTypingEvent() *TypingEvent {
+	if x, ok := x.GetPayload().(*ServerEvent_TypingEvent); ok {
+		return x.TypingEvent
+	}
+	return nil
+}
+
 type isServerEvent_Payload interface {
 	isServerEvent_Payload()
 }
@@ -484,6 +492,11 @@ type ServerEvent_MessageDeletedEvent struct {
 	MessageDeletedEvent *MessageDeletedEvent `protobuf:"bytes,11,opt,name=message_deleted_event,json=messageDeletedEvent,proto3,oneof"`
 }
 
+type ServerEvent_TypingEvent struct {
+	// Ephemeral "…is typing" indicator (optionally with a live draft preview).
+	TypingEvent *TypingEvent `protobuf:"bytes,12,opt,name=typing_event,json=typingEvent,proto3,oneof"`
+}
+
 func (*ServerEvent_ConnectedEvent) isServerEvent_Payload() {}
 
 func (*ServerEvent_DisconnectedEvent) isServerEvent_Payload() {}
@@ -499,6 +512,172 @@ func (*ServerEvent_PingEvent) isServerEvent_Payload() {}
 func (*ServerEvent_MessageStatusEvent) isServerEvent_Payload() {}
 
 func (*ServerEvent_MessageDeletedEvent) isServerEvent_Payload() {}
+
+func (*ServerEvent_TypingEvent) isServerEvent_Payload() {}
+
+// TypingEvent is an ephemeral, real-time "…is typing" indicator.
+//
+// It is never stored, never pushed and never replayed on reconnect: it is
+// delivered only to participants that are online at the moment. Clients show
+// the indicator for timeout_ms and self-expire it (no explicit stop event is
+// required in the common flow — it is superseded by the message or by TTL).
+type TypingEvent struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Thread the indicator belongs to.
+	ThreadId string `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// Participant who is typing.
+	MemberId string `protobuf:"bytes,2,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	// How long to keep the indicator visible, in milliseconds.
+	TimeoutMs int32 `protobuf:"varint,3,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	// Live draft of the message being typed (Live Typing Preview).
+	//
+	// PRIVACY: this is the sender's unsent text. The delivery service attaches it
+	// ONLY for sessions whose member is authorized to see the preview (resolved
+	// server-side from the ephemeral event's allow-list); it is absent for every
+	// other session. Clients MUST NOT log or persist it. The allow-list itself is
+	// a server-only concept and is never sent to clients.
+	PreviewText *string `protobuf:"bytes,4,opt,name=preview_text,json=previewText,proto3,oneof" json:"preview_text,omitempty"`
+}
+
+func (x *TypingEvent) Reset() {
+	*x = TypingEvent{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TypingEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TypingEvent) ProtoMessage() {}
+
+func (x *TypingEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TypingEvent.ProtoReflect.Descriptor instead.
+func (*TypingEvent) Descriptor() ([]byte, []int) {
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TypingEvent) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *TypingEvent) GetMemberId() string {
+	if x != nil {
+		return x.MemberId
+	}
+	return ""
+}
+
+func (x *TypingEvent) GetTimeoutMs() int32 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *TypingEvent) GetPreviewText() string {
+	if x != nil && x.PreviewText != nil {
+		return *x.PreviewText
+	}
+	return ""
+}
+
+// MessageDeletedEvent notifies thread participants that a message was deleted
+// by its author. Clients match the message by id and remove it.
+type MessageDeletedEvent struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Identifier of the deleted message.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Thread the message belonged to.
+	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// Participant who deleted the message.
+	DeletedBy *Peer `protobuf:"bytes,3,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
+	// Unix time in milliseconds when the message was deleted.
+	DeletedAt int64 `protobuf:"varint,4,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+}
+
+func (x *MessageDeletedEvent) Reset() {
+	*x = MessageDeletedEvent{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MessageDeletedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageDeletedEvent) ProtoMessage() {}
+
+func (x *MessageDeletedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageDeletedEvent.ProtoReflect.Descriptor instead.
+func (*MessageDeletedEvent) Descriptor() ([]byte, []int) {
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *MessageDeletedEvent) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MessageDeletedEvent) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *MessageDeletedEvent) GetDeletedBy() *Peer {
+	if x != nil {
+		return x.DeletedBy
+	}
+	return nil
+}
+
+func (x *MessageDeletedEvent) GetDeletedAt() int64 {
+	if x != nil {
+		return x.DeletedAt
+	}
+	return 0
+}
 
 // MessageStatusEvent notifies thread participants that the delivery status
 // of one or more messages changed for a recipient. Read receipts are bulk
@@ -528,7 +707,7 @@ type MessageStatusEvent struct {
 func (x *MessageStatusEvent) Reset() {
 	*x = MessageStatusEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[2]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -541,7 +720,7 @@ func (x *MessageStatusEvent) String() string {
 func (*MessageStatusEvent) ProtoMessage() {}
 
 func (x *MessageStatusEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[2]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -554,7 +733,7 @@ func (x *MessageStatusEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageStatusEvent.ProtoReflect.Descriptor instead.
 func (*MessageStatusEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{2}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MessageStatusEvent) GetThreadId() string {
@@ -623,7 +802,7 @@ type ConnectedEvent struct {
 func (x *ConnectedEvent) Reset() {
 	*x = ConnectedEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[3]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -636,7 +815,7 @@ func (x *ConnectedEvent) String() string {
 func (*ConnectedEvent) ProtoMessage() {}
 
 func (x *ConnectedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[3]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +828,7 @@ func (x *ConnectedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectedEvent.ProtoReflect.Descriptor instead.
 func (*ConnectedEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{3}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ConnectedEvent) GetOk() bool {
@@ -689,7 +868,7 @@ type DisconnectedEvent struct {
 func (x *DisconnectedEvent) Reset() {
 	*x = DisconnectedEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[4]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -702,7 +881,7 @@ func (x *DisconnectedEvent) String() string {
 func (*DisconnectedEvent) ProtoMessage() {}
 
 func (x *DisconnectedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[4]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +894,7 @@ func (x *DisconnectedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectedEvent.ProtoReflect.Descriptor instead.
 func (*DisconnectedEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{4}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DisconnectedEvent) GetReason() string {
@@ -745,7 +924,7 @@ type NewMessageEvent struct {
 func (x *NewMessageEvent) Reset() {
 	*x = NewMessageEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[5]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -758,7 +937,7 @@ func (x *NewMessageEvent) String() string {
 func (*NewMessageEvent) ProtoMessage() {}
 
 func (x *NewMessageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[5]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +950,7 @@ func (x *NewMessageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewMessageEvent.ProtoReflect.Descriptor instead.
 func (*NewMessageEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{5}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *NewMessageEvent) GetMessage() *ThreadMessage {
@@ -779,84 +958,6 @@ func (x *NewMessageEvent) GetMessage() *ThreadMessage {
 		return x.Message
 	}
 	return nil
-}
-
-// MessageDeletedEvent notifies thread participants that a message was deleted
-// by its author. Clients match the message by id and remove it. The deleted
-// content is never carried by this event.
-type MessageDeletedEvent struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	// Identifier of the deleted message.
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Thread the message belonged to.
-	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// Participant who deleted the message.
-	DeletedBy *Peer `protobuf:"bytes,3,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
-	// Unix time in milliseconds when the message was deleted.
-	DeletedAt int64 `protobuf:"varint,4,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
-}
-
-func (x *MessageDeletedEvent) Reset() {
-	*x = MessageDeletedEvent{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[6]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MessageDeletedEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MessageDeletedEvent) ProtoMessage() {}
-
-func (x *MessageDeletedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[6]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MessageDeletedEvent.ProtoReflect.Descriptor instead.
-func (*MessageDeletedEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *MessageDeletedEvent) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *MessageDeletedEvent) GetThreadId() string {
-	if x != nil {
-		return x.ThreadId
-	}
-	return ""
-}
-
-func (x *MessageDeletedEvent) GetDeletedBy() *Peer {
-	if x != nil {
-		return x.DeletedBy
-	}
-	return nil
-}
-
-func (x *MessageDeletedEvent) GetDeletedAt() int64 {
-	if x != nil {
-		return x.DeletedAt
-	}
-	return 0
 }
 
 type ThreadMessage struct {
@@ -883,7 +984,7 @@ type ThreadMessage struct {
 func (x *ThreadMessage) Reset() {
 	*x = ThreadMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[7]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -896,7 +997,7 @@ func (x *ThreadMessage) String() string {
 func (*ThreadMessage) ProtoMessage() {}
 
 func (x *ThreadMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[7]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -909,7 +1010,7 @@ func (x *ThreadMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadMessage.ProtoReflect.Descriptor instead.
 func (*ThreadMessage) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{7}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ThreadMessage) GetId() string {
@@ -1030,7 +1131,7 @@ type QuotedMessage struct {
 func (x *QuotedMessage) Reset() {
 	*x = QuotedMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[8]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1043,7 +1144,7 @@ func (x *QuotedMessage) String() string {
 func (*QuotedMessage) ProtoMessage() {}
 
 func (x *QuotedMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[8]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,7 +1157,7 @@ func (x *QuotedMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuotedMessage.ProtoReflect.Descriptor instead.
 func (*QuotedMessage) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{8}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *QuotedMessage) GetId() string {
@@ -1127,7 +1228,7 @@ type Identity struct {
 func (x *Identity) Reset() {
 	*x = Identity{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[9]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1140,7 +1241,7 @@ func (x *Identity) String() string {
 func (*Identity) ProtoMessage() {}
 
 func (x *Identity) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[9]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,7 +1254,7 @@ func (x *Identity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Identity.ProtoReflect.Descriptor instead.
 func (*Identity) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{9}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Identity) GetIssuer() string {
@@ -1191,7 +1292,7 @@ type Peer struct {
 func (x *Peer) Reset() {
 	*x = Peer{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[10]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1204,7 +1305,7 @@ func (x *Peer) String() string {
 func (*Peer) ProtoMessage() {}
 
 func (x *Peer) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[10]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1318,7 @@ func (x *Peer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Peer.ProtoReflect.Descriptor instead.
 func (*Peer) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{10}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{11}
 }
 
 func (m *Peer) GetKind() isPeer_Kind {
@@ -1305,7 +1406,7 @@ type Document struct {
 func (x *Document) Reset() {
 	*x = Document{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[11]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1318,7 +1419,7 @@ func (x *Document) String() string {
 func (*Document) ProtoMessage() {}
 
 func (x *Document) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[11]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1331,7 +1432,7 @@ func (x *Document) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Document.ProtoReflect.Descriptor instead.
 func (*Document) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{11}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Document) GetId() string {
@@ -1383,7 +1484,7 @@ type Image struct {
 func (x *Image) Reset() {
 	*x = Image{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[12]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1396,7 +1497,7 @@ func (x *Image) String() string {
 func (*Image) ProtoMessage() {}
 
 func (x *Image) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[12]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1510,7 @@ func (x *Image) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Image.ProtoReflect.Descriptor instead.
 func (*Image) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{12}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Image) GetId() string {
@@ -1457,7 +1558,7 @@ type AckEvent struct {
 func (x *AckEvent) Reset() {
 	*x = AckEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[13]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1470,7 +1571,7 @@ func (x *AckEvent) String() string {
 func (*AckEvent) ProtoMessage() {}
 
 func (x *AckEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[13]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1483,7 +1584,7 @@ func (x *AckEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckEvent.ProtoReflect.Descriptor instead.
 func (*AckEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{13}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AckEvent) GetId() string {
@@ -1524,7 +1625,7 @@ type ErrorEvent struct {
 func (x *ErrorEvent) Reset() {
 	*x = ErrorEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[14]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1537,7 +1638,7 @@ func (x *ErrorEvent) String() string {
 func (*ErrorEvent) ProtoMessage() {}
 
 func (x *ErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[14]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1651,7 @@ func (x *ErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorEvent.ProtoReflect.Descriptor instead.
 func (*ErrorEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{14}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ErrorEvent) GetCode() string {
@@ -1587,7 +1688,7 @@ type PingEvent struct {
 func (x *PingEvent) Reset() {
 	*x = PingEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_api_delivery_v1_delivery_proto_msgTypes[15]
+		mi := &file_api_delivery_v1_delivery_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1600,7 +1701,7 @@ func (x *PingEvent) String() string {
 func (*PingEvent) ProtoMessage() {}
 
 func (x *PingEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_api_delivery_v1_delivery_proto_msgTypes[15]
+	mi := &file_api_delivery_v1_delivery_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1613,7 +1714,7 @@ func (x *PingEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingEvent.ProtoReflect.Descriptor instead.
 func (*PingEvent) Descriptor() ([]byte, []int) {
-	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{15}
+	return file_api_delivery_v1_delivery_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PingEvent) GetEcho() string {
@@ -1635,7 +1736,7 @@ var file_api_delivery_v1_delivery_proto_rawDesc = []byte{
 	0x67, 0x65, 0x6e, 0x2d, 0x6f, 0x70, 0x65, 0x6e, 0x61, 0x70, 0x69, 0x76, 0x32, 0x2f, 0x6f, 0x70,
 	0x74, 0x69, 0x6f, 0x6e, 0x73, 0x2f, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e,
 	0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x0f, 0x0a, 0x0d, 0x53, 0x74, 0x72, 0x65, 0x61,
-	0x6d, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0xea, 0x06, 0x0a, 0x0b, 0x53, 0x65, 0x72,
+	0x6d, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0xb8, 0x07, 0x0a, 0x0b, 0x53, 0x65, 0x72,
 	0x76, 0x65, 0x72, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x3c, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x42, 0x2c, 0x92, 0x41, 0x29, 0x32, 0x27, 0x55, 0x6e, 0x69, 0x71, 0x75,
 	0x65, 0x20, 0x69, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0x20, 0x6f, 0x66, 0x20,
@@ -1689,62 +1790,77 @@ var file_api_delivery_v1_delivery_proto_rawDesc = []byte{
 	0x61, 0x70, 0x69, 0x2e, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e,
 	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x45, 0x76,
 	0x65, 0x6e, 0x74, 0x48, 0x00, 0x52, 0x13, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x65,
-	0x6c, 0x65, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x42, 0x09, 0x0a, 0x07, 0x70, 0x61,
-	0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x83, 0x02, 0x0a, 0x12, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x1b, 0x0a, 0x09,
-	0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x08, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x49, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x6d, 0x65, 0x6d,
-	0x62, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6d, 0x65,
-	0x6d, 0x62, 0x65, 0x72, 0x49, 0x64, 0x12, 0x1f, 0x0a, 0x0b, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0a, 0x6d, 0x65, 0x73,
-	0x73, 0x61, 0x67, 0x65, 0x49, 0x64, 0x73, 0x12, 0x49, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75,
-	0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x31, 0x2e, 0x77, 0x65, 0x62, 0x69, 0x74, 0x65,
-	0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72,
-	0x79, 0x2e, 0x76, 0x31, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x65, 0x6c, 0x69,
-	0x76, 0x65, 0x72, 0x79, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74,
-	0x75, 0x73, 0x12, 0x10, 0x0a, 0x03, 0x76, 0x69, 0x61, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x03, 0x76, 0x69, 0x61, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x06, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x1f, 0x0a, 0x0b, 0x6f, 0x63,
-	0x63, 0x75, 0x72, 0x72, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x03, 0x52,
-	0x0a, 0x6f, 0x63, 0x63, 0x75, 0x72, 0x72, 0x65, 0x64, 0x41, 0x74, 0x22, 0x9d, 0x01, 0x0a, 0x0e,
-	0x43, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x3f,
-	0x0a, 0x02, 0x6f, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x42, 0x2f, 0x92, 0x41, 0x2c, 0x32,
-	0x2a, 0x49, 0x6e, 0x64, 0x69, 0x63, 0x61, 0x74, 0x65, 0x73, 0x20, 0x73, 0x75, 0x63, 0x63, 0x65,
-	0x73, 0x73, 0x66, 0x75, 0x6c, 0x20, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x20, 0x69, 0x6e, 0x69,
-	0x74, 0x69, 0x61, 0x6c, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x02, 0x6f, 0x6b, 0x12,
-	0x23, 0x0a, 0x0d, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x69,
-	0x6f, 0x6e, 0x49, 0x64, 0x12, 0x25, 0x0a, 0x0e, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x76,
-	0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x73, 0x65,
-	0x72, 0x76, 0x65, 0x72, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x95, 0x01, 0x0a, 0x11,
-	0x44, 0x69, 0x73, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e,
-	0x74, 0x12, 0x44, 0x0a, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x42, 0x2c, 0x92, 0x41, 0x29, 0x32, 0x27, 0x48, 0x75, 0x6d, 0x61, 0x6e, 0x2d, 0x72, 0x65,
-	0x61, 0x64, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x20, 0x66, 0x6f,
-	0x72, 0x20, 0x64, 0x69, 0x73, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52,
-	0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x12, 0x3a, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x09, 0x42, 0x26, 0x92, 0x41, 0x23, 0x32, 0x21, 0x4d, 0x61, 0x63, 0x68,
-	0x69, 0x6e, 0x65, 0x2d, 0x72, 0x65, 0x61, 0x64, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x74, 0x65, 0x72,
-	0x6d, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x04, 0x63,
-	0x6f, 0x64, 0x65, 0x22, 0x7d, 0x0a, 0x0f, 0x4e, 0x65, 0x77, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x6a, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x77, 0x65, 0x62, 0x69, 0x74, 0x65,
-	0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72,
-	0x79, 0x2e, 0x76, 0x31, 0x2e, 0x54, 0x68, 0x72, 0x65, 0x61, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61,
-	0x67, 0x65, 0x42, 0x25, 0x92, 0x41, 0x22, 0x32, 0x20, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
-	0x20, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x65, 0x64, 0x20, 0x76, 0x69, 0x61, 0x20, 0x74,
-	0x68, 0x65, 0x20, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61,
-	0x67, 0x65, 0x22, 0xa2, 0x01, 0x0a, 0x13, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x44, 0x65,
-	0x6c, 0x65, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x68,
-	0x72, 0x65, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74,
-	0x68, 0x72, 0x65, 0x61, 0x64, 0x49, 0x64, 0x12, 0x3f, 0x0a, 0x0a, 0x64, 0x65, 0x6c, 0x65, 0x74,
-	0x65, 0x64, 0x5f, 0x62, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x77, 0x65,
-	0x62, 0x69, 0x74, 0x65, 0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x64, 0x65, 0x6c,
-	0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x52, 0x09, 0x64,
-	0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x42, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x64, 0x65, 0x6c, 0x65,
-	0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x64, 0x65,
-	0x6c, 0x65, 0x74, 0x65, 0x64, 0x41, 0x74, 0x22, 0x81, 0x04, 0x0a, 0x0d, 0x54, 0x68, 0x72, 0x65,
+	0x6c, 0x65, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x4c, 0x0a, 0x0c, 0x74, 0x79,
+	0x70, 0x69, 0x6e, 0x67, 0x5f, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x27, 0x2e, 0x77, 0x65, 0x62, 0x69, 0x74, 0x65, 0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70,
+	0x69, 0x2e, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e, 0x54, 0x79,
+	0x70, 0x69, 0x6e, 0x67, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x48, 0x00, 0x52, 0x0b, 0x74, 0x79, 0x70,
+	0x69, 0x6e, 0x67, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x42, 0x09, 0x0a, 0x07, 0x70, 0x61, 0x79, 0x6c,
+	0x6f, 0x61, 0x64, 0x22, 0x9f, 0x01, 0x0a, 0x0b, 0x54, 0x79, 0x70, 0x69, 0x6e, 0x67, 0x45, 0x76,
+	0x65, 0x6e, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x49, 0x64,
+	0x12, 0x1b, 0x0a, 0x09, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x08, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x49, 0x64, 0x12, 0x1d, 0x0a,
+	0x0a, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x5f, 0x6d, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x05, 0x52, 0x09, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x4d, 0x73, 0x12, 0x26, 0x0a, 0x0c,
+	0x70, 0x72, 0x65, 0x76, 0x69, 0x65, 0x77, 0x5f, 0x74, 0x65, 0x78, 0x74, 0x18, 0x04, 0x20, 0x01,
+	0x28, 0x09, 0x48, 0x00, 0x52, 0x0b, 0x70, 0x72, 0x65, 0x76, 0x69, 0x65, 0x77, 0x54, 0x65, 0x78,
+	0x74, 0x88, 0x01, 0x01, 0x42, 0x0f, 0x0a, 0x0d, 0x5f, 0x70, 0x72, 0x65, 0x76, 0x69, 0x65, 0x77,
+	0x5f, 0x74, 0x65, 0x78, 0x74, 0x22, 0xa2, 0x01, 0x0a, 0x13, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x0e, 0x0a,
+	0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1b, 0x0a,
+	0x09, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x08, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x49, 0x64, 0x12, 0x3f, 0x0a, 0x0a, 0x64, 0x65,
+	0x6c, 0x65, 0x74, 0x65, 0x64, 0x5f, 0x62, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20,
+	0x2e, 0x77, 0x65, 0x62, 0x69, 0x74, 0x65, 0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e,
+	0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72,
+	0x52, 0x09, 0x64, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x42, 0x79, 0x12, 0x1d, 0x0a, 0x0a, 0x64,
+	0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52,
+	0x09, 0x64, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x41, 0x74, 0x22, 0x83, 0x02, 0x0a, 0x12, 0x4d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x45, 0x76, 0x65, 0x6e,
+	0x74, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x49, 0x64, 0x12, 0x1b,
+	0x0a, 0x09, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x08, 0x6d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x49, 0x64, 0x12, 0x1f, 0x0a, 0x0b, 0x6d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x0a, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x49, 0x64, 0x73, 0x12, 0x49, 0x0a, 0x06,
+	0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x31, 0x2e, 0x77,
+	0x65, 0x62, 0x69, 0x74, 0x65, 0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x64, 0x65,
+	0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x44, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52,
+	0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x10, 0x0a, 0x03, 0x76, 0x69, 0x61, 0x18, 0x05,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x76, 0x69, 0x61, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72, 0x72,
+	0x6f, 0x72, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x12,
+	0x1f, 0x0a, 0x0b, 0x6f, 0x63, 0x63, 0x75, 0x72, 0x72, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x07,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x0a, 0x6f, 0x63, 0x63, 0x75, 0x72, 0x72, 0x65, 0x64, 0x41, 0x74,
+	0x22, 0x9d, 0x01, 0x0a, 0x0e, 0x43, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x65, 0x64, 0x45, 0x76,
+	0x65, 0x6e, 0x74, 0x12, 0x3f, 0x0a, 0x02, 0x6f, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x42,
+	0x2f, 0x92, 0x41, 0x2c, 0x32, 0x2a, 0x49, 0x6e, 0x64, 0x69, 0x63, 0x61, 0x74, 0x65, 0x73, 0x20,
+	0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0x66, 0x75, 0x6c, 0x20, 0x73, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x20, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x61, 0x6c, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x52, 0x02, 0x6f, 0x6b, 0x12, 0x23, 0x0a, 0x0d, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x63, 0x6f, 0x6e,
+	0x6e, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x25, 0x0a, 0x0e, 0x73, 0x65, 0x72,
+	0x76, 0x65, 0x72, 0x5f, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0d, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e,
+	0x22, 0x95, 0x01, 0x0a, 0x11, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x65,
+	0x64, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x44, 0x0a, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x42, 0x2c, 0x92, 0x41, 0x29, 0x32, 0x27, 0x48, 0x75, 0x6d,
+	0x61, 0x6e, 0x2d, 0x72, 0x65, 0x61, 0x64, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x72, 0x65, 0x61, 0x73,
+	0x6f, 0x6e, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x64, 0x69, 0x73, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x12, 0x3a, 0x0a, 0x04,
+	0x63, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x42, 0x26, 0x92, 0x41, 0x23, 0x32,
+	0x21, 0x4d, 0x61, 0x63, 0x68, 0x69, 0x6e, 0x65, 0x2d, 0x72, 0x65, 0x61, 0x64, 0x61, 0x62, 0x6c,
+	0x65, 0x20, 0x74, 0x65, 0x72, 0x6d, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x63, 0x6f,
+	0x64, 0x65, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x22, 0x7d, 0x0a, 0x0f, 0x4e, 0x65, 0x77, 0x4d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x6a, 0x0a, 0x07, 0x6d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x77,
+	0x65, 0x62, 0x69, 0x74, 0x65, 0x6c, 0x2e, 0x69, 0x6d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x64, 0x65,
+	0x6c, 0x69, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x2e, 0x54, 0x68, 0x72, 0x65, 0x61, 0x64,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x42, 0x25, 0x92, 0x41, 0x22, 0x32, 0x20, 0x4d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x20, 0x64, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x65, 0x64, 0x20,
+	0x76, 0x69, 0x61, 0x20, 0x74, 0x68, 0x65, 0x20, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x52, 0x07,
+	0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x81, 0x04, 0x0a, 0x0d, 0x54, 0x68, 0x72, 0x65,
 	0x61, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x68, 0x72,
 	0x65, 0x61, 0x64, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x74, 0x68,
@@ -1911,7 +2027,7 @@ func file_api_delivery_v1_delivery_proto_rawDescGZIP() []byte {
 }
 
 var file_api_delivery_v1_delivery_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_api_delivery_v1_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_api_delivery_v1_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_api_delivery_v1_delivery_proto_goTypes = []interface{}{
 	(MessageDeliveryStatus)(0),  // 0: webitel.im.api.delivery.v1.MessageDeliveryStatus
 	(MessageType)(0),            // 1: webitel.im.api.delivery.v1.MessageType
@@ -1919,50 +2035,52 @@ var file_api_delivery_v1_delivery_proto_goTypes = []interface{}{
 	(EventPriority)(0),          // 3: webitel.im.api.delivery.v1.EventPriority
 	(*StreamRequest)(nil),       // 4: webitel.im.api.delivery.v1.StreamRequest
 	(*ServerEvent)(nil),         // 5: webitel.im.api.delivery.v1.ServerEvent
-	(*MessageStatusEvent)(nil),  // 6: webitel.im.api.delivery.v1.MessageStatusEvent
-	(*ConnectedEvent)(nil),      // 7: webitel.im.api.delivery.v1.ConnectedEvent
-	(*DisconnectedEvent)(nil),   // 8: webitel.im.api.delivery.v1.DisconnectedEvent
-	(*NewMessageEvent)(nil),     // 9: webitel.im.api.delivery.v1.NewMessageEvent
-	(*MessageDeletedEvent)(nil), // 10: webitel.im.api.delivery.v1.MessageDeletedEvent
-	(*ThreadMessage)(nil),       // 11: webitel.im.api.delivery.v1.ThreadMessage
-	(*QuotedMessage)(nil),       // 12: webitel.im.api.delivery.v1.QuotedMessage
-	(*Identity)(nil),            // 13: webitel.im.api.delivery.v1.Identity
-	(*Peer)(nil),                // 14: webitel.im.api.delivery.v1.Peer
-	(*Document)(nil),            // 15: webitel.im.api.delivery.v1.Document
-	(*Image)(nil),               // 16: webitel.im.api.delivery.v1.Image
-	(*AckEvent)(nil),            // 17: webitel.im.api.delivery.v1.AckEvent
-	(*ErrorEvent)(nil),          // 18: webitel.im.api.delivery.v1.ErrorEvent
-	(*PingEvent)(nil),           // 19: webitel.im.api.delivery.v1.PingEvent
-	(*anypb.Any)(nil),           // 20: google.protobuf.Any
+	(*TypingEvent)(nil),         // 6: webitel.im.api.delivery.v1.TypingEvent
+	(*MessageDeletedEvent)(nil), // 7: webitel.im.api.delivery.v1.MessageDeletedEvent
+	(*MessageStatusEvent)(nil),  // 8: webitel.im.api.delivery.v1.MessageStatusEvent
+	(*ConnectedEvent)(nil),      // 9: webitel.im.api.delivery.v1.ConnectedEvent
+	(*DisconnectedEvent)(nil),   // 10: webitel.im.api.delivery.v1.DisconnectedEvent
+	(*NewMessageEvent)(nil),     // 11: webitel.im.api.delivery.v1.NewMessageEvent
+	(*ThreadMessage)(nil),       // 12: webitel.im.api.delivery.v1.ThreadMessage
+	(*QuotedMessage)(nil),       // 13: webitel.im.api.delivery.v1.QuotedMessage
+	(*Identity)(nil),            // 14: webitel.im.api.delivery.v1.Identity
+	(*Peer)(nil),                // 15: webitel.im.api.delivery.v1.Peer
+	(*Document)(nil),            // 16: webitel.im.api.delivery.v1.Document
+	(*Image)(nil),               // 17: webitel.im.api.delivery.v1.Image
+	(*AckEvent)(nil),            // 18: webitel.im.api.delivery.v1.AckEvent
+	(*ErrorEvent)(nil),          // 19: webitel.im.api.delivery.v1.ErrorEvent
+	(*PingEvent)(nil),           // 20: webitel.im.api.delivery.v1.PingEvent
+	(*anypb.Any)(nil),           // 21: google.protobuf.Any
 }
 var file_api_delivery_v1_delivery_proto_depIdxs = []int32{
 	3,  // 0: webitel.im.api.delivery.v1.ServerEvent.priority:type_name -> webitel.im.api.delivery.v1.EventPriority
-	7,  // 1: webitel.im.api.delivery.v1.ServerEvent.connected_event:type_name -> webitel.im.api.delivery.v1.ConnectedEvent
-	8,  // 2: webitel.im.api.delivery.v1.ServerEvent.disconnected_event:type_name -> webitel.im.api.delivery.v1.DisconnectedEvent
-	9,  // 3: webitel.im.api.delivery.v1.ServerEvent.message_event:type_name -> webitel.im.api.delivery.v1.NewMessageEvent
-	17, // 4: webitel.im.api.delivery.v1.ServerEvent.ack_event:type_name -> webitel.im.api.delivery.v1.AckEvent
-	18, // 5: webitel.im.api.delivery.v1.ServerEvent.error_event:type_name -> webitel.im.api.delivery.v1.ErrorEvent
-	19, // 6: webitel.im.api.delivery.v1.ServerEvent.ping_event:type_name -> webitel.im.api.delivery.v1.PingEvent
-	6,  // 7: webitel.im.api.delivery.v1.ServerEvent.message_status_event:type_name -> webitel.im.api.delivery.v1.MessageStatusEvent
-	10, // 8: webitel.im.api.delivery.v1.ServerEvent.message_deleted_event:type_name -> webitel.im.api.delivery.v1.MessageDeletedEvent
-	0,  // 9: webitel.im.api.delivery.v1.MessageStatusEvent.status:type_name -> webitel.im.api.delivery.v1.MessageDeliveryStatus
-	11, // 10: webitel.im.api.delivery.v1.NewMessageEvent.message:type_name -> webitel.im.api.delivery.v1.ThreadMessage
-	14, // 11: webitel.im.api.delivery.v1.MessageDeletedEvent.deleted_by:type_name -> webitel.im.api.delivery.v1.Peer
-	14, // 12: webitel.im.api.delivery.v1.ThreadMessage.from:type_name -> webitel.im.api.delivery.v1.Peer
-	14, // 13: webitel.im.api.delivery.v1.ThreadMessage.to:type_name -> webitel.im.api.delivery.v1.Peer
-	1,  // 14: webitel.im.api.delivery.v1.ThreadMessage.type:type_name -> webitel.im.api.delivery.v1.MessageType
-	15, // 15: webitel.im.api.delivery.v1.ThreadMessage.document:type_name -> webitel.im.api.delivery.v1.Document
-	16, // 16: webitel.im.api.delivery.v1.ThreadMessage.image:type_name -> webitel.im.api.delivery.v1.Image
-	12, // 17: webitel.im.api.delivery.v1.ThreadMessage.reply_to:type_name -> webitel.im.api.delivery.v1.QuotedMessage
-	13, // 18: webitel.im.api.delivery.v1.Peer.identity:type_name -> webitel.im.api.delivery.v1.Identity
-	2,  // 19: webitel.im.api.delivery.v1.AckEvent.status:type_name -> webitel.im.api.delivery.v1.Status
-	20, // 20: webitel.im.api.delivery.v1.AckEvent.details:type_name -> google.protobuf.Any
-	20, // 21: webitel.im.api.delivery.v1.ErrorEvent.details:type_name -> google.protobuf.Any
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	9,  // 1: webitel.im.api.delivery.v1.ServerEvent.connected_event:type_name -> webitel.im.api.delivery.v1.ConnectedEvent
+	10, // 2: webitel.im.api.delivery.v1.ServerEvent.disconnected_event:type_name -> webitel.im.api.delivery.v1.DisconnectedEvent
+	11, // 3: webitel.im.api.delivery.v1.ServerEvent.message_event:type_name -> webitel.im.api.delivery.v1.NewMessageEvent
+	18, // 4: webitel.im.api.delivery.v1.ServerEvent.ack_event:type_name -> webitel.im.api.delivery.v1.AckEvent
+	19, // 5: webitel.im.api.delivery.v1.ServerEvent.error_event:type_name -> webitel.im.api.delivery.v1.ErrorEvent
+	20, // 6: webitel.im.api.delivery.v1.ServerEvent.ping_event:type_name -> webitel.im.api.delivery.v1.PingEvent
+	8,  // 7: webitel.im.api.delivery.v1.ServerEvent.message_status_event:type_name -> webitel.im.api.delivery.v1.MessageStatusEvent
+	7,  // 8: webitel.im.api.delivery.v1.ServerEvent.message_deleted_event:type_name -> webitel.im.api.delivery.v1.MessageDeletedEvent
+	6,  // 9: webitel.im.api.delivery.v1.ServerEvent.typing_event:type_name -> webitel.im.api.delivery.v1.TypingEvent
+	15, // 10: webitel.im.api.delivery.v1.MessageDeletedEvent.deleted_by:type_name -> webitel.im.api.delivery.v1.Peer
+	0,  // 11: webitel.im.api.delivery.v1.MessageStatusEvent.status:type_name -> webitel.im.api.delivery.v1.MessageDeliveryStatus
+	12, // 12: webitel.im.api.delivery.v1.NewMessageEvent.message:type_name -> webitel.im.api.delivery.v1.ThreadMessage
+	15, // 13: webitel.im.api.delivery.v1.ThreadMessage.from:type_name -> webitel.im.api.delivery.v1.Peer
+	15, // 14: webitel.im.api.delivery.v1.ThreadMessage.to:type_name -> webitel.im.api.delivery.v1.Peer
+	1,  // 15: webitel.im.api.delivery.v1.ThreadMessage.type:type_name -> webitel.im.api.delivery.v1.MessageType
+	16, // 16: webitel.im.api.delivery.v1.ThreadMessage.document:type_name -> webitel.im.api.delivery.v1.Document
+	17, // 17: webitel.im.api.delivery.v1.ThreadMessage.image:type_name -> webitel.im.api.delivery.v1.Image
+	13, // 18: webitel.im.api.delivery.v1.ThreadMessage.reply_to:type_name -> webitel.im.api.delivery.v1.QuotedMessage
+	14, // 19: webitel.im.api.delivery.v1.Peer.identity:type_name -> webitel.im.api.delivery.v1.Identity
+	2,  // 20: webitel.im.api.delivery.v1.AckEvent.status:type_name -> webitel.im.api.delivery.v1.Status
+	21, // 21: webitel.im.api.delivery.v1.AckEvent.details:type_name -> google.protobuf.Any
+	21, // 22: webitel.im.api.delivery.v1.ErrorEvent.details:type_name -> google.protobuf.Any
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_api_delivery_v1_delivery_proto_init() }
@@ -1996,7 +2114,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MessageStatusEvent); i {
+			switch v := v.(*TypingEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2008,42 +2126,6 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ConnectedEvent); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_api_delivery_v1_delivery_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DisconnectedEvent); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_api_delivery_v1_delivery_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*NewMessageEvent); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_api_delivery_v1_delivery_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MessageDeletedEvent); i {
 			case 0:
 				return &v.state
@@ -2055,8 +2137,44 @@ func file_api_delivery_v1_delivery_proto_init() {
 				return nil
 			}
 		}
+		file_api_delivery_v1_delivery_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MessageStatusEvent); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_delivery_v1_delivery_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConnectedEvent); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_delivery_v1_delivery_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DisconnectedEvent); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 		file_api_delivery_v1_delivery_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ThreadMessage); i {
+			switch v := v.(*NewMessageEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2068,7 +2186,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*QuotedMessage); i {
+			switch v := v.(*ThreadMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2080,7 +2198,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Identity); i {
+			switch v := v.(*QuotedMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2092,7 +2210,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Peer); i {
+			switch v := v.(*Identity); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2104,7 +2222,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Document); i {
+			switch v := v.(*Peer); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2116,7 +2234,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Image); i {
+			switch v := v.(*Document); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2128,7 +2246,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*AckEvent); i {
+			switch v := v.(*Image); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2140,7 +2258,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ErrorEvent); i {
+			switch v := v.(*AckEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2152,6 +2270,18 @@ func file_api_delivery_v1_delivery_proto_init() {
 			}
 		}
 		file_api_delivery_v1_delivery_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ErrorEvent); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_delivery_v1_delivery_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*PingEvent); i {
 			case 0:
 				return &v.state
@@ -2173,12 +2303,14 @@ func file_api_delivery_v1_delivery_proto_init() {
 		(*ServerEvent_PingEvent)(nil),
 		(*ServerEvent_MessageStatusEvent)(nil),
 		(*ServerEvent_MessageDeletedEvent)(nil),
+		(*ServerEvent_TypingEvent)(nil),
 	}
-	file_api_delivery_v1_delivery_proto_msgTypes[7].OneofWrappers = []interface{}{
+	file_api_delivery_v1_delivery_proto_msgTypes[2].OneofWrappers = []interface{}{}
+	file_api_delivery_v1_delivery_proto_msgTypes[8].OneofWrappers = []interface{}{
 		(*ThreadMessage_Document)(nil),
 		(*ThreadMessage_Image)(nil),
 	}
-	file_api_delivery_v1_delivery_proto_msgTypes[10].OneofWrappers = []interface{}{
+	file_api_delivery_v1_delivery_proto_msgTypes[11].OneofWrappers = []interface{}{
 		(*Peer_UserId)(nil),
 		(*Peer_ChatId)(nil),
 		(*Peer_ChannelId)(nil),
@@ -2190,7 +2322,7 @@ func file_api_delivery_v1_delivery_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_api_delivery_v1_delivery_proto_rawDesc,
 			NumEnums:      4,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

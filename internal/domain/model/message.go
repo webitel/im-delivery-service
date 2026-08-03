@@ -27,6 +27,16 @@ type Message struct {
 	Contact     *Contact        `json:"contact,omitempty"`
 	System      *System         `json:"system,omitempty"`
 	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
+
+	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
+}
+
+type ForwardOrigin struct {
+	Kind            int16      `json:"kind"`
+	SenderID        *uuid.UUID `json:"sender_id,omitempty"`
+	SenderName      string     `json:"sender_name,omitempty"`
+	OriginalSentAt  int64      `json:"original_sent_at,omitempty"`
+	SourceMessageID *uuid.UUID `json:"source_message_id,omitempty"`
 }
 
 type ReplyTo struct {

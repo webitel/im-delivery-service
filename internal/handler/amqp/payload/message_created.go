@@ -43,6 +43,40 @@ type MessageCreatedV1 struct {
 	Metadata    map[string]any  `json:"metadata,omitempty"`
 	System      *System         `json:"system,omitempty"`
 	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
+
+	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
+}
+
+type ForwardOrigin struct {
+	Kind            int16   `json:"kind"`
+	SenderID        *string `json:"sender_id,omitempty"`
+	SenderName      string  `json:"sender_name,omitempty"`
+	OriginalSentAt  int64   `json:"original_sent_at,omitempty"`
+	SourceMessageID *string `json:"source_message_id,omitempty"`
+}
+
+func (forwardOrigin *ForwardOrigin) AsModel() *model.ForwardOrigin {
+	if forwardOrigin == nil {
+		return nil
+	}
+
+	out := &model.ForwardOrigin{
+		Kind:           forwardOrigin.Kind,
+		SenderName:     forwardOrigin.SenderName,
+		OriginalSentAt: forwardOrigin.OriginalSentAt,
+	}
+
+	if forwardOrigin.SenderID != nil {
+		id := util.SafeParseUUID(*forwardOrigin.SenderID)
+		out.SenderID = &id
+	}
+
+	if forwardOrigin.SourceMessageID != nil {
+		id := util.SafeParseUUID(*forwardOrigin.SourceMessageID)
+		out.SourceMessageID = &id
+	}
+
+	return out
 }
 
 type ReplyTo struct {
@@ -93,11 +127,12 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 			MemberID: d.From.MemberID,
 			Role:     int32(d.From.Role),
 		},
-		Interactive: d.Interactive,
-		Location:    d.Location.AsModel(),
-		Contact:     d.Contact.AsModel(),
-		System:      d.System.AsModel(),
-		ReplyTo:     d.ReplyTo.AsModel(),
+		Interactive:   d.Interactive,
+		Location:      d.Location.AsModel(),
+		Contact:       d.Contact.AsModel(),
+		System:        d.System.AsModel(),
+		ReplyTo:       d.ReplyTo.AsModel(),
+		ForwardOrigin: d.ForwardOrigin.AsModel(),
 	}
 
 	// Map all recipients into the domain model.

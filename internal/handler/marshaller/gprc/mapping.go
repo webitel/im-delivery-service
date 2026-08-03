@@ -72,6 +72,28 @@ func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
 	return quoted
 }
 
+func marshalForwardOrigin(f *model.ForwardOrigin) *impb.ForwardOrigin {
+	if f == nil {
+		return nil
+	}
+
+	origin := &impb.ForwardOrigin{
+		Kind:           impb.ForwardOriginKind(f.Kind),
+		SenderName:     f.SenderName,
+		OriginalSentAt: f.OriginalSentAt,
+	}
+
+	if f.SenderID != nil {
+		origin.SenderId = f.SenderID.String()
+	}
+
+	if f.SourceMessageID != nil {
+		origin.SourceMessageId = f.SourceMessageID.String()
+	}
+
+	return origin
+}
+
 func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_MessageDeletedEvent {
 	return &impb.ServerEvent_MessageDeletedEvent{
 		MessageDeletedEvent: &impb.MessageDeletedEvent{
@@ -99,6 +121,8 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 		EditedAt:  m.EditedAt,
 		From:      marshalPeer(&m.From),
 		ReplyTo:   marshalReplyTo(m.ReplyTo),
+
+		ForwardOrigin: marshalForwardOrigin(m.ForwardOrigin),
 	}
 
 	// [CONTENT_TYPE_LOGIC]

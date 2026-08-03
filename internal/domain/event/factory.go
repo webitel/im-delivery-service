@@ -220,3 +220,23 @@ func NewInteractiveCallbackEvent(payload *model.InteractiveCallback) Eventer {
 		Kind:       InteractiveCallback,
 	}
 }
+
+// [NEW_TYPING_EVENT] Factory for the ephemeral "…is typing" indicator. It is
+// real-time only: CanPush=false keeps it out of the push pipeline, and it is
+// never persisted or replayed on reconnect.
+func NewTypingEvent(t *model.Typing, targetID uuid.UUID, domainID, occurredAt int64) Eventer {
+	if occurredAt <= 0 {
+		occurredAt = time.Now().UnixMilli()
+	}
+
+	return &Envelope[*model.Typing]{
+		ID:         uuid.New(),
+		Payload:    t,
+		UserID:     targetID,
+		DomainID:   domainID,
+		Kind:       Typing,
+		Priority:   PriorityNormal,
+		CanPush:    false,
+		OccurredAt: occurredAt,
+	}
+}

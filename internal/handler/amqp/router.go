@@ -25,6 +25,7 @@ const (
 	TopicMessageEdited       = "im_message.#.message.edited.v1"
 	TopicMessageDeleted      = "im_message.#.message.deleted.v1"
 	TopicMessageStatus       = "im_message.#.message.status.v1"
+	TopicMessageReaction     = "im_message.#.message.reaction.v1"
 	TopicThreadCreated       = "im_thread.#.thread.created.v1"
 	TopicDeviceRegister      = "updates.device.register.#"
 	TopicDeviceUnregister    = "updates.device.unregister.#"
@@ -108,6 +109,12 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicMessageDeleted,
 			Handler:  Bind(h, h.OnMessageDeletedV1),
+		},
+		{
+			Name:     "ON_MESSAGE_REACTION",
+			Exchange: MessageEventsExchange,
+			Topic:    TopicMessageReaction,
+			Handler:  Bind(h, h.OnMessageReactionV1),
 		},
 		{
 			Name:     "ON_MESSAGE_STATUS",

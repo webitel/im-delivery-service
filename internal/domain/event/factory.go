@@ -240,3 +240,29 @@ func NewTypingEvent(t *model.Typing, targetID uuid.UUID, domainID, occurredAt in
 		OccurredAt: occurredAt,
 	}
 }
+
+// [NEW_MESSAGE_REACTION_EVENT] Factory for emoji reactions on messages. Reactions
+// update message state on clients that have the message, so it is not pushed as a
+// notification (CanPush=false).
+func NewMessageReactionEvent(
+	msg *model.MessageReaction,
+	targetID uuid.UUID,
+	opts ...Option[*model.MessageReaction],
+) Eventer {
+	e := &Envelope[*model.MessageReaction]{
+		ID:         uuid.New(),
+		Payload:    msg,
+		UserID:     targetID,
+		DomainID:   msg.DomainID,
+		Kind:       MessageReaction,
+		Priority:   PriorityHigh,
+		OccurredAt: msg.ReactedAt,
+		CanPush:    false,
+	}
+
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	return e
+}

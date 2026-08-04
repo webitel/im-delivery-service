@@ -46,6 +46,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		lp.Type = "message_created"
 	case *model.MessageDeleted:
 		lp.Type = "message_deleted"
+	case *model.MessageReaction:
+		lp.Type = "message_reaction"
 	case *model.ConnectedPayload:
 		lp.Type = "system_connected"
 	case *model.DisconnectedPayload:

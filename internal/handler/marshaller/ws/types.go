@@ -33,6 +33,7 @@ const (
 	EventInteractiveCallback                  // interactive_callback
 	EventMessageStatus                        // message_status_event
 	EventMessageDeleted                       // message_deleted_event
+	EventMessageReaction                      // message_reaction_event
 )
 
 // [ENVELOPE] ServerEvent is the top-level WebSocket JSON container.

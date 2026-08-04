@@ -19,4 +19,5 @@ const (
 	MessageStatusChanged                      // [BUSINESS]
 	MessageDeleted                            // [BUSINESS]
 	Typing                                    // [BUSINESS] ephemeral, real-time only
+	MessageReaction                           // [BUSINESS]
 )

@@ -32,6 +32,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload = marshalMessagePayload(p)
 	case *model.MessageDeleted:
 		res.Payload = marshalMessageDeletedPayload(p)
+	case *model.MessageReaction:
+		res.Payload = marshalMessageReactionPayload(p)
 	case *model.ConnectedPayload:
 		res.Payload = &impb.ServerEvent_ConnectedEvent{ConnectedEvent: &impb.ConnectedEvent{
 			Ok:            p.Ok,

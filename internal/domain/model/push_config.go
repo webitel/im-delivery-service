@@ -8,6 +8,9 @@ type PushConfig struct {
 	// [APNS_SPECIFIC]
 	KeyID  string `json:"key_id,omitempty"`  // Apple Key ID (10 chars)
 	TeamID string `json:"team_id,omitempty"` // Apple Team ID (10 chars)
+	// Proto is the APNs proxy transport: "h2" (default) or "http/1.1". Only
+	// meaningful for a custom proxy endpoint.
+	Proto string `json:"proto,omitempty"`
 }
 
 // [DEVICE] Represents a single notification target with its specific app configuration.

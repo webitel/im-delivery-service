@@ -171,6 +171,35 @@ components:
           items:
             type: object
             additionalProperties: true
+        reply_to:
+          $ref: '#/components/schemas/WSReplyTo'
+
+    WSReplyTo:
+      type: object
+      description: "Compact snapshot of the quoted (replied-to) message"
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: ["text", "image", "document", "system", "interactive", "location", "contact"]
+        body:
+          type: string
+          description: "Body snippet, max 256 chars"
+        created_at:
+          type: integer
+          format: int64
+        attachment_kind:
+          type: string
+          enum: ["document", "image"]
+        attachment_name:
+          type: string
+        attachment_mime:
+          type: string
 
     WSThread:
       type: object

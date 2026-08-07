@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/fx"
 
+	imthread "github.com/webitel/im-delivery-service/infra/client/im-thread"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
 
@@ -67,6 +68,32 @@ var Module = fx.Module(
 			fx.ResultTags(`group:"event_handlers"`),
 		),
 
+		// --- Delivery Status Reporting ---
+
+		// 1. Concrete Implementation: resolves ACKs/pushes into MarkDelivered
+		//    reports for im-thread-service (batched, best-effort).
+		service.NewMessageStatusReporter,
+
+		// 2. Thread client surface consumed by the reporter.
+		fx.Annotate(
+			func(c *imthread.Client) service.ThreadStatusClient { return c },
+			fx.As(new(service.ThreadStatusClient)),
+		),
+
+		// 3. Delivery confirmations funnel (WS ACKs via Orchestrator, pushes via PushHandler).
+		fx.Annotate(
+			func(r *service.MessageStatusReporter) service.DeliveryConfirmer { return r },
+			fx.As(new(service.DeliveryConfirmer)),
+		),
+
+		// 4. Event Handling: observes message fan-out envelopes to remember
+		//    their message context for later ACK resolution.
+		fx.Annotate(
+			func(r *service.MessageStatusReporter) service.EventHandler { return r },
+			fx.As(new(service.EventHandler)),
+			fx.ResultTags(`group:"event_handlers"`),
+		),
+
 		// --- Domain & Helper Services ---
 
 		// [PRESENCE] Tracks user online/offline status and session heat-maps.
@@ -81,7 +108,7 @@ var Module = fx.Module(
 
 	// [LIFECYCLE_INVOCATION]
 	// Bootstraps background workers and ensures clean resource disposal on shutdown.
-	fx.Invoke(func(lc fx.Lifecycle, o service.Orchestrator, ph service.Pusher) {
+	fx.Invoke(func(lc fx.Lifecycle, o service.Orchestrator, ph service.Pusher, reporter *service.MessageStatusReporter) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				// Launch the push notification polling loop in a dedicated goroutine.
@@ -90,12 +117,19 @@ var Module = fx.Module(
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				// Trigger graceful shutdown for the orchestrator if supported.
+				// Stop the orchestrator first so its worker pool stops
+				// producing new status confirmations, then drain the reporter.
+				// Late confirmations from WS pumps / push goroutines after this
+				// point are safely dropped by the reporter's shutdown guard
+				// rather than panicking on a closed channel.
 				if s, ok := o.(interface{ Close() error }); ok {
-					return s.Close()
+					if err := s.Close(); err != nil {
+						return err
+					}
 				}
 
-				return nil
+				// Drain pending delivery/read receipts before shutdown.
+				return reporter.Close()
 			},
 		})
 	}),

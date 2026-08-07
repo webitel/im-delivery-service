@@ -8,6 +8,7 @@ import (
 	imadmin "github.com/webitel/im-delivery-service/infra/client/im-admin"
 	imauth "github.com/webitel/im-delivery-service/infra/client/im-auth"
 	imcontact "github.com/webitel/im-delivery-service/infra/client/im-contact"
+	imthread "github.com/webitel/im-delivery-service/infra/client/im-thread"
 )
 
 var Module = fx.Module(
@@ -17,6 +18,7 @@ var Module = fx.Module(
 	fx.Provide(imcontact.New),
 	fx.Provide(imauth.New),
 	fx.Provide(imadmin.New),
+	fx.Provide(imthread.New),
 
 	// [LIFECYCLE] Ensures the gRPC connection pool is closed gracefully on app shutdown
 	fx.Invoke(func(lc fx.Lifecycle, client *imcontact.Client) {
@@ -36,6 +38,14 @@ var Module = fx.Module(
 	}),
 
 	fx.Invoke(func(lc fx.Lifecycle, client *imadmin.Client) {
+		lc.Append(fx.Hook{
+			OnStop: func(ctx context.Context) error {
+				return client.Close()
+			},
+		})
+	}),
+
+	fx.Invoke(func(lc fx.Lifecycle, client *imthread.Client) {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
 				return client.Close()

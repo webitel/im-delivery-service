@@ -14,11 +14,7 @@ var Module = fx.Module("registry",
 			return NewHub(
 				WithEvictionInterval(15*time.Minute),
 				WithIdleTimeout(30*time.Minute),
-				// Per-user actor mailbox. The drain loop pulls up to 64 events per
-				// wake-up, so a few hundred slots absorb realistic bursts; anything
-				// larger just pre-allocates idle memory (16 bytes/slot per user).
-				// 2048 -> 256 cuts ~28 KB of empty buffer per connected user.
-				WithMailboxSize(256),
+				WithMailboxSize(2048),
 			)
 		},
 		fx.Annotate(

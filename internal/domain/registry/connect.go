@@ -91,66 +91,28 @@ func (c *connect) GetUserID() uuid.UUID { return c.userID }
 // Send attempts to push an event into the channel.
 // If the channel is full, it tries to evict lower priority events to make room.
 func (c *connect) Send(ev event.Eventer, timeout time.Duration) bool {
-	// [FAST_PATH] Non-blocking enqueue. This covers the overwhelming majority of
-	// deliveries — whenever the consumer keeps up there is free buffer space — and
-	// it allocates nothing. The previous implementation built a context.WithTimeout
-	// (timer + cancel closure) on EVERY event to EVERY session, which was the single
-	// largest source of allocations on the hot delivery path.
-	select {
-	case <-c.ctx.Done():
-		return false
-	case c.sendCh <- ev:
-		return true
-	default:
-	}
-
-	// [SLOW_PATH] Buffer is saturated. Wait up to 'timeout' for space, using a
-	// pooled timer instead of a fresh context so the wait stays allocation-free.
-	t := acquireTimer(timeout)
-	defer releaseTimer(t)
+	// [RESOURCE_MANAGEMENT] Create a localized context to enforce a strict delivery window.
+	// This ensures that the User Cell is not held hostage by a single stalled session.
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	select {
-	// 1. [LIFECYCLE_GATE] Abort if the underlying transport is already dead.
+	// 1. [LIFECYCLE_GATE] Immediately abort if the underlying transport is already dead.
 	case <-c.ctx.Done():
 		return false
 
-	// 2. [PRIMARY_DELIVERY] Space freed up within the delivery window.
+	// 2. [PRIMARY_DELIVERY] Attempt to enqueue the event into the session's mailbox.
+	// Unlike a 'default' block, this will wait up to 'timeout' for space to become available,
+	// which smooths out transient network jitter.
 	case c.sendCh <- ev:
 		return true
 
-	// 3. [BACKPRESSURE_THRESHOLD] Buffer stayed saturated for the whole window:
-	// a persistent slow consumer or network congestion. Shed via priority logic.
-	case <-t.C:
+	// 3. [BACKPRESSURE_THRESHOLD] Triggered if the buffer remains saturated for the entire duration.
+	// This indicates a persistent slow consumer or network congestion.
+	case <-ctx.Done():
+		// Initiate smart eviction or shedding logic to preserve system throughput.
 		return c.handleBackpressure(ev, timeout)
 	}
-}
-
-// [TIMER_POOL] Reusable timers for the Send slow path. Pooling avoids the
-// per-call allocation that time.NewTimer / context.WithTimeout would incur
-// under sustained backpressure.
-var timerPool = sync.Pool{
-	New: func() any {
-		t := time.NewTimer(time.Hour)
-		t.Stop()
-		return t
-	},
-}
-
-func acquireTimer(d time.Duration) *time.Timer {
-	t := timerPool.Get().(*time.Timer)
-	t.Reset(d)
-	return t
-}
-
-func releaseTimer(t *time.Timer) {
-	// Stop and drain so a fired-but-unread tick never leaks into the next user.
-	if !t.Stop() {
-		select {
-		case <-t.C:
-		default:
-		}
-	}
-	timerPool.Put(t)
 }
 
 // handleBackpressure manages full buffers by dropping low-priority events.

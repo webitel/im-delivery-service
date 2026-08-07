@@ -18,7 +18,6 @@ type Message struct {
 	Type        string          `json:"type"`
 	CreatedAt   int64           `json:"created_at"`
 	EditedAt    int64           `json:"updated_at,omitempty"`
-	Edited      bool            `json:"edited,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
 	Documents   []*Document     `json:"documents,omitempty"`
 	Images      []*Image        `json:"images,omitempty"`
@@ -26,37 +25,10 @@ type Message struct {
 	Location    *Location       `json:"location,omitempty"`
 	Contact     *Contact        `json:"contact,omitempty"`
 	System      *System         `json:"system,omitempty"`
-	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
-
-	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
-}
-
-type ForwardOrigin struct {
-	Kind            int16      `json:"kind"`
-	SenderID        *uuid.UUID `json:"sender_id,omitempty"`
-	SenderName      string     `json:"sender_name,omitempty"`
-	OriginalSentAt  int64      `json:"original_sent_at,omitempty"`
-	SourceMessageID *uuid.UUID `json:"source_message_id,omitempty"`
-}
-
-type ReplyTo struct {
-	MessageID      uuid.UUID `json:"message_id"`
-	SenderID       uuid.UUID `json:"sender_id"`
-	Type           string    `json:"type"`
-	Body           string    `json:"body"`
-	CreatedAt      int64     `json:"created_at"`
-	AttachmentKind *string   `json:"attachment_kind,omitempty"`
-	AttachmentName *string   `json:"attachment_name,omitempty"`
-	AttachmentMime *string   `json:"attachment_mime,omitempty"`
 }
 
 func (m *Message) RoutingKey() string {
-	action := "created"
-	if m.Edited {
-		action = "edited"
-	}
-
-	return fmt.Sprintf("im_delivery.v1.%d.message.%s", m.DomainID, action)
+	return fmt.Sprintf("im_delivery.v1.%d.message.created", m.DomainID)
 }
 
 // NotificationTitle returns a friendly display name for push notifications.

@@ -42,7 +42,6 @@ type OrchestratorParams struct {
 	Hub        registry.Hubber
 	Tracker    store.DeliveryTracker
 	Handlers   []EventHandler `group:"event_handlers"` // [AUTO_DISCOVERY]
-	Confirmer  DeliveryConfirmer
 	Log        *slog.Logger
 	Workers    int           `name:"worker_count"`
 	AckTimeout time.Duration `name:"ack_timeout"`
@@ -52,7 +51,6 @@ type EventOrchestrator struct {
 	hub        registry.Hubber
 	tracker    store.DeliveryTracker
 	handlers   []EventHandler
-	confirmer  DeliveryConfirmer
 	queue      chan task
 	log        *slog.Logger
 	wg         sync.WaitGroup
@@ -70,7 +68,6 @@ func NewEventOrchestrator(p OrchestratorParams) *EventOrchestrator {
 		hub:        p.Hub,
 		tracker:    p.Tracker,
 		handlers:   p.Handlers,
-		confirmer:  p.Confirmer,
 		log:        p.Log.With("service", "event_orchestrator"),
 		queue:      make(chan task, 8192),
 		ackTimeout: p.AckTimeout,
@@ -110,17 +107,7 @@ func (o *EventOrchestrator) Ack(ctx context.Context, eid, cid uuid.UUID) error {
 		slog.String("eid", eid.String()),
 		slog.String("cid", cid.String()))
 
-	if err := o.tracker.Ack(ctx, eid, cid, o.ackTimeout); err != nil {
-		return err
-	}
-
-	// [STATUS_REPORT] Resolve the envelope into a per-recipient delivered
-	// status for im-thread-service (batched, best-effort).
-	if o.confirmer != nil {
-		o.confirmer.ConfirmDelivered(ctx, eid, viaWebSocket)
-	}
-
-	return nil
+	return o.tracker.Ack(ctx, eid, cid, o.ackTimeout)
 }
 
 // [ENQUEUE] Non-blocking hand-off to the internal worker pool.

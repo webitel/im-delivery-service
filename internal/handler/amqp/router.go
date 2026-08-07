@@ -22,10 +22,6 @@ const (
 
 	// Routing Keys
 	TopicMessageCreated      = "im_message.#.message.created.v1"
-	TopicMessageEdited       = "im_message.#.message.edited.v1"
-	TopicMessageDeleted      = "im_message.#.message.deleted.v1"
-	TopicMessageStatus       = "im_message.#.message.status.v1"
-	TopicMessageReaction     = "im_message.#.message.reaction.v1"
 	TopicThreadCreated       = "im_thread.#.thread.created.v1"
 	TopicDeviceRegister      = "updates.device.register.#"
 	TopicDeviceUnregister    = "updates.device.unregister.#"
@@ -35,7 +31,6 @@ const (
 	TopicMemberAdded         = "im_thread.*.member.*.joined.v1"
 	TopicMemberLeft          = "im_thread.*.member.*.left.v1"
 	TopicInteractiveCallbacl = "im_message.*.interactive_callback.#"
-	TopicTyping              = "im_message.#.typing.v1"
 
 	// Queues
 	DeliveryProcessorQueue = "im-delivery.incoming-processor.v1"
@@ -99,30 +94,6 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Handler:  Bind(h, h.OnMessageCreatedV1),
 		},
 		{
-			Name:     "ON_MESSAGE_EDITED",
-			Exchange: MessageEventsExchange,
-			Topic:    TopicMessageEdited,
-			Handler:  Bind(h, h.OnMessageEditedV1),
-		},
-		{
-			Name:     "ON_MESSAGE_DELETED",
-			Exchange: MessageEventsExchange,
-			Topic:    TopicMessageDeleted,
-			Handler:  Bind(h, h.OnMessageDeletedV1),
-		},
-		{
-			Name:     "ON_MESSAGE_REACTION",
-			Exchange: MessageEventsExchange,
-			Topic:    TopicMessageReaction,
-			Handler:  Bind(h, h.OnMessageReactionV1),
-		},
-		{
-			Name:     "ON_MESSAGE_STATUS",
-			Exchange: MessageEventsExchange,
-			Topic:    TopicMessageStatus,
-			Handler:  Bind(h, h.OnMessageStatusV1),
-		},
-		{
 			Name:     "ON_THREAD_CREATED",
 			Exchange: MessageEventsExchange,
 			Topic:    TopicThreadCreated,
@@ -175,12 +146,6 @@ func (h *MessageHandler) RegisterHandlers(router *message.Router, subProvider *p
 			Exchange: MessageEventsExchange,
 			Topic:    TopicInteractiveCallbacl,
 			Handler:  Bind(h, h.OnInteractiveCallbackReactedV1),
-		},
-		{
-			Name:     "ON_TYPING",
-			Exchange: MessageEventsExchange,
-			Topic:    TopicTyping,
-			Handler:  Bind(h, h.OnTypingV1),
 		},
 	}
 

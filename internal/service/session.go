@@ -37,11 +37,7 @@ func NewSessionService(hub registry.Hubber, presence store.PresenceStore, log *s
 
 // [ATTACH] Registers a new active session into the Hub and marks user as Online.
 func (s *SessionService) Attach(ctx context.Context, uid uuid.UUID, deviceID string) (registry.Connector, error) {
-	// Per-session send buffer. The write pump drains this to the socket; 128
-	// slots smooth out network jitter while cutting ~14 KB of idle buffer per
-	// session versus the previous 1024. Overflow is handled by Send's
-	// priority-aware backpressure, not by hoarding memory.
-	conn := registry.NewConnector(ctx, uid, 128)
+	conn := registry.NewConnector(ctx, uid, 1024)
 
 	// [PRESENCE] Mark session as online before registering in the hub.
 	// We use the provided context to respect the connection handshake timeout.

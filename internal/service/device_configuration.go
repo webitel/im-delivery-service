@@ -133,7 +133,6 @@ func (s *DeviceService) apply(d *model.Device, ps *adminv1.PUSHServiceClient) {
 	case ProviderAPNS:
 		if apn := ps.GetApn(); apn != nil {
 			d.PushConfig.Proxy = apn.GetProxy()
-			d.PushConfig.Proto = apn.GetProto()
 
 			d.PushConfig.Topic = apn.GetTopic()
 			if token := apn.GetToken(); token != nil {

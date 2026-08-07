@@ -30,10 +30,6 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	switch p := ev.GetPayload().(type) {
 	case *model.Message:
 		res.Payload = marshalMessagePayload(p)
-	case *model.MessageDeleted:
-		res.Payload = marshalMessageDeletedPayload(p)
-	case *model.MessageReaction:
-		res.Payload = marshalMessageReactionPayload(p)
 	case *model.ConnectedPayload:
 		res.Payload = &impb.ServerEvent_ConnectedEvent{ConnectedEvent: &impb.ConnectedEvent{
 			Ok:            p.Ok,
@@ -42,20 +38,6 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		}}
 	case *model.DisconnectedPayload:
 		res.Payload = &impb.ServerEvent_DisconnectedEvent{DisconnectedEvent: &impb.DisconnectedEvent{Reason: p.Reason}}
-	case *model.Typing:
-		te := &impb.TypingEvent{
-			ThreadId:  p.ThreadID,
-			MemberId:  p.MemberID,
-			TimeoutMs: p.TimeoutMs,
-		}
-
-		// preview_text is optional; attach only when this session is authorized.
-		if p.PreviewText != "" {
-			preview := p.PreviewText
-			te.PreviewText = &preview
-		}
-
-		res.Payload = &impb.ServerEvent_TypingEvent{TypingEvent: te}
 	}
 
 	ev.SetCached(res)

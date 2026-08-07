@@ -7,6 +7,7 @@ import (
 
 	"firebase.google.com/go/v4/messaging"
 
+	"github.com/webitel/im-delivery-service/infra/push/webhook"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
@@ -55,12 +56,22 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 		// [1. PAYLOAD_CONSTRUCTION]
 		msg := p.buildFCMMessage(dev, req, isDismiss)
 
-		// [2. CLIENT_RESOLUTION]
-		// Resolves an authenticated messaging client from the registry. A
-		// configured proxy substitutes the FCM v1 endpoint, so the native SDK
-		// still writes the path, body and OAuth2 Bearer — the proxy receives a
-		// request identical to what fcm.googleapis.com would.
-		client, err := p.registry.resolve(ctx, dev.AppID, dev.PushConfig.Proxy, dev.PushConfig.Credentials)
+		// [2. PROXY_DELEGATION]
+		// If Proxy URL is defined, bypass direct Firebase dispatch.
+		if dev.PushConfig.Proxy != "" {
+			p.log.Debug("DELEGATING_TO_PROXY", slog.String("url", dev.PushConfig.Proxy))
+
+			proxy := webhook.GetOrCreate[*messaging.Message](dev.PushConfig.Proxy)
+			if err := proxy.Send(ctx, msg); err != nil {
+				p.log.Error("PROXY_DISPATCH_FAILED", slog.Any("error", err))
+			}
+
+			continue
+		}
+
+		// [3. CLIENT_RESOLUTION]
+		// Resolves an authenticated messaging client from the registry.
+		client, err := p.registry.resolve(ctx, dev.AppID, dev.PushConfig.Credentials)
 		if err != nil {
 			p.log.Error("CLIENT_RESOLUTION_FAILED",
 				slog.String("app_id", dev.AppID),
@@ -69,8 +80,8 @@ func (p *Provider) dispatch(ctx context.Context, req *model.PushRequest, isDismi
 			continue
 		}
 
-		// [3. TRANSPORT_EXECUTION]
-		// Synchronous dispatch to the FCM v1 HTTP API (or the configured proxy).
+		// [4. TRANSPORT_EXECUTION]
+		// Synchronous dispatch to FCM v1 HTTP API.
 		// https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
 		msgID, err := client.Send(ctx, msg)
 		if err != nil {

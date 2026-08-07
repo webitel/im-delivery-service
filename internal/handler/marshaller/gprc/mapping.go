@@ -44,80 +44,6 @@ func marshalPeer(p *model.Peer) *impb.Peer {
 	return res
 }
 
-func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
-	if r == nil {
-		return nil
-	}
-
-	quoted := &impb.QuotedMessage{
-		Id:        r.MessageID.String(),
-		SenderId:  r.SenderID.String(),
-		Type:      r.Type,
-		Body:      r.Body,
-		CreatedAt: r.CreatedAt,
-	}
-
-	if r.AttachmentKind != nil {
-		quoted.AttachmentKind = *r.AttachmentKind
-	}
-
-	if r.AttachmentName != nil {
-		quoted.AttachmentName = *r.AttachmentName
-	}
-
-	if r.AttachmentMime != nil {
-		quoted.AttachmentMime = *r.AttachmentMime
-	}
-
-	return quoted
-}
-
-func marshalForwardOrigin(f *model.ForwardOrigin) *impb.ForwardOrigin {
-	if f == nil {
-		return nil
-	}
-
-	origin := &impb.ForwardOrigin{
-		Kind:           impb.ForwardOriginKind(f.Kind),
-		SenderName:     f.SenderName,
-		OriginalSentAt: f.OriginalSentAt,
-	}
-
-	if f.SenderID != nil {
-		origin.SenderId = f.SenderID.String()
-	}
-
-	if f.SourceMessageID != nil {
-		origin.SourceMessageId = f.SourceMessageID.String()
-	}
-
-	return origin
-}
-
-func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_MessageDeletedEvent {
-	return &impb.ServerEvent_MessageDeletedEvent{
-		MessageDeletedEvent: &impb.MessageDeletedEvent{
-			Id:        m.ID.String(),
-			ThreadId:  m.ThreadID.String(),
-			DeletedBy: marshalPeer(&m.DeletedBy),
-			DeletedAt: m.DeletedAt,
-		},
-	}
-}
-
-func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_MessageReactionEvent {
-	return &impb.ServerEvent_MessageReactionEvent{
-		MessageReactionEvent: &impb.MessageReactionEvent{
-			MessageId: m.ID.String(),
-			ThreadId:  m.ThreadID.String(),
-			Reactor:   marshalPeer(&m.Reactor),
-			Emoji:     m.Emoji,
-			Removed:   m.Removed,
-			ReactedAt: m.ReactedAt,
-		},
-	}
-}
-
 // marshalMessagePayload converts the domain Message model to a gRPC server event.
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	// Map the slice of recipients from domain to PB
@@ -133,9 +59,6 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
 		From:      marshalPeer(&m.From),
-		ReplyTo:   marshalReplyTo(m.ReplyTo),
-
-		ForwardOrigin: marshalForwardOrigin(m.ForwardOrigin),
 	}
 
 	// [CONTENT_TYPE_LOGIC]

@@ -18,8 +18,5 @@ var Module = fx.Options(
 		func(rdb *goredis.Client) store.DeliveryScheduler {
 			return NewRedisScheduler(rdb)
 		},
-		func(rdb *goredis.Client) store.MessageRefTracker {
-			return NewRedisMessageRefTracker(rdb)
-		},
 	),
 )

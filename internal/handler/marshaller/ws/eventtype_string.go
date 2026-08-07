@@ -18,18 +18,16 @@ func _() {
 	_ = x[EventMemberAdded-7]
 	_ = x[EventMemberLeft-8]
 	_ = x[EventInteractiveCallback-9]
-	_ = x[EventMessageStatus-10]
-	_ = x[EventMessageDeleted-11]
-	_ = x[EventMessageReaction-12]
 }
 
-const _EventType_name = "connected_eventdisconnected_eventmessage_eventthread_created_eventack_eventerror_eventping_eventmember_added_eventmember_left_eventinteractive_callbackmessage_status_eventmessage_deleted_eventmessage_reaction_event"
+const _EventType_name = "connected_eventdisconnected_eventmessage_eventthread_created_eventack_eventerror_eventping_eventmember_added_eventmember_left_eventinteractive_callback"
 
-var _EventType_index = [...]uint8{0, 15, 33, 46, 66, 75, 86, 96, 114, 131, 151, 171, 192, 214}
+var _EventType_index = [...]uint8{0, 15, 33, 46, 66, 75, 86, 96, 114, 131, 151}
 
 func (i EventType) String() string {
-	if i < 0 || i >= EventType(len(_EventType_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_EventType_index)-1 {
 		return "EventType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _EventType_name[_EventType_index[i]:_EventType_index[i+1]]
+	return _EventType_name[_EventType_index[idx]:_EventType_index[idx+1]]
 }

@@ -40,9 +40,6 @@ type WSMessage struct {
 	Location    *model.Location   `json:"location,omitempty"`
 	System      *model.System     `json:"system,omitempty"`
 	Metadata    map[string]any    `json:"metadata,omitempty"`
-	ReplyTo     *model.ReplyTo    `json:"reply_to,omitempty"`
-
-	ForwardOrigin *model.ForwardOrigin `json:"forward_origin,omitempty"`
 }
 
 // mapPeer converts internal model.Peer to the nested WSPeer structure.
@@ -81,9 +78,6 @@ func mapMessage(m *model.Message) *WSMessage {
 		Location:  m.Location,
 		Metadata:  m.Metadata,
 		System:    m.System,
-		ReplyTo:   m.ReplyTo,
-
-		ForwardOrigin: m.ForwardOrigin,
 	}
 
 	if len(m.Images) > 0 {

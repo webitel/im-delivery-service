@@ -110,6 +110,16 @@ func (p *Provider) buildAPNSNotification(dev model.Device, req *model.PushReques
 		pl.Sound("default")
 		pl.MutableContent()
 
+		// [GROUPING] aps.thread-id is required by the mobile client and groups
+		// notifications per chat in the iOS Notification Center. Prefer the
+		// chat id; fall back to the collapse id so the field is never empty.
+		threadID := req.Data["chat.id"]
+		if threadID == "" {
+			threadID = req.CollapseID
+		}
+
+		pl.ThreadID(threadID)
+
 		n.Priority = apns2.PriorityHigh
 		n.PushType = apns2.PushTypeAlert
 	}

@@ -30,6 +30,10 @@ func NewMessageEvent(
 		Metadata: map[string]string{
 			"sender_name": msg.NotificationTitle(),
 			"text":        msg.NotificationBody(),
+			// [PUSH_DATA] Routing keys the mobile client expects in the FCM/APNs
+			// data block (chat.id / message.id); see FillFromEvent.
+			"chat.id":    msg.ThreadID.String(),
+			"message.id": msg.ID.String(),
 		},
 	}
 

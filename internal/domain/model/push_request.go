@@ -42,8 +42,33 @@ func (r *PushRequest) FillFromEvent(ev pushSource) {
 	// Use event ID as a collapse key to group notifications from the same source.
 	r.CollapseID = ev.GetID()
 
+	meta := ev.GetMetadata()
+
 	// Resolve human-readable text based on event type and metadata.
-	r.Title, r.Body = formatNotification(ev.GetKindName(), ev.GetMetadata())
+	r.Title, r.Body = formatNotification(ev.GetKindName(), meta)
+
+	// [DATA] The mobile client (webitel-companion) deserializes the FCM/APNs
+	// data block into a strict schema: chat.id, message.id and type are all
+	// required. FCM/APNs omit an empty map, so we always populate these keys —
+	// otherwise the client rejects the payload with a MissingFieldException.
+	if r.Data == nil {
+		r.Data = make(map[string]string)
+	}
+
+	r.Data["type"] = pushType(ev.GetKindName())
+	r.Data["chat.id"] = meta["chat.id"]
+	r.Data["message.id"] = meta["message.id"]
+}
+
+// pushType maps an internal event kind to the update type string the mobile
+// client routes on (portal-compatible; e.g. a new message is "UpdateNewMessage").
+func pushType(kind string) string {
+	switch kind {
+	case "MessageCreated":
+		return "UpdateNewMessage"
+	default:
+		return kind
+	}
 }
 
 // formatNotification handles the visual representation of the push.

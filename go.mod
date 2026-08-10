@@ -12,7 +12,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gorilla/websocket v1.5.3
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.8
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/consul/api v1.33.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/lmittmann/tint v1.1.3
@@ -32,7 +32,7 @@ require (
 	go.uber.org/fx v1.24.0
 	go.uber.org/goleak v1.3.0
 	google.golang.org/api v0.231.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.80.0
 )
 
 require (
@@ -46,7 +46,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.7 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
 	cloud.google.com/go/storage v1.53.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
@@ -55,10 +55,10 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cncf/xds/go v0.0.0-20251022180443-0feb69152e9f // indirect
+	github.com/cncf/xds/go v0.0.0-20251210132809-ee656c7534f5 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/envoyproxy/go-control-plane/envoy v1.35.0 // indirect
-	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
+	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
@@ -87,7 +87,7 @@ require (
 	github.com/webitel/wlog v0.0.0-20250325101442-de4f125c1ec7 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.17.0 // indirect
-	go.opentelemetry.io/contrib/detectors/gcp v1.38.0 // indirect
+	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.12.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.12.2 // indirect
@@ -107,12 +107,12 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
@@ -139,8 +139,8 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.49.0
 	golang.org/x/sys v0.40.0
-	golang.org/x/text v0.34.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57
+	golang.org/x/text v0.36.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478
 	google.golang.org/protobuf v1.36.11
 )
 

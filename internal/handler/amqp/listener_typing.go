@@ -46,10 +46,21 @@ func (h *MessageHandler) OnTypingV1(_ context.Context, raw *payload.TypingV1) ([
 			continue // no self-echo for typing
 		}
 
+		// Populate member identity from the payload.
+		var typingMember *model.TypingMember
+		if raw.Member != nil {
+			typingMember = &model.TypingMember{
+				ID:     raw.MemberID,
+				Name:   raw.Member.Name,
+				Issuer: raw.Member.Issuer,
+			}
+		}
+
 		t := &model.Typing{
 			ThreadID:  raw.ThreadID,
 			MemberID:  raw.MemberID,
 			TimeoutMs: raw.TimeoutMS,
+			Member:    typingMember,
 		}
 
 		// Privacy gate: attach the draft only for authorized recipients.

@@ -34,6 +34,8 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload = marshalMessageDeletedPayload(p)
 	case *model.MessageReaction:
 		res.Payload = marshalMessageReactionPayload(p)
+	case *model.MessageStatusUpdate:
+		res.Payload = marshalMessageStatusPayload(p)
 	case *model.ConnectedPayload:
 		res.Payload = &impb.ServerEvent_ConnectedEvent{ConnectedEvent: &impb.ConnectedEvent{
 			Ok:            p.Ok,
@@ -47,6 +49,17 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 			ThreadId:  p.ThreadID,
 			MemberId:  p.MemberID,
 			TimeoutMs: p.TimeoutMs,
+		}
+
+		// Populate member identity if available.
+		if p.Member != nil {
+			te.Member = &impb.Peer{
+				Kind: &impb.Peer_UserId{UserId: p.Member.ID},
+				Identity: &impb.Identity{
+					Issuer: p.Member.Issuer,
+					Name:   p.Member.Name,
+				},
+			}
 		}
 
 		// preview_text is optional; attach only when this session is authorized.

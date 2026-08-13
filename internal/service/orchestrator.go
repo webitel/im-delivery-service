@@ -31,6 +31,12 @@ type Orchestrator interface {
 	Notify(ctx context.Context, ev event.Eventer)
 	Dismiss(ctx context.Context, ev event.Eventer)
 	Ack(ctx context.Context, eid, cid uuid.UUID) error
+	AckByMessageID(ctx context.Context, mid, cid uuid.UUID) error
+	AckByMessageIDDirect(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, cid uuid.UUID) error
+	AckBySeqDirect(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, cid uuid.UUID) error
+	DismissByMessageID(ctx context.Context, ev event.Eventer)
+	DismissByMessageIDDirect(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64)
+	DismissBySeqDirect(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64)
 }
 
 // --- Orchestrator Implementation ---
@@ -121,6 +127,89 @@ func (o *EventOrchestrator) Ack(ctx context.Context, eid, cid uuid.UUID) error {
 	}
 
 	return nil
+}
+
+// [ACK_BY_MESSAGE_ID] Finalizes delivery when client provides message_id directly
+// (e.g., on reconnect from HISTORY). Skips envelope-ref lookup.
+func (o *EventOrchestrator) AckByMessageID(ctx context.Context, mid, cid uuid.UUID) error {
+	o.log.Info("ACK_RECEIVED_FROM_WS_VIA_MESSAGE_ID",
+		slog.String("mid", mid.String()),
+		slog.String("cid", cid.String()))
+
+	// [STATUS_REPORT] Use message_id directly as the delivered-up-to boundary.
+	if o.confirmer != nil {
+		o.confirmer.ConfirmDeliveredDirect(ctx, mid, cid, viaWebSocket)
+	}
+
+	return nil
+}
+
+// [ACK_BY_MESSAGE_ID_DIRECT] Finalizes delivery with full context (thread_id + message_id)
+// from authenticated session (member_id + domain from session, not from frame).
+func (o *EventOrchestrator) AckByMessageIDDirect(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, cid uuid.UUID) error {
+	o.log.Info("ACK_RECEIVED_FROM_WS_VIA_MESSAGE_ID_DIRECT",
+		slog.String("mid", messageID.String()),
+		slog.String("tid", threadID.String()),
+		slog.String("uid", memberID.String()),
+		slog.Int64("domain_id", domainID),
+		slog.String("cid", cid.String()))
+
+	// [STATUS_REPORT] Report delivery with full context.
+	if o.confirmer != nil {
+		o.confirmer.ConfirmDeliveredDirectWithContext(ctx, threadID, messageID, memberID, domainID, viaWebSocket)
+	}
+
+	return nil
+}
+
+// [DISMISS_BY_MESSAGE_ID] Signals a read event when client provides message_id directly.
+func (o *EventOrchestrator) DismissByMessageID(ctx context.Context, ev event.Eventer) {
+	o.enqueue(ctx, ev, true)
+}
+
+// [DISMISS_BY_MESSAGE_ID_DIRECT] Signals a read event with full context from authenticated session.
+func (o *EventOrchestrator) DismissByMessageIDDirect(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64) {
+	o.log.Info("DISMISS_RECEIVED_FROM_WS_VIA_MESSAGE_ID_DIRECT",
+		slog.String("mid", messageID.String()),
+		slog.String("tid", threadID.String()),
+		slog.String("uid", memberID.String()),
+		slog.Int64("domain_id", domainID))
+
+	// [STATUS_REPORT] Report read with full context.
+	if o.confirmer != nil {
+		o.confirmer.ConfirmReadDirectWithContext(ctx, threadID, messageID, memberID, domainID, viaWebSocket)
+	}
+}
+
+// [ACK_BY_SEQ_DIRECT] Finalizes delivery with seq from authenticated session (thread_id + seq).
+func (o *EventOrchestrator) AckBySeqDirect(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, cid uuid.UUID) error {
+	o.log.Info("ACK_RECEIVED_FROM_WS_VIA_SEQ_DIRECT",
+		slog.String("tid", threadID.String()),
+		slog.Int64("seq", seq),
+		slog.String("uid", memberID.String()),
+		slog.Int64("domain_id", domainID),
+		slog.String("cid", cid.String()))
+
+	// [STATUS_REPORT] Report delivery with seq context.
+	if o.confirmer != nil {
+		o.confirmer.ConfirmDeliveredDirectWithSeq(ctx, threadID, seq, memberID, domainID, viaWebSocket)
+	}
+
+	return nil
+}
+
+// [DISMISS_BY_SEQ_DIRECT] Signals a read event with seq from authenticated session.
+func (o *EventOrchestrator) DismissBySeqDirect(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64) {
+	o.log.Info("DISMISS_RECEIVED_FROM_WS_VIA_SEQ_DIRECT",
+		slog.String("tid", threadID.String()),
+		slog.Int64("seq", seq),
+		slog.String("uid", memberID.String()),
+		slog.Int64("domain_id", domainID))
+
+	// [STATUS_REPORT] Report read with seq context.
+	if o.confirmer != nil {
+		o.confirmer.ConfirmReadDirectWithSeq(ctx, threadID, seq, memberID, domainID, viaWebSocket)
+	}
 }
 
 // [ENQUEUE] Non-blocking hand-off to the internal worker pool.

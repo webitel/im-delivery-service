@@ -16,6 +16,7 @@ type MessageReactionV1 struct {
 	Emoji      string      `json:"emoji"`
 	Action     string      `json:"action"`
 	OccurredAt string      `json:"occurred_at"`
+	SendId     string      `json:"send_id"`
 }
 
 func (r *MessageReactionV1) ToDomain() *model.MessageReaction {
@@ -26,6 +27,7 @@ func (r *MessageReactionV1) ToDomain() *model.MessageReaction {
 		Emoji:     r.Emoji,
 		Removed:   r.Action == "removed",
 		ReactedAt: util.SafeParseRFC3339(r.OccurredAt),
+		SendId:    r.SendId,
 		Reactor: model.Peer{
 			ID:       util.SafeParseUUID(r.Reactor.ContactID),
 			MemberID: r.Reactor.MemberID,

@@ -13,7 +13,7 @@ import (
 )
 
 // [READ_PUMP] Continuous read loop.
-func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
+func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID, domainID int64) {
 	defer func() { _ = conn.Close() }()
 
 	conn.SetReadLimit(maxMessageSize)
@@ -34,8 +34,11 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 
 	for {
 		var req struct {
-			Type string    `json:"type"`
-			EID  uuid.UUID `json:"event_id"`
+			Type      string    `json:"type"`
+			EID       uuid.UUID `json:"event_id"`
+			MessageID uuid.UUID `json:"message_id"`
+			ThreadID  uuid.UUID `json:"thread_id"`
+			Seq       int64     `json:"seq"`
 		}
 		if err := conn.ReadJSON(&req); err != nil {
 			break // Loop breaks immediately if terminate() is called.
@@ -45,9 +48,21 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID) {
 
 		switch req.Type {
 		case "ack":
-			_ = h.orchestrator.Ack(ctx, req.EID, cid)
+			// A reconnecting client acks by (thread_id + seq) from history;
+			// a live client acks by envelope event_id (resolved via the 24h ref).
+			switch {
+			case req.ThreadID != uuid.Nil && req.Seq > 0:
+				_ = h.orchestrator.AckBySeqDirect(ctx, req.ThreadID, req.Seq, uid, domainID, cid)
+			default:
+				_ = h.orchestrator.Ack(ctx, req.EID, cid)
+			}
 		case "read":
-			h.orchestrator.Dismiss(ctx, event.NewReadEvent(req.EID, uid))
+			switch {
+			case req.ThreadID != uuid.Nil && req.Seq > 0:
+				h.orchestrator.DismissBySeqDirect(ctx, req.ThreadID, req.Seq, uid, domainID)
+			default:
+				h.orchestrator.Dismiss(ctx, event.NewReadEvent(req.EID, uid))
+			}
 		}
 	}
 }

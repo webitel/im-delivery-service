@@ -47,6 +47,28 @@ type DeliveryConfirmer interface {
 	// recipient via the given source (ws|push). Unknown envelopes
 	// (non-message events, expired refs) are silently skipped.
 	ConfirmDelivered(ctx context.Context, eid uuid.UUID, via string)
+
+	// ConfirmDeliveredDirect reports delivery when the client supplies message_id directly
+	// (e.g., on reconnect from HISTORY). mid is the message_id, cid is the connection/session id.
+	ConfirmDeliveredDirect(ctx context.Context, mid, cid uuid.UUID, via string)
+
+	// ConfirmDeliveredDirectWithContext reports delivery with full context from authenticated session:
+	// threadID, messageID (delivered-up-to), memberID, and domainID.
+	ConfirmDeliveredDirectWithContext(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, via string)
+
+	// ConfirmDeliveredDirectWithSeq reports delivery with full context from authenticated session
+	// using per-thread seq as the watermark (preferred over message_id).
+	ConfirmDeliveredDirectWithSeq(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, via string)
+
+	// ConfirmReadDirect reports read receipt for direct message_id (bypassing envelope-ref).
+	ConfirmReadDirect(ctx context.Context, mid, cid uuid.UUID, via string)
+
+	// ConfirmReadDirectWithContext reports read receipt with full context from authenticated session.
+	ConfirmReadDirectWithContext(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, via string)
+
+	// ConfirmReadDirectWithSeq reports read receipt with full context from authenticated session
+	// using per-thread seq as the watermark (preferred over message_id).
+	ConfirmReadDirectWithSeq(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, via string)
 }
 
 // [INTERFACE_GUARDS]
@@ -149,7 +171,9 @@ func (r *MessageStatusReporter) HandleDismiss(ctx context.Context, ev event.Even
 }
 
 // [CONFIRM_DELIVERED] Resolves the envelope back to its message context and
-// enqueues a delivery receipt for the batched MarkDelivered report.
+// enqueues a delivery receipt for the batched MarkDelivered report. The resolved
+// message id is the delivered-up-to boundary: im-thread marks it and every
+// earlier undelivered message of the recipient in the thread as delivered.
 func (r *MessageStatusReporter) ConfirmDelivered(ctx context.Context, eid uuid.UUID, via string) {
 	ref := r.lookup(ctx, eid)
 	if ref == nil {
@@ -157,12 +181,87 @@ func (r *MessageStatusReporter) ConfirmDelivered(ctx context.Context, eid uuid.U
 	}
 
 	r.enqueueDelivered(eid, &threadv1.DeliveryReceipt{
-		ThreadId:    ref.ThreadID.String(),
-		MessageId:   ref.MessageID.String(),
-		MemberId:    ref.MemberID.String(),
+		ThreadId:      ref.ThreadID.String(),
+		MemberId:      ref.MemberID.String(),
+		UpToMessageId: ref.MessageID.String(),
+		DeliveredAt:   time.Now().UnixMilli(),
+		Via:           via,
+		DomainId:      int32(ref.DomainID),
+	})
+}
+
+// [CONFIRM_DELIVERED_DIRECT] Enqueues a delivery receipt when the client supplies
+// message_id directly (bypassing the envelope-ref lookup). mid is the message_id,
+// cid is the connection/session id (not used for the receipt, but for logging context).
+func (r *MessageStatusReporter) ConfirmDeliveredDirect(ctx context.Context, mid, cid uuid.UUID, via string) {
+	// For direct message_id delivery without full context, skip silently.
+	// Use ConfirmDeliveredDirectWithContext when thread_id is available.
+	r.log.Debug("CONFIRM_DELIVERED_DIRECT_SKIPPED",
+		slog.String("mid", mid.String()),
+		slog.String("cid", cid.String()),
+		slog.String("reason", "message_id alone insufficient; use direct path with thread_id when available"),
+	)
+}
+
+// [CONFIRM_DELIVERED_DIRECT_WITH_CONTEXT] Enqueues a delivery receipt with full context
+// from authenticated session: threadID, messageID (delivered-up-to), memberID, domainID.
+func (r *MessageStatusReporter) ConfirmDeliveredDirectWithContext(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, via string) {
+	r.enqueueDelivered(uuid.Nil, &threadv1.DeliveryReceipt{
+		ThreadId:      threadID.String(),
+		MemberId:      memberID.String(),
+		UpToMessageId: messageID.String(),
+		DeliveredAt:   time.Now().UnixMilli(),
+		Via:           via,
+		DomainId:      int32(domainID),
+	})
+}
+
+// [CONFIRM_READ_DIRECT] Read receipt for direct message_id (no full context).
+func (r *MessageStatusReporter) ConfirmReadDirect(ctx context.Context, mid, cid uuid.UUID, via string) {
+	// For direct message_id read without full context, skip silently.
+	// Use ConfirmReadDirectWithContext when thread_id is available.
+	r.log.Debug("CONFIRM_READ_DIRECT_SKIPPED",
+		slog.String("mid", mid.String()),
+		slog.String("cid", cid.String()),
+		slog.String("reason", "message_id alone insufficient; use direct path with thread_id when available"),
+	)
+}
+
+// [CONFIRM_READ_DIRECT_WITH_CONTEXT] Read receipt with full context from authenticated session.
+func (r *MessageStatusReporter) ConfirmReadDirectWithContext(ctx context.Context, threadID, messageID, memberID uuid.UUID, domainID int64, via string) {
+	r.enqueueRead(uuid.Nil, &threadv1.ReadReceipt{
+		ThreadId:      threadID.String(),
+		MemberId:      memberID.String(),
+		UpToMessageId: messageID.String(),
+		ReadAt:        time.Now().UnixMilli(),
+		Via:           via,
+		DomainId:      int32(domainID),
+	})
+}
+
+// [CONFIRM_DELIVERED_DIRECT_WITH_SEQ] Delivery receipt with full context from authenticated session
+// using per-thread seq as the watermark (preferred over message_id).
+func (r *MessageStatusReporter) ConfirmDeliveredDirectWithSeq(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, via string) {
+	r.enqueueDelivered(uuid.Nil, &threadv1.DeliveryReceipt{
+		ThreadId:   threadID.String(),
+		MemberId:   memberID.String(),
+		UpToSeq:    seq,
 		DeliveredAt: time.Now().UnixMilli(),
-		Via:         via,
-		DomainId:    int32(ref.DomainID),
+		Via:        via,
+		DomainId:   int32(domainID),
+	})
+}
+
+// [CONFIRM_READ_DIRECT_WITH_SEQ] Read receipt with full context from authenticated session
+// using per-thread seq as the watermark (preferred over message_id).
+func (r *MessageStatusReporter) ConfirmReadDirectWithSeq(ctx context.Context, threadID uuid.UUID, seq int64, memberID uuid.UUID, domainID int64, via string) {
+	r.enqueueRead(uuid.Nil, &threadv1.ReadReceipt{
+		ThreadId:  threadID.String(),
+		MemberId:  memberID.String(),
+		UpToSeq:   seq,
+		ReadAt:    time.Now().UnixMilli(),
+		Via:       via,
+		DomainId:  int32(domainID),
 	})
 }
 

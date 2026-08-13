@@ -197,6 +197,22 @@ func NewReadEvent(eventID, userID uuid.UUID) Eventer {
 	}
 }
 
+// [NEW_READ_EVENT_WITH_MESSAGE_ID] Factory for read confirmations when message_id is supplied directly.
+// The event ID is set to the message_id to keep payload consistent, but the event is still recognized
+// as a MessageRead by the orchestrator and handlers.
+func NewReadEventWithMessageID(messageID, userID uuid.UUID) Eventer {
+	return &Envelope[*model.MessageReadPayload]{
+		ID:         messageID,
+		UserID:     userID,
+		Kind:       MessageRead,
+		Priority:   PriorityLow,
+		OccurredAt: time.Now().UnixMilli(),
+		Payload: &model.MessageReadPayload{
+			MessageID: messageID,
+		},
+	}
+}
+
 func NewVariableEvent(
 	payload *model.VariablesPayload,
 	targetID uuid.UUID,

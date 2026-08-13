@@ -21,6 +21,12 @@ type MessageStatusUpdate struct {
 	Error map[string]any `json:"error,omitempty"`
 	// OccurredAt is the status change time (Unix ms).
 	OccurredAt int64 `json:"occurred_at"`
+	// UpToMessageID is the watermark: highest message id covered by this
+	// status change (delivered/read-up-to).
+	UpToMessageID uuid.UUID `json:"up_to_message_id,omitempty"`
+	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
+	// (preferred watermark; supercedes UpToMessageID).
+	UpToSeq int64 `json:"up_to_seq,omitempty"`
 }
 
 // EventMessageRef is the message context of a fan-out event envelope, kept

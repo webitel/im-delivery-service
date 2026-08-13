@@ -62,7 +62,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 		slog.String("session_id", uuid.NewString()),
 	)
 
-	l.Info("[STREAM] incoming connection requолest", slog.String("version", model.ServerVersion))
+	l.Info("[STREAM] incoming connection request", slog.String("version", model.ServerVersion))
 
 	// [ACTOR_ATTACHMENT]
 	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).

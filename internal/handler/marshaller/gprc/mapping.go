@@ -114,6 +114,39 @@ func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_M
 			Emoji:     m.Emoji,
 			Removed:   m.Removed,
 			ReactedAt: m.ReactedAt,
+			SendId:    m.SendId,
+		},
+	}
+}
+
+// marshalMessageStatusPayload converts the domain MessageStatusUpdate to a gRPC MessageStatusEvent.
+func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent_MessageStatusEvent {
+	messageIDs := make([]string, 0, len(m.MessageIDs))
+	for _, id := range m.MessageIDs {
+		messageIDs = append(messageIDs, id.String())
+	}
+
+	statusMap := map[string]impb.MessageDeliveryStatus{
+		"delivered": impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_DELIVERED,
+		"read":      impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_READ,
+		"failed":    impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_FAILED,
+	}
+
+	status, ok := statusMap[m.Status]
+	if !ok {
+		status = impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_UNSPECIFIED
+	}
+
+	return &impb.ServerEvent_MessageStatusEvent{
+		MessageStatusEvent: &impb.MessageStatusEvent{
+			ThreadId:      m.ThreadID.String(),
+			MemberId:      m.MemberID.String(),
+			MessageIds:    messageIDs,
+			Status:        status,
+			Via:           m.Via,
+			OccurredAt:    m.OccurredAt,
+			UpToMessageId: m.UpToMessageID.String(),
+			UpToSeq:       m.UpToSeq,
 		},
 	}
 }

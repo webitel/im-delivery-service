@@ -321,3 +321,55 @@ func TestClose_DrainsPendingReceipts(t *testing.T) {
 		t.Fatalf("expected all 3 pending receipts flushed on close, got %d", total)
 	}
 }
+
+func TestConfirmDeliveredDirectWithContext_ReportsWithFullContext(t *testing.T) {
+	r, _, thread := newTestReporter(t)
+	threadID := uuid.New()
+	messageID := uuid.New()
+	memberID := uuid.New()
+	domainID := int64(42)
+
+	r.ConfirmDeliveredDirectWithContext(context.Background(), threadID, messageID, memberID, domainID, viaWebSocket)
+
+	req := thread.wait(t, 3*statusFlushInterval)
+
+	if len(req.Receipts) != 1 {
+		t.Fatalf("expected one delivery receipt, got %d", len(req.Receipts))
+	}
+
+	got := req.Receipts[0]
+	if got.ThreadId != threadID.String() ||
+		got.UpToMessageId != messageID.String() ||
+		got.MemberId != memberID.String() ||
+		got.DomainId != int32(domainID) ||
+		got.Via != viaWebSocket ||
+		got.DeliveredAt <= 0 {
+		t.Errorf("delivery receipt mismatch: %+v", got)
+	}
+}
+
+func TestConfirmReadDirectWithContext_ReportsWithFullContext(t *testing.T) {
+	r, _, thread := newTestReporter(t)
+	threadID := uuid.New()
+	messageID := uuid.New()
+	memberID := uuid.New()
+	domainID := int64(42)
+
+	r.ConfirmReadDirectWithContext(context.Background(), threadID, messageID, memberID, domainID, viaWebSocket)
+
+	req := thread.waitRead(t, 3*statusFlushInterval)
+
+	if len(req.Receipts) != 1 {
+		t.Fatalf("expected one read receipt, got %d", len(req.Receipts))
+	}
+
+	got := req.Receipts[0]
+	if got.ThreadId != threadID.String() ||
+		got.UpToMessageId != messageID.String() ||
+		got.MemberId != memberID.String() ||
+		got.DomainId != int32(domainID) ||
+		got.Via != viaWebSocket ||
+		got.ReadAt <= 0 {
+		t.Errorf("read receipt mismatch: %+v", got)
+	}
+}

@@ -18,6 +18,7 @@ type MessageReaction struct {
 	Emoji     string    `json:"emoji"`
 	Removed   bool      `json:"removed"`
 	ReactedAt int64     `json:"reacted_at"`
+	SendId    string    `json:"send_id"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.
 	To []Peer `json:"-"`

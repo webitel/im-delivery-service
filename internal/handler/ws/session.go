@@ -107,7 +107,7 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 		ConnectionID: cid.String(),
 	})
 
-	go h.readPump(c, uid, cid)
+	go h.readPump(c, uid, cid, auth.DC)
 
 	h.writePump(sessionCtx, c, sub, log)
 }

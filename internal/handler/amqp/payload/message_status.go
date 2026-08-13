@@ -22,6 +22,13 @@ type MessageStatusV1 struct {
 	// Participants are contact ids of all current thread members, stamped by
 	// im-thread-service so the event can be fanned out without a thread lookup.
 	Participants []string `json:"participants,omitempty"`
+	// UpToMessageID is the highest message id covered by this status change
+	// (delivered/read watermark). When present, clients can advance their
+	// local peer-horizon in O(1) instead of iterating message_ids.
+	UpToMessageID string `json:"up_to_message_id,omitempty"`
+	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
+	// (preferred watermark; supercedes UpToMessageID).
+	UpToSeq int64 `json:"up_to_seq,omitempty"`
 }
 
 // ToDomain converts the AMQP payload into the internal domain model.
@@ -34,13 +41,15 @@ func (d *MessageStatusV1) ToDomain() *model.MessageStatusUpdate {
 	}
 
 	return &model.MessageStatusUpdate{
-		ThreadID:   util.SafeParseUUID(d.ThreadID),
-		MemberID:   util.SafeParseUUID(d.MemberID),
-		MessageIDs: messageIDs,
-		Status:     d.Status,
-		Via:        d.Via,
-		Error:      d.Error,
-		OccurredAt: util.SafeParseRFC3339(d.OccurredAt),
+		ThreadID:      util.SafeParseUUID(d.ThreadID),
+		MemberID:      util.SafeParseUUID(d.MemberID),
+		MessageIDs:    messageIDs,
+		Status:        d.Status,
+		Via:           d.Via,
+		Error:         d.Error,
+		OccurredAt:    util.SafeParseRFC3339(d.OccurredAt),
+		UpToMessageID: util.SafeParseUUID(d.UpToMessageID),
+		UpToSeq:       d.UpToSeq,
 	}
 }
 

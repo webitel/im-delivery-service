@@ -1,16 +1,11 @@
 package payload
 
-// TypingMemberIdentity carries enriched sender identification from the typing event.
-type TypingMemberIdentity struct {
-	Name   string `json:"name,omitempty"`
-	Issuer string `json:"issuer,omitempty"`
-}
-
 // TypingV1 is the ephemeral typing indicator published by im-thread on
 // im_message.<thread_id>.typing.v1 (fire-and-forget, bypasses the outbox).
 type TypingV1 struct {
 	ThreadID   string `json:"thread_id"`
-	MemberID   string `json:"member_id"` // who is typing
+	MemberID   string `json:"member_id"` // who is typing (contact id)
+	DomainID   int32  `json:"domain_id"` // used to enrich the sender via the contact resolver
 	TimeoutMS  int32  `json:"timeout_ms"`
 	OccurredAt string `json:"occurred_at"`
 
@@ -18,10 +13,6 @@ type TypingV1 struct {
 	// preview allow-list is used as the recipient set (forward-compatible with
 	// im-thread emitting an explicit recipient list later).
 	To []string `json:"to,omitempty"`
-
-	// Member carries enriched sender identity (name, issuer, etc.) for client rendering.
-	// Populated from the authenticated session at the gateway.
-	Member *TypingMemberIdentity `json:"member,omitempty"`
 
 	// PreviewText is the sender's unsent draft (Live Typing Preview). It is
 	// attached to a delivered session only if that session's member is in

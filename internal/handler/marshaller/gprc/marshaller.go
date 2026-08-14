@@ -45,21 +45,13 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 	case *model.DisconnectedPayload:
 		res.Payload = &impb.ServerEvent_DisconnectedEvent{DisconnectedEvent: &impb.DisconnectedEvent{Reason: p.Reason}}
 	case *model.Typing:
+		// member is the enriched typing participant, marshalled with the SAME
+		// helper as a message sender (marshalPeer) — identical shape to a
+		// NewMessageEvent's `from`.
 		te := &impb.TypingEvent{
 			ThreadId:  p.ThreadID,
-			MemberId:  p.MemberID,
 			TimeoutMs: p.TimeoutMs,
-		}
-
-		// Populate member identity if available.
-		if p.Member != nil {
-			te.Member = &impb.Peer{
-				Kind: &impb.Peer_UserId{UserId: p.Member.ID},
-				Identity: &impb.Identity{
-					Issuer: p.Member.Issuer,
-					Name:   p.Member.Name,
-				},
-			}
+			Member:    marshalPeer(&p.From),
 		}
 
 		// preview_text is optional; attach only when this session is authorized.

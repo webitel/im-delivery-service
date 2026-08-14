@@ -72,7 +72,7 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload[EventMessageReaction.String()] = p
 
 	case *model.Typing:
-		res.Payload["typing_event"] = p
+		res.Payload["typing_event"] = mapTyping(p)
 
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.

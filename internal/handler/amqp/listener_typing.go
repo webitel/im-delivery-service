@@ -44,6 +44,12 @@ func (h *MessageHandler) OnTypingV1(ctx context.Context, raw *payload.TypingV1) 
 		}
 	}
 
+	// The enricher only knows identity, not thread membership. Overlay MemberID
+	// and Role from the RAW event so `from` is populated the SAME way a message
+	// sender's is (mapPeer maps MemberID -> id and Role -> role).
+	from.MemberID = raw.MemberID
+	from.Role = raw.Role
+
 	previewAllowed := make(map[uuid.UUID]struct{}, len(raw.PreviewVisibleTo))
 
 	for _, id := range raw.PreviewVisibleTo {

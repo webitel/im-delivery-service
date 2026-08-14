@@ -5,6 +5,7 @@ package payload
 type TypingV1 struct {
 	ThreadID   string `json:"thread_id"`
 	MemberID   string `json:"member_id"` // who is typing (contact id)
+	Role       int32  `json:"role"`      // sender's thread role; overlaid onto the enriched peer
 	DomainID   int32  `json:"domain_id"` // used to enrich the sender via the contact resolver
 	TimeoutMS  int32  `json:"timeout_ms"`
 	OccurredAt string `json:"occurred_at"`

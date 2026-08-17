@@ -20,8 +20,23 @@ type MessageReaction struct {
 	ReactedAt int64     `json:"reacted_at"`
 	SendId    string    `json:"send_id"`
 
+	// Reactions is the authoritative per-emoji aggregate on the message AFTER
+	// this change, letting a client replace its reaction state instead of
+	// applying the (Emoji, Removed) delta. reacted_by_me is derived client-side
+	// from ReactorIDs.
+	Reactions []ReactionAggregate `json:"reactions,omitempty"`
+
 	// To is the recipient set used for fan-out only; it never reaches clients.
 	To []Peer `json:"-"`
+}
+
+// ReactionAggregate is one emoji's state on a message: how many members hold it
+// and a capped sample of their contact ids.
+type ReactionAggregate struct {
+	Emoji         string   `json:"emoji"`
+	Count         int32    `json:"count"`
+	ReactorIDs    []string `json:"reactor_ids"`
+	LastReactedAt int64    `json:"last_reacted_at"`
 }
 
 func (m *MessageReaction) RoutingKey() string {

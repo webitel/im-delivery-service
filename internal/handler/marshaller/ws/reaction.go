@@ -14,6 +14,11 @@ type WSReaction struct {
 	Removed   bool    `json:"removed"`
 	ReactedAt int64   `json:"reacted_at"`
 	SendID    string  `json:"send_id,omitempty"`
+
+	// Reactions is the authoritative per-emoji aggregate on the message after
+	// this change; the client replaces its reaction state from it and derives
+	// reacted_by_me from reactor_ids.
+	Reactions []model.ReactionAggregate `json:"reactions,omitempty"`
 }
 
 // mapReaction transforms the internal reaction domain into a WebSocket DTO.
@@ -26,5 +31,6 @@ func mapReaction(m *model.MessageReaction) *WSReaction {
 		Removed:   m.Removed,
 		ReactedAt: m.ReactedAt,
 		SendID:    m.SendId,
+		Reactions: m.Reactions,
 	}
 }

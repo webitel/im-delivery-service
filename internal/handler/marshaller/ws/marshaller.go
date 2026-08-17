@@ -69,7 +69,7 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload[EventMessageDeleted.String()] = p
 
 	case *model.MessageReaction:
-		res.Payload[EventMessageReaction.String()] = p
+		res.Payload[EventMessageReaction.String()] = mapReaction(p)
 
 	case *model.Typing:
 		res.Payload["typing_event"] = mapTyping(p)

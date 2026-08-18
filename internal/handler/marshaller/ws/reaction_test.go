@@ -48,13 +48,13 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 		t.Errorf("😭: viewer reacted, want reacted_by_me=true")
 	}
 
-	// The action lives in actor, separate from the per-viewer state.
-	if got.Actor.Emoji != "🔥" || got.Actor.Removed {
-		t.Errorf("actor = {%q, removed=%v}, want {🔥, false}", got.Actor.Emoji, got.Actor.Removed)
+	// The action fields are top-level, separate from the per-viewer state.
+	if got.Emoji != "🔥" || got.Removed {
+		t.Errorf("action = {%q, removed=%v}, want {🔥, false}", got.Emoji, got.Removed)
 	}
 
-	if got.Actor.SendID != "react-5" {
-		t.Errorf("actor.send_id = %q, want react-5", got.Actor.SendID)
+	if got.SendID != "react-5" {
+		t.Errorf("send_id = %q, want react-5", got.SendID)
 	}
 
 	// reactor_ids must not leak into the client payload.

@@ -7,15 +7,19 @@ import (
 )
 
 // lpReaction is the long-poll payload for an emoji reaction change, seen by a
-// single recipient. It mirrors the WebSocket shape: Reactions is the
-// authoritative per-emoji state to replace the bar with (always present, empty
-// array means no reactions left), while Actor is the single action that
-// produced the event for optional UI hints.
+// single recipient. It mirrors the WebSocket shape: the reactor/emoji/removed
+// fields describe the action, while Reactions is the authoritative per-emoji
+// state to replace the bar with (always present, empty array means no
+// reactions left).
 type lpReaction struct {
 	MessageID string                `json:"message_id"`
 	ThreadID  string                `json:"thread_id"`
+	Reactor   model.Peer            `json:"reactor"`
+	Emoji     string                `json:"emoji"`
+	Removed   bool                  `json:"removed"`
+	ReactedAt int64                 `json:"reacted_at"`
+	SendID    string                `json:"send_id,omitempty"`
 	Reactions []lpReactionAggregate `json:"reactions"`
-	Actor     lpReactionActor       `json:"actor"`
 }
 
 // lpReactionAggregate is one emoji's state on the message for this recipient.
@@ -24,15 +28,6 @@ type lpReactionAggregate struct {
 	Count         int32  `json:"count"`
 	ReactedByMe   bool   `json:"reacted_by_me"`
 	LastReactedAt int64  `json:"last_reacted_at"`
-}
-
-// lpReactionActor is who triggered the event and what they did.
-type lpReactionActor struct {
-	Reactor   model.Peer `json:"reactor"`
-	Emoji     string     `json:"emoji"`
-	Removed   bool       `json:"removed"`
-	ReactedAt int64      `json:"reacted_at"`
-	SendID    string     `json:"send_id,omitempty"`
 }
 
 // mapReaction builds the viewer-scoped long-poll reaction payload, resolving
@@ -53,13 +48,11 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *lpReaction {
 	return &lpReaction{
 		MessageID: m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
+		Reactor:   m.Reactor,
+		Emoji:     m.Emoji,
+		Removed:   m.Removed,
+		ReactedAt: m.ReactedAt,
+		SendID:    m.SendId,
 		Reactions: aggs,
-		Actor: lpReactionActor{
-			Reactor:   m.Reactor,
-			Emoji:     m.Emoji,
-			Removed:   m.Removed,
-			ReactedAt: m.ReactedAt,
-			SendID:    m.SendId,
-		},
 	}
 }

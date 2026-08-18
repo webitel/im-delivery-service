@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 )
@@ -37,6 +38,17 @@ type ReactionAggregate struct {
 	Count         int32    `json:"count"`
 	ReactorIDs    []string `json:"reactor_ids"`
 	LastReactedAt int64    `json:"last_reacted_at"`
+}
+
+// ReactedBy reports whether the given viewer contact id is among this emoji's
+// reactors. Marshallers use it to derive the per-viewer reacted_by_me flag so
+// the raw ReactorIDs never have to reach the client.
+func (a ReactionAggregate) ReactedBy(viewer string) bool {
+	if viewer == "" {
+		return false
+	}
+
+	return slices.Contains(a.ReactorIDs, viewer)
 }
 
 func (m *MessageReaction) RoutingKey() string {

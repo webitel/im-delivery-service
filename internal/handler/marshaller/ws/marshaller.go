@@ -3,6 +3,8 @@ package wsmarshaller
 import (
 	"encoding/json"
 
+	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
@@ -16,11 +18,17 @@ type Marshaller struct{}
 func New() *Marshaller { return &Marshaller{} }
 
 // Marshal transforms a domain event into JSON bytes, utilizing cache if available.
-func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
+func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
+	// A reaction carries a per-viewer reacted_by_me flag, so its bytes cannot be
+	// shared across recipients — bypass the cross-stream cache for it.
+	_, perViewer := ev.GetPayload().(*model.MessageReaction)
+
 	// 1. [PERFORMANCE] Check cache
-	if cached := ev.GetCached(); cached != nil {
-		if data, ok := cached.([]byte); ok {
-			return data, nil
+	if !perViewer {
+		if cached := ev.GetCached(); cached != nil {
+			if data, ok := cached.([]byte); ok {
+				return data, nil
+			}
 		}
 	}
 
@@ -69,7 +77,7 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		res.Payload[EventMessageDeleted.String()] = p
 
 	case *model.MessageReaction:
-		res.Payload[EventMessageReaction.String()] = mapReaction(p)
+		res.Payload[EventMessageReaction.String()] = mapReaction(p, viewer)
 
 	case *model.Typing:
 		res.Payload["typing_event"] = mapTyping(p)
@@ -85,8 +93,11 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 		return nil, err
 	}
 
-	// 5. [CACHE] Store for reuse across concurrent WebSocket streams.
-	ev.SetCached(data)
+	// 5. [CACHE] Store for reuse across concurrent WebSocket streams. Skipped for
+	// per-viewer payloads, whose bytes differ between recipients.
+	if !perViewer {
+		ev.SetCached(data)
+	}
 
 	return data, nil
 }

@@ -3,6 +3,8 @@ package lpmarshaller
 import (
 	"encoding/json"
 
+	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/handler/marshaller"
@@ -27,7 +29,17 @@ func New() *Marshaller { return &Marshaller{} }
 
 // Marshal returns a single LPEvent.
 // Note: We return the structure itself here to make MarshalBatch more efficient.
-func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
+func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
+	// A reaction carries a per-viewer reacted_by_me flag, so its payload differs
+	// between recipients — build it fresh per viewer and never share the cache.
+	if r, ok := ev.GetPayload().(*model.MessageReaction); ok {
+		return LPEvent{
+			ID:      ev.GetID(),
+			Type:    "message_reaction",
+			Payload: mapReaction(r, viewer),
+		}, nil
+	}
+
 	// [PERFORMANCE] Check for cached LPEvent structure
 	if cached := ev.GetCached(); cached != nil {
 		if lp, ok := cached.(LPEvent); ok {
@@ -65,13 +77,13 @@ func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
 }
 
 // MarshalBatch handles the collection of events and returns final JSON bytes.
-func (m *Marshaller) MarshalBatch(events []event.Eventer) (any, error) {
+func (m *Marshaller) MarshalBatch(events []event.Eventer, viewer uuid.UUID) (any, error) {
 	res := Response{
 		Events: make([]LPEvent, 0, len(events)),
 	}
 
 	for _, ev := range events {
-		val, err := m.Marshal(ev)
+		val, err := m.Marshal(ev, viewer)
 		if err != nil {
 			continue
 		}

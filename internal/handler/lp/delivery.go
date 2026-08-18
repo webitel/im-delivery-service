@@ -89,7 +89,7 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// [SERIALIZATION] Use the batch marshaller interface.
-	val, err := h.marshaller.MarshalBatch(events)
+	val, err := h.marshaller.MarshalBatch(events, userID)
 	if err != nil {
 		h.logger.Error("LP_MARSHALL_FAILED", slog.Any("err", err))
 		http.Error(w, "internal serialization error", http.StatusInternalServerError)

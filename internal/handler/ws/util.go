@@ -65,9 +65,10 @@ func (h *WSHandler) terminate(c *websocket.Conn, wsCode int, reason string) {
 	})
 }
 
-// [SEND] Standard marshaling and transmission logic.
-func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) {
-	raw, err := h.marshaller.Marshal(ev)
+// [SEND] Standard marshaling and transmission logic. viewer is the recipient
+// this connection belongs to, used to resolve per-viewer fields at marshal time.
+func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, viewer uuid.UUID, log *slog.Logger) {
+	raw, err := h.marshaller.Marshal(ev, viewer)
 	if err != nil {
 		log.Error("ws: marshal failed", slog.Any("err", err))
 
@@ -84,5 +85,5 @@ func (h *WSHandler) send(c *websocket.Conn, ev event.Eventer, log *slog.Logger) 
 
 // [SEND_SYSTEM] Factory-to-socket bridge for system events.
 func (h *WSHandler) sendSystem(c *websocket.Conn, uid uuid.UUID, kind event.EventKind, p any) {
-	h.send(c, event.NewSystemEvent(uid, kind, p), h.log)
+	h.send(c, event.NewSystemEvent(uid, kind, p), uid, h.log)
 }

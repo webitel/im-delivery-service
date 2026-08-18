@@ -102,7 +102,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	)
 
 	// [MARSHALING]
-	val, err := d.marshaller.Marshal(welcomeEv)
+	val, err := d.marshaller.Marshal(welcomeEv, userID)
 	if err != nil {
 		l.Error("[STREAM] handshake mapping failed", slog.Any("err", err))
 
@@ -148,7 +148,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 				)
 
 				// [MARSHALL & ASSERT]
-				if val, err := d.marshaller.Marshal(terminationEv); err == nil {
+				if val, err := d.marshaller.Marshal(terminationEv, userID); err == nil {
 					if pb, ok := val.(*impb.ServerEvent); ok {
 						_ = stream.Send(pb)
 					}
@@ -160,7 +160,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			// [TRANSMIT_OVER_HTTP2]
 			// Serialize and push the event into the gRPC transmit buffer.
 			// gRPC handles internal flow control and HTTP/2 framing.
-			val, err := d.marshaller.Marshal(ev)
+			val, err := d.marshaller.Marshal(ev, userID)
 			if err != nil {
 				l.Error("[STREAM] marshaling error", slog.Any("err", err))
 

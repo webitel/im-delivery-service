@@ -1,6 +1,8 @@
 package grpcmarshaller
 
 import (
+	"github.com/google/uuid"
+
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -14,7 +16,9 @@ type Marshaller struct{}
 
 func New() *Marshaller { return &Marshaller{} }
 
-func (m *Marshaller) Marshal(ev event.Eventer) (any, error) {
+// Marshal ignores viewer: the delivery proto's MessageReactionEvent carries no
+// per-emoji aggregate, so there is no per-viewer field to resolve here.
+func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 	// [CACHE] Retrieve if already marshaled for this event
 	if cached := ev.GetCached(); cached != nil {
 		if pb, ok := cached.(*impb.ServerEvent); ok {

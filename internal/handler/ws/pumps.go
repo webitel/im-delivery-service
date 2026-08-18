@@ -68,7 +68,7 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID, domainID 
 }
 
 // [WRITE_PUMP] Outbound event stream.
-func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub registry.Connector, log *slog.Logger) {
+func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, viewer uuid.UUID, sub registry.Connector, log *slog.Logger) {
 	t := time.NewTicker(pingPeriod)
 	defer t.Stop()
 
@@ -81,7 +81,7 @@ func (h *WSHandler) writePump(ctx context.Context, c *websocket.Conn, sub regist
 				return
 			}
 
-			h.send(c, ev, log)
+			h.send(c, ev, viewer, log)
 		case <-t.C:
 			_ = c.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.WriteMessage(websocket.PingMessage, nil); err != nil {

@@ -11,7 +11,8 @@ import (
 )
 
 // TestMapReactionReactedByMePerViewer guards that reacted_by_me is resolved from
-// the viewer's own contact id and that the raw reactor_ids never reach the wire.
+// the viewer's own contact id and that the aggregate mirrors the im-thread
+// history shape (nested reaction object).
 func TestMapReactionReactedByMePerViewer(t *testing.T) {
 	me := uuid.New()
 	other := uuid.New()
@@ -21,7 +22,6 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 		ThreadID: uuid.New(),
 		Reactor:  model.Peer{ID: other, MemberID: uuid.NewString(), Role: 1},
 		Emoji:    "🔥",
-		SendId:   "react-5",
 		Reactions: []model.ReactionAggregate{
 			{Emoji: "🔥", Count: 1, ReactorIDs: []string{other.String()}, LastReactedAt: 1},
 			{Emoji: "😭", Count: 1, ReactorIDs: []string{me.String()}, LastReactedAt: 2},
@@ -38,7 +38,11 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 		t.Fatalf("want 2 aggregates, got %d", len(got.Reactions))
 	}
 
-	// 🔥 was added by the actor (other), not the viewer.
+	if got.Reactions[0].Emoji != "🔥" {
+		t.Errorf("reaction[0].emoji = %q, want 🔥", got.Reactions[0].Emoji)
+	}
+
+	// 🔥 was added by the other member, not the viewer.
 	if got.Reactions[0].ReactedByMe {
 		t.Errorf("🔥: viewer did not react, want reacted_by_me=false")
 	}
@@ -46,25 +50,6 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 	// 😭 is held by the viewer.
 	if !got.Reactions[1].ReactedByMe {
 		t.Errorf("😭: viewer reacted, want reacted_by_me=true")
-	}
-
-	// The action fields are top-level, separate from the per-viewer state.
-	if got.Emoji != "🔥" || got.Removed {
-		t.Errorf("action = {%q, removed=%v}, want {🔥, false}", got.Emoji, got.Removed)
-	}
-
-	if got.SendID != "react-5" {
-		t.Errorf("send_id = %q, want react-5", got.SendID)
-	}
-
-	// reactor_ids must not leak into the client payload.
-	raw, err := json.Marshal(got)
-	if err != nil {
-		t.Fatalf("marshal reaction: %v", err)
-	}
-
-	if strings.Contains(string(raw), "reactor_ids") {
-		t.Errorf("reactor_ids leaked into payload: %s", raw)
 	}
 }
 

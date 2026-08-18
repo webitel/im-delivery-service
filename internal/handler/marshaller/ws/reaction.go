@@ -6,30 +6,30 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// WSReaction is the WebSocket DTO of an emoji reaction change on a message.
-// The reactor/emoji/removed fields describe the single action that produced the
-// event, while Reactions is the authoritative per-emoji state AFTER it — the
-// client replaces the message's whole reaction bar from Reactions. Reactions is
-// always present (an empty array means the last reaction was removed).
+// WSReaction is the WebSocket DTO of a reaction change on a message. It carries
+// only the authoritative per-emoji state AFTER the change: the client replaces
+// the message's whole reaction bar from Reactions. Reactions is always present
+// (an empty array means the last reaction was removed).
+//
+// Each aggregate mirrors the im-thread message-history MessageReaction shape
+// field-for-field, so the client can reuse the exact same rendering it already
+// uses for history.
 type WSReaction struct {
 	MessageID string                `json:"message_id"`
 	ThreadID  string                `json:"thread_id"`
-	Reactor   *WSPeer               `json:"reactor"`
-	Emoji     string                `json:"emoji"`
-	Removed   bool                  `json:"removed"`
-	ReactedAt int64                 `json:"reacted_at"`
-	SendID    string                `json:"send_id,omitempty"`
 	Reactions []WSReactionAggregate `json:"reactions"`
 }
 
 // WSReactionAggregate is one emoji's state on the message as seen by a single
-// recipient. ReactedByMe is derived server-side from the aggregate's reactor
-// ids, so the raw ids never reach the client.
+// recipient — a copy of the im-thread history aggregate. ReactedByMe is derived
+// server-side for this recipient. LastReactedAt is emitted as a string to match
+// the im-thread int64/protojson wire representation.
 type WSReactionAggregate struct {
-	Emoji         string `json:"emoji"`
-	Count         int32  `json:"count"`
-	ReactedByMe   bool   `json:"reacted_by_me"`
-	LastReactedAt int64  `json:"last_reacted_at"`
+	Emoji         string   `json:"emoji"`
+	Count         int32    `json:"count"`
+	ReactedByMe   bool     `json:"reacted_by_me"`
+	ReactorIDs    []string `json:"reactor_ids,omitempty"`
+	LastReactedAt int64    `json:"last_reacted_at,string"`
 }
 
 // mapReaction transforms the internal reaction domain into a WebSocket DTO for
@@ -45,6 +45,7 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *WSReaction {
 			Emoji:         a.Emoji,
 			Count:         a.Count,
 			ReactedByMe:   a.ReactedBy(vid),
+			ReactorIDs:    a.ReactorIDs,
 			LastReactedAt: a.LastReactedAt,
 		})
 	}
@@ -52,11 +53,6 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *WSReaction {
 	return &WSReaction{
 		MessageID: m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
-		Reactor:   mapPeer(&m.Reactor),
-		Emoji:     m.Emoji,
-		Removed:   m.Removed,
-		ReactedAt: m.ReactedAt,
-		SendID:    m.SendId,
 		Reactions: aggs,
 	}
 }

@@ -6,28 +6,25 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// lpReaction is the long-poll payload for an emoji reaction change, seen by a
-// single recipient. It mirrors the WebSocket shape: the reactor/emoji/removed
-// fields describe the action, while Reactions is the authoritative per-emoji
-// state to replace the bar with (always present, empty array means no
-// reactions left).
+// lpReaction is the long-poll payload for a reaction change, seen by a single
+// recipient. It mirrors the WebSocket shape: only the authoritative per-emoji
+// state (Reactions) to replace the bar with, always present (empty array means
+// no reactions left). Each aggregate is a copy of the im-thread history shape.
 type lpReaction struct {
 	MessageID string                `json:"message_id"`
 	ThreadID  string                `json:"thread_id"`
-	Reactor   model.Peer            `json:"reactor"`
-	Emoji     string                `json:"emoji"`
-	Removed   bool                  `json:"removed"`
-	ReactedAt int64                 `json:"reacted_at"`
-	SendID    string                `json:"send_id,omitempty"`
 	Reactions []lpReactionAggregate `json:"reactions"`
 }
 
-// lpReactionAggregate is one emoji's state on the message for this recipient.
+// lpReactionAggregate is one emoji's state on the message for this recipient,
+// mirroring the im-thread history aggregate. LastReactedAt is emitted as a
+// string to match the im-thread int64/protojson wire representation.
 type lpReactionAggregate struct {
-	Emoji         string `json:"emoji"`
-	Count         int32  `json:"count"`
-	ReactedByMe   bool   `json:"reacted_by_me"`
-	LastReactedAt int64  `json:"last_reacted_at"`
+	Emoji         string   `json:"emoji"`
+	Count         int32    `json:"count"`
+	ReactedByMe   bool     `json:"reacted_by_me"`
+	ReactorIDs    []string `json:"reactor_ids,omitempty"`
+	LastReactedAt int64    `json:"last_reacted_at,string"`
 }
 
 // mapReaction builds the viewer-scoped long-poll reaction payload, resolving
@@ -41,6 +38,7 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *lpReaction {
 			Emoji:         a.Emoji,
 			Count:         a.Count,
 			ReactedByMe:   a.ReactedBy(vid),
+			ReactorIDs:    a.ReactorIDs,
 			LastReactedAt: a.LastReactedAt,
 		})
 	}
@@ -48,11 +46,6 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *lpReaction {
 	return &lpReaction{
 		MessageID: m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
-		Reactor:   m.Reactor,
-		Emoji:     m.Emoji,
-		Removed:   m.Removed,
-		ReactedAt: m.ReactedAt,
-		SendID:    m.SendId,
 		Reactions: aggs,
 	}
 }

@@ -20,25 +20,41 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 		ID:       uuid.New(),
 		ThreadID: uuid.New(),
 		Reactor:  model.Peer{ID: other, MemberID: uuid.NewString(), Role: 1},
-		Emoji:    "👀",
+		Emoji:    "🔥",
+		SendId:   "react-5",
 		Reactions: []model.ReactionAggregate{
-			{Emoji: "👀", Count: 2, ReactorIDs: []string{me.String(), other.String()}, LastReactedAt: 1},
-			{Emoji: "😭", Count: 1, ReactorIDs: []string{other.String()}, LastReactedAt: 2},
+			{Emoji: "🔥", Count: 1, ReactorIDs: []string{other.String()}, LastReactedAt: 1},
+			{Emoji: "😭", Count: 1, ReactorIDs: []string{me.String()}, LastReactedAt: 2},
 		},
 	}
 
 	got := mapReaction(reaction, me)
 
+	if got.MessageID != reaction.ID.String() {
+		t.Errorf("message_id = %q, want %q", got.MessageID, reaction.ID.String())
+	}
+
 	if len(got.Reactions) != 2 {
 		t.Fatalf("want 2 aggregates, got %d", len(got.Reactions))
 	}
 
-	if !got.Reactions[0].ReactedByMe {
-		t.Errorf("👀: viewer reacted, want reacted_by_me=true")
+	// 🔥 was added by the actor (other), not the viewer.
+	if got.Reactions[0].ReactedByMe {
+		t.Errorf("🔥: viewer did not react, want reacted_by_me=false")
 	}
 
-	if got.Reactions[1].ReactedByMe {
-		t.Errorf("😭: viewer did not react, want reacted_by_me=false")
+	// 😭 is held by the viewer.
+	if !got.Reactions[1].ReactedByMe {
+		t.Errorf("😭: viewer reacted, want reacted_by_me=true")
+	}
+
+	// The action lives in actor, separate from the per-viewer state.
+	if got.Actor.Emoji != "🔥" || got.Actor.Removed {
+		t.Errorf("actor = {%q, removed=%v}, want {🔥, false}", got.Actor.Emoji, got.Actor.Removed)
+	}
+
+	if got.Actor.SendID != "react-5" {
+		t.Errorf("actor.send_id = %q, want react-5", got.Actor.SendID)
 	}
 
 	// reactor_ids must not leak into the client payload.
@@ -49,5 +65,27 @@ func TestMapReactionReactedByMePerViewer(t *testing.T) {
 
 	if strings.Contains(string(raw), "reactor_ids") {
 		t.Errorf("reactor_ids leaked into payload: %s", raw)
+	}
+}
+
+// TestMapReactionAlwaysEmitsReactionsArray guards that clearing the last
+// reaction still sends an empty (non-null) reactions array so the client can
+// empty the bar.
+func TestMapReactionAlwaysEmitsReactionsArray(t *testing.T) {
+	reaction := &model.MessageReaction{
+		ID:       uuid.New(),
+		ThreadID: uuid.New(),
+		Reactor:  model.Peer{ID: uuid.New(), MemberID: uuid.NewString(), Role: 1},
+		Emoji:    "🔥",
+		Removed:  true,
+	}
+
+	raw, err := json.Marshal(mapReaction(reaction, uuid.New()))
+	if err != nil {
+		t.Fatalf("marshal reaction: %v", err)
+	}
+
+	if !strings.Contains(string(raw), `"reactions":[]`) {
+		t.Errorf("want empty reactions array, got: %s", raw)
 	}
 }

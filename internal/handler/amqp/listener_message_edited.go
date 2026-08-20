@@ -58,7 +58,7 @@ func (h *MessageHandler) OnMessageEditedV1(ctx context.Context, raw *payload.Mes
 
 	template := raw.ToDomain()
 	if sender, ok := peerMap[senderID]; ok {
-		template.From = *sender
+		template.EditedBy = *sender
 	}
 
 	events := make([]event.Eventer, 0, len(targets))
@@ -77,7 +77,7 @@ func (h *MessageHandler) OnMessageEditedV1(ctx context.Context, raw *payload.Mes
 		events = append(events, event.NewMessageEditedEvent(
 			&msg,
 			targetID,
-			event.WithEcho[*model.Message](isEcho),
+			event.WithEcho[*model.MessageEdited](isEcho),
 		))
 	}
 

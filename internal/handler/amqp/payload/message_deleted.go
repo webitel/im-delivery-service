@@ -14,14 +14,21 @@ type MessageDeletedV1 struct {
 	DeletedBy  Peer        `json:"deleted_by"`
 	To         []Recipient `json:"to"`
 	Type       string      `json:"type"`
+	CreatedAt  string      `json:"created_at"`
 	OccurredAt string      `json:"occurred_at"`
 }
 
 func (d *MessageDeletedV1) ToDomain() *model.MessageDeleted {
+	var createdAt int64
+	if d.CreatedAt != "" {
+		createdAt = util.SafeParseRFC3339(d.CreatedAt)
+	}
+
 	msg := &model.MessageDeleted{
 		ID:        util.SafeParseUUID(d.MessageID),
 		ThreadID:  util.SafeParseUUID(d.ThreadID),
 		DomainID:  int64(d.DomainID),
+		CreatedAt: createdAt,
 		DeletedAt: util.SafeParseRFC3339(d.OccurredAt),
 		DeletedBy: model.Peer{
 			ID:       util.SafeParseUUID(d.DeletedBy.ContactID),

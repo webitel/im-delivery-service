@@ -151,6 +151,39 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 	}
 }
 
+// marshalMessageType maps the domain type name onto the wire enum. The enum
+// covers text, document and image only, so a system, interactive, location or
+// contact message reports UNSPECIFIED rather than pretending to be text — an
+// edit never changes the type, and the client already holds the message.
+func marshalMessageType(name string) impb.MessageType {
+	switch name {
+	case "text":
+		return impb.MessageType_TEXT
+	case "document":
+		return impb.MessageType_DOCUMENT
+	case "image":
+		return impb.MessageType_IMAGE
+	default:
+		return impb.MessageType_UNSPECIFIED_MESSAGE_TYPE
+	}
+}
+
+// marshalMessageEditedPayload converts an edit to a gRPC server event.
+func marshalMessageEditedPayload(m *model.MessageEdited) *impb.ServerEvent_MessageEditedEvent {
+	return &impb.ServerEvent_MessageEditedEvent{
+		MessageEditedEvent: &impb.MessageEditedEvent{
+			Id:        m.ID.String(),
+			ThreadId:  m.ThreadID.String(),
+			EditedBy:  marshalPeer(&m.EditedBy),
+			Text:      m.Text,
+			Type:      marshalMessageType(m.Type),
+			CreatedAt: m.CreatedAt,
+			EditedAt:  m.EditedAt,
+			Version:   m.Version,
+		},
+	}
+}
+
 // marshalMessagePayload converts the domain Message model to a gRPC server event.
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	// Map the slice of recipients from domain to PB

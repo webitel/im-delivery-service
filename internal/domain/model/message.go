@@ -18,7 +18,6 @@ type Message struct {
 	Type        string          `json:"type"`
 	CreatedAt   int64           `json:"created_at"`
 	EditedAt    int64           `json:"updated_at,omitempty"`
-	Edited      bool            `json:"edited,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
 	Documents   []*Document     `json:"documents,omitempty"`
 	Images      []*Image        `json:"images,omitempty"`
@@ -51,12 +50,7 @@ type ReplyTo struct {
 }
 
 func (m *Message) RoutingKey() string {
-	action := "created"
-	if m.Edited {
-		action = "edited"
-	}
-
-	return fmt.Sprintf("im_delivery.v1.%d.message.%s", m.DomainID, action)
+	return fmt.Sprintf("im_delivery.v1.%d.message.created", m.DomainID)
 }
 
 // NotificationTitle returns a friendly display name for push notifications.

@@ -13,23 +13,31 @@ type MessageEditedV1 struct {
 	To         []Recipient    `json:"to"`
 	Body       string         `json:"body"`
 	Type       string         `json:"type"`
+	Version    int32          `json:"version"`
+	CreatedAt  string         `json:"created_at"`
 	OccurredAt string         `json:"occurred_at"`
 	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
-func (d *MessageEditedV1) ToDomain() *model.Message {
+func (d *MessageEditedV1) ToDomain() *model.MessageEdited {
 	editedAt := util.SafeParseRFC3339(d.OccurredAt)
 
-	msg := &model.Message{
-		ID:       util.SafeParseUUID(d.MessageID),
-		ThreadID: util.SafeParseUUID(d.ThreadID),
-		DomainID: int64(d.DomainID),
-		Text:     d.Body,
-		Type:     d.Type,
-		Metadata: d.Metadata,
-		Edited:   true,
-		EditedAt: editedAt,
-		From: model.Peer{
+	var createdAt int64
+	if d.CreatedAt != "" {
+		createdAt = util.SafeParseRFC3339(d.CreatedAt)
+	}
+
+	msg := &model.MessageEdited{
+		ID:        util.SafeParseUUID(d.MessageID),
+		ThreadID:  util.SafeParseUUID(d.ThreadID),
+		DomainID:  int64(d.DomainID),
+		Text:      d.Body,
+		Type:      d.Type,
+		Metadata:  d.Metadata,
+		Version:   d.Version,
+		CreatedAt: createdAt,
+		EditedAt:  editedAt,
+		EditedBy: model.Peer{
 			ID:       util.SafeParseUUID(d.EditedBy.ContactID),
 			MemberID: d.EditedBy.MemberID,
 			Role:     int32(d.EditedBy.Role),

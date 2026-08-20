@@ -49,11 +49,11 @@ func NewMessageEvent(
 // so it is not pushed as a notification (CanPush=false) and its timestamp is the
 // edit time.
 func NewMessageEditedEvent(
-	msg *model.Message,
+	msg *model.MessageEdited,
 	targetID uuid.UUID,
-	opts ...Option[*model.Message],
+	opts ...Option[*model.MessageEdited],
 ) Eventer {
-	e := &Envelope[*model.Message]{
+	e := &Envelope[*model.MessageEdited]{
 		ID:         uuid.New(),
 		Payload:    msg,
 		UserID:     targetID,

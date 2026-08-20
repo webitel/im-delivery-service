@@ -15,6 +15,7 @@ type MessageDeleted struct {
 	ThreadID  uuid.UUID `json:"thread_id"`
 	DomainID  int64     `json:"domain_id"`
 	DeletedBy Peer      `json:"deleted_by"`
+	CreatedAt int64     `json:"created_at"`
 	DeletedAt int64     `json:"deleted_at"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.

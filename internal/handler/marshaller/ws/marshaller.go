@@ -45,6 +45,9 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 	case *model.Message:
 		res.Payload[EventMessage.String()] = mapMessage(p)
 
+	case *model.MessageEdited:
+		res.Payload[EventMessageEdited.String()] = mapMessageEdited(p)
+
 	case *model.ConnectedPayload:
 		res.Payload[EventConnected.String()] = p
 

@@ -34,6 +34,8 @@ func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 	switch p := ev.GetPayload().(type) {
 	case *model.Message:
 		res.Payload = marshalMessagePayload(p)
+	case *model.MessageEdited:
+		res.Payload = marshalMessageEditedPayload(p)
 	case *model.MessageDeleted:
 		res.Payload = marshalMessageDeletedPayload(p)
 	case *model.MessageReaction:

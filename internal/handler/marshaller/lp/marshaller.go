@@ -56,6 +56,8 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 	switch ev.GetPayload().(type) {
 	case *model.Message:
 		lp.Type = "message_created"
+	case *model.MessageEdited:
+		lp.Type = "message_edited"
 	case *model.MessageDeleted:
 		lp.Type = "message_deleted"
 	case *model.MessageReaction:

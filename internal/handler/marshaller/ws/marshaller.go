@@ -77,7 +77,7 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 		res.Payload[EventMessageStatus.String()] = p
 
 	case *model.MessageDeleted:
-		res.Payload[EventMessageDeleted.String()] = p
+		res.Payload[EventMessageDeleted.String()] = mapMessageDeleted(p)
 
 	case *model.MessageReaction:
 		res.Payload[EventMessageReaction.String()] = mapReaction(p, viewer)

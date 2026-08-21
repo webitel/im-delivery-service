@@ -22,6 +22,14 @@ func (h *MessageHandler) Dispatch(ctx context.Context, events []event.Eventer) {
 			continue
 		}
 
+		if h.logger.Enabled(ctx, slog.LevelDebug) {
+			h.logger.Debug("LOCAL_DELIVERY",
+				"kind", ev.GetKindName(),
+				"recipient", ev.GetUserID(),
+				"ws_connected", h.hub.Connected(ev.GetUserID()),
+			)
+		}
+
 		// [LOCAL_DELIVERY] WebSocket / gRPC / Long-Polling dispatch for connected clients.
 		h.orchestrator.Notify(ctx, ev)
 

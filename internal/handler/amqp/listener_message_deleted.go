@@ -18,37 +18,17 @@ func (h *MessageHandler) OnMessageDeletedV1(ctx context.Context, raw *payload.Me
 		return nil, nil
 	}
 
-	peers, err := h.enricher.Resolve(ctx, raw.DomainID, participantIDs...)
-	if err != nil {
-		h.logger.Error("failed to enrich peer data for delete", "error", err)
-
-		return nil, err
-	}
-
-	peerMap := make(map[uuid.UUID]*model.Peer, len(peers))
-	for i := range peers {
-		peerMap[peers[i].ID] = &peers[i]
-	}
-
-	// Overlay member/role context from the raw event onto the enriched peers.
-	if p, ok := peerMap[senderID]; ok {
-		p.MemberID = raw.DeletedBy.MemberID
-		p.Role = int32(raw.DeletedBy.Role)
-	}
-
-	for _, r := range raw.To {
-		rid, err := uuid.Parse(r.ContactID)
-		if err == nil {
-			if p, ok := peerMap[rid]; ok {
-				p.MemberID = r.MemberID
-				p.Role = int32(r.Role)
-			}
-		}
-	}
-
 	template := raw.ToDomain()
-	if sender, ok := peerMap[senderID]; ok {
-		template.DeletedBy = *sender
+
+	if !template.DeletedBy.IsEnriched() {
+		deleter, err := h.resolveDeleter(ctx, raw, senderID)
+		if err != nil {
+			return nil, err
+		}
+
+		if deleter != nil {
+			template.DeletedBy = *deleter
+		}
 	}
 
 	events := make([]event.Eventer, 0, len(targets))
@@ -67,9 +47,31 @@ func (h *MessageHandler) OnMessageDeletedV1(ctx context.Context, raw *payload.Me
 	return events, nil
 }
 
+// resolveDeleter covers events published without an enriched contact block:
+// the membership context still comes from the event, the identity from
+// im-contact-service.
+func (h *MessageHandler) resolveDeleter(ctx context.Context, raw *payload.MessageDeletedV1, senderID uuid.UUID) (*model.Peer, error) {
+	peers, err := h.enricher.Resolve(ctx, raw.DomainID, senderID)
+	if err != nil {
+		h.logger.Error("failed to enrich peer data for delete", "error", err)
+
+		return nil, err
+	}
+
+	if len(peers) == 0 {
+		return nil, nil
+	}
+
+	deleter := peers[0]
+	deleter.MemberID = raw.DeletedBy.ID
+	deleter.Role = int32(model.ParseRoleName(raw.DeletedBy.Role))
+
+	return &deleter, nil
+}
+
 // extractDeleteParticipants returns the deleter plus the unique set of recipients.
 func (h *MessageHandler) extractDeleteParticipants(raw *payload.MessageDeletedV1) (uuid.UUID, []uuid.UUID) {
-	sID, _ := uuid.Parse(raw.DeletedBy.ContactID)
+	sID, _ := uuid.Parse(raw.DeletedBy.ContactID())
 	seen := make(map[uuid.UUID]struct{})
 	res := make([]uuid.UUID, 0)
 

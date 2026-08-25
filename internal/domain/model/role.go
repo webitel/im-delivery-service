@@ -31,6 +31,23 @@ func (r ThreadRole) String() string {
 	}
 }
 
+// ParseRoleName converts a ThreadRole name (as carried by AMQP events) back to
+// the enum. An unknown name degrades to RoleUnspecified.
+func ParseRoleName(v string) ThreadRole {
+	switch v {
+	case "ROLE_MEMBER":
+		return RoleMember
+	case "ROLE_ADMIN":
+		return RoleAdmin
+	case "ROLE_SUPERVISOR":
+		return RoleSupervisor
+	case "ROLE_OWNER":
+		return RoleOwner
+	default:
+		return RoleUnspecified
+	}
+}
+
 // ParseRole safely converts an integer (e.g. from Protobuf/AMQP) to ThreadRole.
 func ParseRole(v int32) ThreadRole {
 	if v < 0 || v > 4 {

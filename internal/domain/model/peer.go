@@ -15,6 +15,20 @@ const (
 	PeerChannel
 )
 
+// ParsePeerType maps a contact's channel type onto the addressing kind. Every
+// unrecognised type addresses a user: PeerType has no zero member, and an unset
+// one leaves a gRPC Peer without any Kind.
+func ParsePeerType(t string) PeerType {
+	switch t {
+	case "group":
+		return PeerGroup
+	case "channel":
+		return PeerChannel
+	default:
+		return PeerUser
+	}
+}
+
 type Peer struct {
 	ID          uuid.UUID `json:"id"`
 	Type        PeerType  `json:"type"`
@@ -22,6 +36,7 @@ type Peer struct {
 	Sub         string    `json:"sub,omitempty"`
 	Issuer      string    `json:"issuer,omitempty"`
 	Name        string    `json:"name,omitempty"`
+	Username    string    `json:"username,omitempty"`
 	IsBot       bool      `json:"is_bot"`
 	MemberID    string    `json:"member_id,omitempty"`
 	Role        int32     `json:"role,omitempty"`

@@ -125,24 +125,12 @@ func (e *ContactEnricher) toPeer(c *contactv1.Contact) model.Peer {
 
 	return model.Peer{
 		ID:          uuid.MustParse(c.GetId()),
-		Type:        e.parseType(c.GetType()),
+		Type:        model.ParsePeerType(c.GetType()),
 		ContactType: c.GetType(),
 		Name:        name,
+		Username:    c.GetUsername(),
 		Sub:         c.GetSubject(),
 		Issuer:      c.GetIssId(),
 		IsBot:       c.GetIsBot(),
-	}
-}
-
-func (e *ContactEnricher) parseType(t string) model.PeerType {
-	switch t {
-	case "user":
-		return model.PeerUser
-	case "group":
-		return model.PeerGroup
-	case "channel":
-		return model.PeerChannel
-	default:
-		return model.PeerUser
 	}
 }

@@ -1,6 +1,7 @@
 package wsmarshaller
 
 import (
+	"cmp"
 	"encoding/json"
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -58,9 +59,9 @@ func mapPeer(p *model.Peer) *WSPeer {
 			Sub:      p.Sub,
 			Iss:      p.Issuer,
 			Name:     p.Name,
-			Username: p.Name, // Using name as username as fallback
+			Username: cmp.Or(p.Username, p.Name),
 			Type:     p.ContactType,
-			IsBot:    p.IsBot, // Assigned inside the contact object
+			IsBot:    p.IsBot,
 		},
 	}
 }

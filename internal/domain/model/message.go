@@ -47,6 +47,8 @@ type ReplyTo struct {
 	AttachmentKind *string   `json:"attachment_kind,omitempty"`
 	AttachmentName *string   `json:"attachment_name,omitempty"`
 	AttachmentMime *string   `json:"attachment_mime,omitempty"`
+
+	AttachmentAddress *string `json:"attachment_address,omitempty"`
 }
 
 func (m *Message) RoutingKey() string {

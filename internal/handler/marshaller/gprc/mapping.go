@@ -69,6 +69,10 @@ func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
 		quoted.AttachmentMime = *r.AttachmentMime
 	}
 
+	if r.AttachmentAddress != nil {
+		quoted.AttachmentAddress = *r.AttachmentAddress
+	}
+
 	return quoted
 }
 

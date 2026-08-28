@@ -88,6 +88,8 @@ type ReplyTo struct {
 	AttachmentKind *string `json:"attachment_kind,omitempty"`
 	AttachmentName *string `json:"attachment_name,omitempty"`
 	AttachmentMime *string `json:"attachment_mime,omitempty"`
+
+	AttachmentAddress *string `json:"attachment_address,omitempty"`
 }
 
 func (replyTo *ReplyTo) AsModel() *model.ReplyTo {
@@ -104,6 +106,8 @@ func (replyTo *ReplyTo) AsModel() *model.ReplyTo {
 		AttachmentKind: replyTo.AttachmentKind,
 		AttachmentName: replyTo.AttachmentName,
 		AttachmentMime: replyTo.AttachmentMime,
+
+		AttachmentAddress: replyTo.AttachmentAddress,
 	}
 }
 

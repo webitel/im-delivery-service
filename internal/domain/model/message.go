@@ -41,6 +41,7 @@ type ForwardOrigin struct {
 type ReplyTo struct {
 	MessageID      uuid.UUID `json:"message_id"`
 	SenderID       uuid.UUID `json:"sender_id"`
+	Sender         *Peer     `json:"sender,omitempty"`
 	Type           string    `json:"type"`
 	Body           string    `json:"body"`
 	CreatedAt      int64     `json:"created_at"`
@@ -49,6 +50,7 @@ type ReplyTo struct {
 	AttachmentMime *string   `json:"attachment_mime,omitempty"`
 
 	AttachmentAddress *string `json:"attachment_address,omitempty"`
+	IsDeleted         bool    `json:"is_deleted,omitempty"`
 }
 
 func (m *Message) RoutingKey() string {

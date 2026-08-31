@@ -7,6 +7,7 @@ import (
 
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/util"
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
 )
 
@@ -21,7 +22,8 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	}
 
 	// Resolve ALL participant metadata (names, types) from storage/cache.
-	peers, err := h.enricher.Resolve(ctx, raw.DomainID, participantIDs...)
+	// The quoted message sender is enriched too, but never becomes a delivery target.
+	peers, err := h.enricher.Resolve(ctx, raw.DomainID, withReplySender(participantIDs, raw)...)
 	if err != nil {
 		h.logger.Error("failed to enrich peer data", "error", err)
 
@@ -71,6 +73,12 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 		template.From = *sender
 	}
 
+	if template.ReplyTo != nil {
+		if sender, ok := peerMap[template.ReplyTo.SenderID]; ok {
+			template.ReplyTo.Sender = sender
+		}
+	}
+
 	events := make([]event.Eventer, 0, len(targets))
 	for _, targetID := range targets {
 		isEcho := targetID == senderID
@@ -99,6 +107,29 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	}
 
 	return events, nil
+}
+
+// withReplySender appends the quoted message sender to the enrichment list only.
+func withReplySender(participantIDs []uuid.UUID, raw *payload.MessageCreatedV1) []uuid.UUID {
+	if raw.ReplyTo == nil {
+		return participantIDs
+	}
+
+	senderID := util.SafeParseUUID(raw.ReplyTo.SenderID)
+	if senderID == uuid.Nil {
+		return participantIDs
+	}
+
+	for _, id := range participantIDs {
+		if id == senderID {
+			return participantIDs
+		}
+	}
+
+	ids := make([]uuid.UUID, len(participantIDs), len(participantIDs)+1)
+	copy(ids, participantIDs)
+
+	return append(ids, senderID)
 }
 
 // extractParticipants safely parses contact IDs and ensures unique IDs in the list.

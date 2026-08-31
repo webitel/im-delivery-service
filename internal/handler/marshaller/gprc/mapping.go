@@ -55,6 +55,7 @@ func marshalReplyTo(r *model.ReplyTo) *impb.QuotedMessage {
 		Type:      r.Type,
 		Body:      r.Body,
 		CreatedAt: r.CreatedAt,
+		IsDeleted: r.IsDeleted,
 	}
 
 	if r.AttachmentKind != nil {

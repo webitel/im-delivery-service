@@ -41,9 +41,44 @@ type WSMessage struct {
 	Location    *model.Location   `json:"location,omitempty"`
 	System      *model.System     `json:"system,omitempty"`
 	Metadata    map[string]any    `json:"metadata,omitempty"`
-	ReplyTo     *model.ReplyTo    `json:"reply_to,omitempty"`
+	ReplyTo     *WSReplyTo        `json:"reply_to,omitempty"`
 
 	ForwardOrigin *model.ForwardOrigin `json:"forward_origin,omitempty"`
+}
+
+// WSReplyTo is the quoted message preview with the same nested sender shape as WSMessage.
+type WSReplyTo struct {
+	MessageID         string  `json:"message_id"`
+	Sender            *WSPeer `json:"sender,omitempty"`
+	SenderID          string  `json:"sender_id"`
+	Type              string  `json:"type"`
+	Body              string  `json:"body"`
+	CreatedAt         int64   `json:"created_at"`
+	AttachmentKind    *string `json:"attachment_kind,omitempty"`
+	AttachmentName    *string `json:"attachment_name,omitempty"`
+	AttachmentMime    *string `json:"attachment_mime,omitempty"`
+	AttachmentAddress *string `json:"attachment_address,omitempty"`
+	IsDeleted         bool    `json:"is_deleted,omitempty"`
+}
+
+func mapReplyTo(r *model.ReplyTo) *WSReplyTo {
+	if r == nil {
+		return nil
+	}
+
+	return &WSReplyTo{
+		MessageID:         r.MessageID.String(),
+		Sender:            mapPeer(r.Sender),
+		SenderID:          r.SenderID.String(),
+		Type:              r.Type,
+		Body:              r.Body,
+		CreatedAt:         r.CreatedAt,
+		AttachmentKind:    r.AttachmentKind,
+		AttachmentName:    r.AttachmentName,
+		AttachmentMime:    r.AttachmentMime,
+		AttachmentAddress: r.AttachmentAddress,
+		IsDeleted:         r.IsDeleted,
+	}
 }
 
 // mapPeer converts internal model.Peer to the nested WSPeer structure.
@@ -82,7 +117,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		Location:  m.Location,
 		Metadata:  m.Metadata,
 		System:    m.System,
-		ReplyTo:   m.ReplyTo,
+		ReplyTo:   mapReplyTo(m.ReplyTo),
 
 		ForwardOrigin: m.ForwardOrigin,
 	}

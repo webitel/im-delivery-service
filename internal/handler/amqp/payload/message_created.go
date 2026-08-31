@@ -90,6 +90,7 @@ type ReplyTo struct {
 	AttachmentMime *string `json:"attachment_mime,omitempty"`
 
 	AttachmentAddress *string `json:"attachment_address,omitempty"`
+	IsDeleted         bool    `json:"is_deleted,omitempty"`
 }
 
 func (replyTo *ReplyTo) AsModel() *model.ReplyTo {
@@ -108,6 +109,7 @@ func (replyTo *ReplyTo) AsModel() *model.ReplyTo {
 		AttachmentMime: replyTo.AttachmentMime,
 
 		AttachmentAddress: replyTo.AttachmentAddress,
+		IsDeleted:         replyTo.IsDeleted,
 	}
 }
 

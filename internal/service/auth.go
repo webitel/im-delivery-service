@@ -54,7 +54,12 @@ func (s *AuthService) Inspect(ctx context.Context) (*model.AuthContact, error) {
 		Devices: []model.Device{{
 			ID:       auth.GetDevice().GetId(),
 			Platform: auth.GetDevice().GetApp().GetOs(),
-			AppID:    auth.GetDevice().GetApp().GetName(),
+			// AppId is the Application's client_id (see gen/go/auth/v1/authorization.pb.go's
+			// doc comment: "Application [client_id] ; VIA"). This is the SAME field and
+			// provenance that device_configuration.go's toDomain uses for push-config AppID
+			// lookups (a.GetAppId()) -- using it here too means SessionService.Attach's
+			// AppConfigProvider lookup and PushHandler's lookup are now keyed consistently.
+			AppID: auth.GetAppId(),
 		}},
 	}, nil
 }

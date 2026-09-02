@@ -14,6 +14,7 @@ Key Architectural Concepts:
 package registry
 
 import (
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -163,10 +164,40 @@ func (c *Cell) deliver(ev event.Eventer) {
 		return
 	}
 
+	// [OPTIMIZATION] Call SystemMessageType once before the loop; the result
+	// is the same for every connection in this fan-out.
+	systemType, isSystemMessage := event.SystemMessageType(ev)
+
 	for _, conn := range c.sessions {
+		// [SYSTEM_MESSAGE_FILTER] Only check filter if this event carries a system type.
+		// If ok=false, systemMessageAllowed implicitly returns true (fail-open).
+		if isSystemMessage && !c.systemMessageAllowed(conn, systemType) {
+			continue
+		}
 		// Strict 250ms window. If a connection is slow, it won't kill the Actor loop.
 		conn.Send(ev, time.Millisecond*250)
 	}
+}
+
+// systemMessageAllowed wraps conn.SystemMessageAllowed in a recover() guard.
+// Caller-supplied system message filters are arbitrary code running on Cell's
+// single loop() goroutine which has no recover() of its own -- an unguarded panic
+// would crash the whole process's event delivery, not just one user's. On panic,
+// log via slog.Error and fail OPEN (return true), matching the system's fail-open
+// contract everywhere else.
+func (c *Cell) systemMessageAllowed(conn Connector, systemType string) (allowed bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("SYSTEM_MESSAGE_FILTER_PANIC",
+				slog.String("user_id", c.userID.String()),
+				slog.Any("panic", r),
+			)
+
+			allowed = true
+		}
+	}()
+
+	return conn.SystemMessageAllowed(systemType)
 }
 
 func (c *Cell) Stop() {

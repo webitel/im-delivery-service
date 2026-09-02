@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/fx"
 
+	imadmin "github.com/webitel/im-delivery-service/infra/client/im-admin"
 	imthread "github.com/webitel/im-delivery-service/infra/client/im-thread"
 	"github.com/webitel/im-delivery-service/internal/service"
 )
@@ -104,6 +105,18 @@ var Module = fx.Module(
 
 		// [AUTH] Validates JWT/OAuth tokens and builds the initial security context.
 		fx.Annotate(service.NewAuthService, fx.As(new(service.Auther))),
+
+		// [APP_CONFIG] Resolves per-application delivery policy for system messages.
+		fx.Annotate(service.NewAppConfigService, fx.As(new(service.AppConfigProvider))),
+
+		// [ADMIN_APP_SEARCHER] Narrow interface wrapping *imadmin.Client's SearchApps method.
+		// This mirrors the ThreadStatusClient adapter pattern: the concrete client is provided
+		// from infra/client/di/module.go, and we adapt it here to the service layer's narrow
+		// AdminAppSearcher interface to keep the service layer decoupled from the concrete client.
+		fx.Annotate(
+			func(c *imadmin.Client) service.AdminAppSearcher { return c },
+			fx.As(new(service.AdminAppSearcher)),
+		),
 	),
 
 	// [LIFECYCLE_INVOCATION]

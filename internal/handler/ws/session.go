@@ -76,7 +76,7 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 	uid, _ := uuid.Parse(auth.ContactID)
 	sessionCtx, cancel := context.WithCancel(context.Background())
 
-	sub, err := h.sessionManager.Attach(sessionCtx, uid, auth.Devices[0].ID)
+	sub, err := h.sessionManager.Attach(sessionCtx, uid, auth.Devices[0].ID, auth.Devices[0].AppID)
 	if err != nil {
 		h.log.Error("ws: session attach failed", slog.Any("err", err))
 		h.terminate(c, 1011, "SESSION_ATTACH_ERROR")

@@ -45,6 +45,7 @@ type PushHandler struct {
 	pusher         PushProvider
 	leader         leader.LeaderAwarer
 	confirmer      DeliveryConfirmer
+	appConfig      AppConfigProvider
 	cb             *gobreaker.CircuitBreaker
 	log            *slog.Logger
 	timeout        time.Duration
@@ -59,6 +60,7 @@ func NewPushHandler(
 	pusher PushProvider,
 	leader leader.LeaderAwarer,
 	confirmer DeliveryConfirmer,
+	appConfig AppConfigProvider,
 	cfg *config.Config,
 	log *slog.Logger,
 ) *PushHandler {
@@ -78,6 +80,7 @@ func NewPushHandler(
 		pusher:         pusher,
 		leader:         leader,
 		confirmer:      confirmer,
+		appConfig:      appConfig,
 		cb:             cb,
 		log:            log.With("component", "push_handler"),
 		timeout:        cfg.Delivery.AckTimeout,
@@ -168,6 +171,14 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 
 	// [FILTER] Remove devices that have active/acked WebSocket sessions.
 	targets := h.filter(ctx, uid, devices, acked)
+
+	// [SYSTEM_MESSAGE_FILTER] If this is a system message, further filter by app-level policy.
+	if len(targets) > 0 {
+		if systemType, ok := event.SystemMessageType(ev); ok {
+			targets = h.filterSystemMessagePolicy(ctx, targets, systemType)
+		}
+	}
+
 	if len(targets) > 0 {
 		h.ship(ctx, ev, targets)
 	}
@@ -232,10 +243,29 @@ func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model
 		}
 	}
 
-	filtered := make([]model.Device, 0)
+	filtered := make([]model.Device, 0, len(devices))
 
 	for _, d := range devices {
 		if _, seen := ackedMap[d.ID]; !seen {
+			filtered = append(filtered, d)
+		}
+	}
+
+	return filtered
+}
+
+// [FILTER_SYSTEM_MESSAGE_POLICY] Filters push targets by application-level system message policy.
+// Returns devices unchanged if appConfig is nil (fail-open). Otherwise, keeps only devices
+// where the app's system message policy allows the given system type.
+func (h *PushHandler) filterSystemMessagePolicy(ctx context.Context, devices []model.Device, systemType string) []model.Device {
+	if h.appConfig == nil {
+		return devices
+	}
+
+	filtered := make([]model.Device, 0, len(devices))
+
+	for _, d := range devices {
+		if h.appConfig.SystemMessageAllowed(ctx, d.AppID, systemType) {
 			filtered = append(filtered, d)
 		}
 	}

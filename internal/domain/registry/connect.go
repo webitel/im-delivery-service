@@ -14,6 +14,9 @@ import (
 // Interface guard
 var _ Connector = (*connect)(nil)
 
+// [SYSTEM_MESSAGE_FILTER] Determines whether a system message type is allowed.
+type SystemMessageFilter func(systemType string) bool
+
 // [CONNECTOR] THE INTERFACE FOR EXTERNAL LAYERS (REGISTRY/HUB)
 // This allows mocking and decoupling from the concrete implementation
 type Connector interface {
@@ -21,6 +24,7 @@ type Connector interface {
 	GetUserID() uuid.UUID
 	Send(ev event.Eventer, timeout time.Duration) bool // Thread-safe send with backpressure handling
 	Recv() <-chan event.Eventer
+	SystemMessageAllowed(systemType string) bool
 	Close() // Terminate connection and release resources
 }
 
@@ -34,16 +38,17 @@ type ConnectMetadata struct {
 
 // [CONNECT] CONCRETE IMPLEMENTATION (UNEXPORTED TO FORCE INTERFACE USAGE)
 type connect struct {
-	id             uuid.UUID
-	userID         uuid.UUID
-	metadata       ConnectMetadata
-	createdAt      time.Time
-	ctx            context.Context
-	cancelFn       context.CancelFunc
-	sendCh         chan event.Eventer
-	closeOnce      sync.Once // [PROTECTION]
-	lastActivityAt int64     // [ATOMIC_FIELD]
-	droppedCount   uint64    // [ATOMIC_FIELD]
+	id              uuid.UUID
+	userID          uuid.UUID
+	metadata        ConnectMetadata
+	createdAt       time.Time
+	ctx             context.Context
+	cancelFn        context.CancelFunc
+	sendCh          chan event.Eventer
+	closeOnce       sync.Once // [PROTECTION]
+	lastActivityAt  int64     // [ATOMIC_FIELD]
+	droppedCount    uint64    // [ATOMIC_FIELD]
+	systemMsgFilter SystemMessageFilter
 }
 
 // [POOL] SYNC.POOL FOR OBJECT REUSE (REDUCES GC PRESSURE)
@@ -54,32 +59,33 @@ var connectPool = sync.Pool{
 }
 
 // [NEW_CONNECTOR] FACTORY FUNCTION USING POOLING
-func NewConnector(ctx context.Context, userID uuid.UUID, bufferSize int) Connector {
+func NewConnector(ctx context.Context, userID uuid.UUID, bufferSize int, filter SystemMessageFilter) Connector {
 	c := connectPool.Get().(*connect)
 
 	// [INITIALIZATION]
 	// Delegate state setup to the reset method to ensure a clean slate.
-	c.reset(ctx, userID, bufferSize)
+	c.reset(ctx, userID, bufferSize, filter)
 
 	return c
 }
 
 // reset re-initializes the connector's internal state using a struct literal.
 // This is the cleanest way to wipe 'stale' data from pooled objects and reset the sync.Once guard.
-func (c *connect) reset(ctx context.Context, userID uuid.UUID, bufferSize int) {
+func (c *connect) reset(ctx context.Context, userID uuid.UUID, bufferSize int, filter SystemMessageFilter) {
 	childCtx, cancel := context.WithCancel(ctx)
 
 	// [BLANK_SLATE_ASSIGNMENT]
 	// By reassigning the pointer's value to a new literal, we ensure all fields,
 	// including metadata and counters, are reset to their zero-values or defaults.
 	*c = connect{
-		id:             uuid.New(),
-		userID:         userID,
-		createdAt:      time.Now(),
-		ctx:            childCtx,
-		cancelFn:       cancel,
-		sendCh:         make(chan event.Eventer, bufferSize),
-		lastActivityAt: time.Now().UnixNano(),
+		id:              uuid.New(),
+		userID:          userID,
+		createdAt:       time.Now(),
+		ctx:             childCtx,
+		cancelFn:        cancel,
+		sendCh:          make(chan event.Eventer, bufferSize),
+		lastActivityAt:  time.Now().UnixNano(),
+		systemMsgFilter: filter,
 	}
 }
 
@@ -87,6 +93,14 @@ func (c *connect) reset(ctx context.Context, userID uuid.UUID, bufferSize int) {
 
 func (c *connect) GetID() uuid.UUID     { return c.id }
 func (c *connect) GetUserID() uuid.UUID { return c.userID }
+
+func (c *connect) SystemMessageAllowed(systemType string) bool {
+	if c.systemMsgFilter == nil {
+		return true // no policy resolved for this connection -- fail open
+	}
+
+	return c.systemMsgFilter(systemType)
+}
 
 // Send attempts to push an event into the channel.
 // If the channel is full, it tries to evict lower priority events to make room.
@@ -210,6 +224,7 @@ func (c *connect) Close() {
 		// This ensures the next user of this pooled object starts with a clean slate.
 		c.sendCh = nil
 		c.metadata = ConnectMetadata{}
+		c.systemMsgFilter = nil
 
 		// 4. [RESOURCE_RECYCLING] Return the sanitized structure to reduce GC allocation pressure.
 		connectPool.Put(c)

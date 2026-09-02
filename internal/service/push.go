@@ -172,7 +172,9 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 	// [FILTER] Remove devices that have active/acked WebSocket sessions.
 	targets := h.filter(ctx, uid, devices, acked)
 
-	// [SYSTEM_MESSAGE_FILTER] If this is a system message, further filter by app-level policy.
+	// A system message that Cell.deliver already suppressed for a connection never
+	// gets ACKed, which would otherwise make it look "undelivered" and push it here
+	// regardless of the app's policy. Apply the same policy check before shipping.
 	if len(targets) > 0 {
 		if systemType, ok := event.SystemMessageType(ev); ok {
 			targets = h.filterSystemMessagePolicy(ctx, targets, systemType)
@@ -254,9 +256,6 @@ func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model
 	return filtered
 }
 
-// [FILTER_SYSTEM_MESSAGE_POLICY] Filters push targets by application-level system message policy.
-// Returns devices unchanged if appConfig is nil (fail-open). Otherwise, keeps only devices
-// where the app's system message policy allows the given system type.
 func (h *PushHandler) filterSystemMessagePolicy(ctx context.Context, devices []model.Device, systemType string) []model.Device {
 	if h.appConfig == nil {
 		return devices

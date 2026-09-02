@@ -164,13 +164,11 @@ func (c *Cell) deliver(ev event.Eventer) {
 		return
 	}
 
-	// [OPTIMIZATION] Call SystemMessageType once before the loop; the result
-	// is the same for every connection in this fan-out.
+	// The result is the same for every connection in this fan-out, so compute
+	// it once rather than per-connection.
 	systemType, isSystemMessage := event.SystemMessageType(ev)
 
 	for _, conn := range c.sessions {
-		// [SYSTEM_MESSAGE_FILTER] Only check filter if this event carries a system type.
-		// If ok=false, systemMessageAllowed implicitly returns true (fail-open).
 		if isSystemMessage && !c.systemMessageAllowed(conn, systemType) {
 			continue
 		}

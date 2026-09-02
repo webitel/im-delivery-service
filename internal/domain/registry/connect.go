@@ -14,7 +14,6 @@ import (
 // Interface guard
 var _ Connector = (*connect)(nil)
 
-// [SYSTEM_MESSAGE_FILTER] Determines whether a system message type is allowed.
 type SystemMessageFilter func(systemType string) bool
 
 // [CONNECTOR] THE INTERFACE FOR EXTERNAL LAYERS (REGISTRY/HUB)

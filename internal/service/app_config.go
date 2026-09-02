@@ -89,14 +89,10 @@ func NewAppConfigService(admin AdminAppSearcher, logger *slog.Logger) *AppConfig
 	}
 }
 
-// SystemMessageAllowed is a one-liner delegating to ResolvePolicy.
 func (s *AppConfigService) SystemMessageAllowed(ctx context.Context, appID, systemType string) bool {
 	return s.ResolvePolicy(ctx, appID).Allows(systemType)
 }
 
-// ResolvePolicy resolves the system message policy for an application.
-// Returns a zero-value (allow-all) policy immediately for empty appID to fail open
-// (e.g., long-polling with no auth context). Otherwise delegates to policyFor.
 func (s *AppConfigService) ResolvePolicy(ctx context.Context, appID string) SystemMessagePolicy {
 	if appID == "" {
 		return SystemMessagePolicy{}
@@ -105,20 +101,16 @@ func (s *AppConfigService) ResolvePolicy(ctx context.Context, appID string) Syst
 	return s.policyFor(ctx, appID)
 }
 
-// policyFor checks the success cache, then the failure cache, then calls resolve via singleflight.
-// This ensures at most one concurrent RPC call per appID even under concurrent ResolvePolicy callers.
+// policyFor collapses concurrent lookups for the same appID into a single RPC.
 func (s *AppConfigService) policyFor(ctx context.Context, appID string) SystemMessagePolicy {
-	// Check success cache first
 	if policy, ok := s.successCache.Get(appID); ok {
 		return policy
 	}
 
-	// Check failure cache: a recent failure means return allow-all without re-hitting RPC
 	if _, ok := s.failureCache.Get(appID); ok {
 		return SystemMessagePolicy{}
 	}
 
-	// Use singleflight to call resolve exactly once even under concurrent callers
 	v, _, _ := s.singleflight.Do(appID, func() (any, error) {
 		policy, ok := s.resolve(ctx, appID)
 		if !ok {
@@ -140,11 +132,7 @@ func (s *AppConfigService) policyFor(ctx context.Context, appID string) SystemMe
 	return policy
 }
 
-// resolve fetches the allow-list for an application from the admin service.
-// On any error, nil response, or empty Data, logs a Warn and returns (zero-value policy, false).
-// On success, reads AllowSystemMessages field:
-//   - If nil: returns (allow-all policy, true).
-//   - If present: returns (restricted policy with allowed types, true).
+// resolve fetches the policy for appID from the admin service.
 //
 // AppID provenance: SessionService.Attach passes the live-session AppID from
 // Authorization.AppId (auth.go's AuthService.Inspect), and PushHandler passes each
@@ -179,13 +167,10 @@ func (s *AppConfigService) resolve(ctx context.Context, appID string) (SystemMes
 	}
 
 	allowList := app.GetAllowSystemMessages()
-
-	// Not configured on admin-service: allow all
 	if allowList == nil {
 		return SystemMessagePolicy{}, true
 	}
 
-	// Configured with types: return restricted policy with allowed list
 	return SystemMessagePolicy{
 		restricted: true,
 		allowed:    allowList.GetTypes(),

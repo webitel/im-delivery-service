@@ -14,9 +14,8 @@ import (
 )
 
 type fakeAdminAppSearcher struct {
-	mu    sync.Mutex
-	calls int
-	// Configurable response
+	mu       sync.Mutex
+	calls    int
 	response *adminv1.ApplicationList
 	err      error
 }
@@ -174,9 +173,7 @@ func TestSystemMessageAllowed_CachesSuccessfulResult(t *testing.T) {
 	}
 	svc := NewAppConfigService(fake, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	// First call
 	result1 := svc.SystemMessageAllowed(context.Background(), "myapp", "user_joined")
-	// Second call (should hit cache, not call admin)
 	result2 := svc.SystemMessageAllowed(context.Background(), "myapp", "user_joined")
 
 	if !result1 || !result2 {
@@ -202,9 +199,7 @@ func TestResolvePolicy_ResolvesOnce_MultipleAllows(t *testing.T) {
 	}
 	svc := NewAppConfigService(fake, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	// Resolve once
 	policy := svc.ResolvePolicy(context.Background(), "myapp")
-	// Call Allows multiple times
 	r1 := policy.Allows("user_joined")
 	r2 := policy.Allows("user_left")
 	r3 := policy.Allows("user_joined")
@@ -213,7 +208,6 @@ func TestResolvePolicy_ResolvesOnce_MultipleAllows(t *testing.T) {
 		t.Error("unexpected Allows results")
 	}
 
-	// Should have exactly 1 admin call
 	if fake.callCount() != 1 {
 		t.Errorf("expected exactly 1 admin call total, got %d", fake.callCount())
 	}

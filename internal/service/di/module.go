@@ -109,10 +109,7 @@ var Module = fx.Module(
 		// [APP_CONFIG] Resolves per-application delivery policy for system messages.
 		fx.Annotate(service.NewAppConfigService, fx.As(new(service.AppConfigProvider))),
 
-		// [ADMIN_APP_SEARCHER] Narrow interface wrapping *imadmin.Client's SearchApps method.
-		// This mirrors the ThreadStatusClient adapter pattern: the concrete client is provided
-		// from infra/client/di/module.go, and we adapt it here to the service layer's narrow
-		// AdminAppSearcher interface to keep the service layer decoupled from the concrete client.
+		// [ADMIN_APP_SEARCHER] Adapts *imadmin.Client to the narrow AdminAppSearcher interface (mirrors the ThreadStatusClient adapter above).
 		fx.Annotate(
 			func(c *imadmin.Client) service.AdminAppSearcher { return c },
 			fx.As(new(service.AdminAppSearcher)),

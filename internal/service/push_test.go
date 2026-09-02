@@ -119,7 +119,6 @@ func TestFilterSystemMessagePolicy(t *testing.T) {
 			t.Errorf("expected 2 devices, got %d", len(filtered))
 		}
 
-		// Check that only app1 devices remain
 		for _, d := range filtered {
 			if d.AppID != "app1" {
 				t.Errorf("expected all filtered devices to be from app1, got %s", d.AppID)
@@ -169,7 +168,6 @@ func TestFilterSystemMessagePolicy(t *testing.T) {
 			t.Errorf("expected 3 devices, got %d", len(filtered))
 		}
 
-		// Check that we have app1 (2) and app3 (1) devices
 		appCounts := make(map[string]int)
 		for _, d := range filtered {
 			appCounts[d.AppID]++

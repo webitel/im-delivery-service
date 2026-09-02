@@ -263,11 +263,8 @@ func TestCellDeliver(t *testing.T) {
 			Priority: event.PriorityHigh,
 		}
 
-		// Should not panic even though panicConn.filter panics
 		cell.deliver(ev)
 
-		// Both connectors should have received the event
-		// (panic is caught and treated as fail-open)
 		goodEvents := goodConn.getEvents()
 		if len(goodEvents) != 1 {
 			t.Errorf("expected good connector to receive 1 event, got %d", len(goodEvents))

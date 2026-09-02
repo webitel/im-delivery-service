@@ -11,16 +11,13 @@ import (
 	"github.com/webitel/im-delivery-service/internal/store"
 )
 
-const (
-	// [RESOLVE_TIMEOUT] Bounded context for one-time synchronous admin lookup at Attach.
-	// This is short (a few seconds) to avoid blocking session attachment under transient
-	// admin-service delays; the filter will fail open on timeout.
-	appConfigResolveTimeout = 3 * time.Second
-)
+// appConfigResolveTimeout bounds the admin lookup in Attach so a slow
+// admin-service can't block session attachment; the filter fails open on timeout.
+const appConfigResolveTimeout = 3 * time.Second
 
 // [SESSION_MANAGER] Interface for handling physical connection lifecycle.
 type SessionManager interface {
-	// Attach now requires deviceID to synchronize presence state, and appID to filter system messages.
+	// Attach now requires deviceID to synchronize presence state.
 	Attach(ctx context.Context, uid uuid.UUID, deviceID, appID string) (registry.Connector, error)
 	Detach(ctx context.Context, uid, cid uuid.UUID)
 	Close()

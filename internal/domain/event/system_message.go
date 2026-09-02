@@ -3,13 +3,10 @@ package event
 import "github.com/webitel/im-delivery-service/internal/domain/model"
 
 // SystemMessageType returns the model.System.Type carried by a MessageCreated
-// chat "system" message event (e.g. "user_joined", "user_left"), and ok=true
-// only when ev is such an event. Any other event kind, or a MessageCreated
-// event whose payload has no System block, or a System block with an empty Type,
-// returns ok=false so callers treat it as "not subject to system-message filtering"
-// and deliver it unconditionally. An empty Type can never match any app's allow-list,
-// so filtering would silently drop the message for restricted apps -- instead, we
-// treat it as an unfiltered message to avoid data loss.
+// chat "system" message event, and ok=true only when ev is such an event.
+// An empty Type also returns ok=false: it can never match any app's allow-list,
+// so treating it as filterable would silently drop the message instead of
+// delivering it.
 func SystemMessageType(ev Eventer) (string, bool) {
 	if ev.GetKind() != MessageCreated {
 		return "", false

@@ -47,11 +47,15 @@ func (h *LPHandler) Poll(w http.ResponseWriter, r *http.Request) {
 
 	// [SUBSCRIPTION] Create a transient connector for this request.
 	// TODO pass real deviceID and handle error
-	conn, _ := h.sessionManager.Attach(r.Context(), userID, uuid.New().String())
+	conn, _ := h.sessionManager.Attach(r.Context(), userID, uuid.New().String(), "")
 
 	// [LIFECYCLE] Cleanup connector resources on request completion.
-	defer h.sessionManager.Detach(r.Context(), userID, conn.GetID())
+	// Defer order matters: defers run LIFO, so we defer Close first (runs last at unwind)
+	// and Detach second (runs first at unwind). This ensures the connector is removed
+	// from the Cell's sessions map before it's closed and recycled to the pool, preventing
+	// a race where concurrent delivery on another goroutine observes a torn/reused object.
 	defer conn.Close()
+	defer h.sessionManager.Detach(r.Context(), userID, conn.GetID())
 
 	var events []event.Eventer
 

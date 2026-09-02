@@ -180,6 +180,7 @@ drafts/
 
 # Claude Code local config (personal, not committed)
 .claude/
+docs/
 
 # graphify generated knowledge graph (local)
 graphify-out/

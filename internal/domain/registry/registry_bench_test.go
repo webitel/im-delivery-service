@@ -48,7 +48,7 @@ func benchMemoryPerUser(b *testing.B, users, mailbox, connBuf int) {
 	conns := make([]Connector, users)
 	for i := range users {
 		uid := uuid.New()
-		c := NewConnector(context.Background(), uid, connBuf)
+		c := NewConnector(context.Background(), uid, connBuf, nil)
 		h.Register(c)
 		conns[i] = c
 	}
@@ -93,7 +93,7 @@ func BenchmarkBroadcast_SingleSession(b *testing.B) {
 	defer h.Shutdown()
 
 	uid := uuid.New()
-	c := NewConnector(context.Background(), uid, 4096)
+	c := NewConnector(context.Background(), uid, 4096, nil)
 	h.Register(c)
 
 	// drain the connector so the mailbox never blocks
@@ -119,7 +119,7 @@ func BenchmarkBroadcast_FanoutManyUsers(b *testing.B) {
 	for i := range users {
 		uid := uuid.New()
 		ids[i] = uid
-		c := NewConnector(context.Background(), uid, 4096)
+		c := NewConnector(context.Background(), uid, 4096, nil)
 		h.Register(c)
 		go func() {
 			for range c.Recv() {
@@ -152,7 +152,7 @@ func TestNoGoroutineLeak_RegisterUnregister(t *testing.T) {
 		conns := make([]Connector, 0, 1000)
 		for range 1000 {
 			uid := uuid.New()
-			c := NewConnector(context.Background(), uid, 32)
+			c := NewConnector(context.Background(), uid, 32, nil)
 			h.Register(c)
 			conns = append(conns, c)
 		}

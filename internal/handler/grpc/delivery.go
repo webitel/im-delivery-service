@@ -67,7 +67,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 	// [ACTOR_ATTACHMENT]
 	// Subscribe links this specific gRPC stream to the User's Virtual Cell (Actor).
 	// This ensures all events routed to the Hub for this UserID will reach this stream.
-	conn, err := d.sessionManager.Attach(stream.Context(), userID, auth.Devices[0].ID)
+	conn, err := d.sessionManager.Attach(stream.Context(), userID, auth.Devices[0].ID, auth.Devices[0].AppID)
 	if err != nil {
 		l.Error("[STREAM] failed to attach session",
 			slog.Any("err", err),

@@ -45,6 +45,7 @@ type PushHandler struct {
 	pusher         PushProvider
 	leader         leader.LeaderAwarer
 	confirmer      DeliveryConfirmer
+	appConfig      AppConfigProvider
 	cb             *gobreaker.CircuitBreaker
 	log            *slog.Logger
 	timeout        time.Duration
@@ -59,6 +60,7 @@ func NewPushHandler(
 	pusher PushProvider,
 	leader leader.LeaderAwarer,
 	confirmer DeliveryConfirmer,
+	appConfig AppConfigProvider,
 	cfg *config.Config,
 	log *slog.Logger,
 ) *PushHandler {
@@ -78,6 +80,7 @@ func NewPushHandler(
 		pusher:         pusher,
 		leader:         leader,
 		confirmer:      confirmer,
+		appConfig:      appConfig,
 		cb:             cb,
 		log:            log.With("component", "push_handler"),
 		timeout:        cfg.Delivery.AckTimeout,
@@ -168,6 +171,16 @@ func (h *PushHandler) dispatch(ev event.Eventer) {
 
 	// [FILTER] Remove devices that have active/acked WebSocket sessions.
 	targets := h.filter(ctx, uid, devices, acked)
+
+	// A system message that Cell.deliver already suppressed for a connection never
+	// gets ACKed, which would otherwise make it look "undelivered" and push it here
+	// regardless of the app's policy. Apply the same policy check before shipping.
+	if len(targets) > 0 {
+		if systemType, ok := event.SystemMessageType(ev); ok {
+			targets = h.filterSystemMessagePolicy(ctx, targets, systemType)
+		}
+	}
+
 	if len(targets) > 0 {
 		h.ship(ctx, ev, targets)
 	}
@@ -232,10 +245,26 @@ func (h *PushHandler) filter(ctx context.Context, uid uuid.UUID, devices []model
 		}
 	}
 
-	filtered := make([]model.Device, 0)
+	filtered := make([]model.Device, 0, len(devices))
 
 	for _, d := range devices {
 		if _, seen := ackedMap[d.ID]; !seen {
+			filtered = append(filtered, d)
+		}
+	}
+
+	return filtered
+}
+
+func (h *PushHandler) filterSystemMessagePolicy(ctx context.Context, devices []model.Device, systemType string) []model.Device {
+	if h.appConfig == nil {
+		return devices
+	}
+
+	filtered := make([]model.Device, 0, len(devices))
+
+	for _, d := range devices {
+		if h.appConfig.SystemMessageAllowed(ctx, d.AppID, systemType) {
 			filtered = append(filtered, d)
 		}
 	}

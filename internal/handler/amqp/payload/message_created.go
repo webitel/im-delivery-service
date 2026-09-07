@@ -15,6 +15,7 @@ type Peer struct {
 	MemberID  string `json:"member_id"`
 	Role      int    `json:"role"`
 	Type      int    `json:"type"`
+	IsBot     bool   `json:"is_bot"`
 }
 
 // Recipient represents a target participant in the conversation.
@@ -22,6 +23,7 @@ type Recipient struct {
 	MemberID  string `json:"member_id"`
 	ContactID string `json:"contact_id"`
 	Role      int    `json:"role"`
+	IsBot     bool   `json:"is_bot"`
 }
 
 // MessageCreatedV1 is the top-level structure for the version 1 message event.

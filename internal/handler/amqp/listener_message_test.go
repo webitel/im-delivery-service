@@ -81,8 +81,8 @@ func TestOnMessageCreatedV1_SkipsNonControllerBot(t *testing.T) {
 		DomainID:  1,
 		From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
 		To: []payload.Recipient{
-			{ContactID: ownerBotID, MemberID: "ob-mem"},
-			{ContactID: ctrlBotID, MemberID: "cb-mem"},
+			{ContactID: ownerBotID, MemberID: "ob-mem", IsBot: true},
+			{ContactID: ctrlBotID, MemberID: "cb-mem", IsBot: true},
 		},
 		BotControllerMemberID: strPtr("cb-mem"),
 	}
@@ -105,6 +105,39 @@ func TestOnMessageCreatedV1_SkipsNonControllerBot(t *testing.T) {
 	}
 }
 
+// Regression: bot-ness is per-thread-membership, so the contact enricher may report the
+// owner bot's contact as NOT a bot. The event's to[].is_bot is authoritative and must win —
+// otherwise the owner is treated as a human, never filtered, and started on every message.
+func TestOnMessageCreatedV1_EventIsBotOverridesEnricher(t *testing.T) {
+	// Enricher wrongly says the owner contact is not a bot.
+	peers := []model.Peer{
+		{ID: uuid.MustParse(customerID), IsBot: false},
+		{ID: uuid.MustParse(ownerBotID), IsBot: false},
+		{ID: uuid.MustParse(ctrlBotID), IsBot: true},
+	}
+
+	raw := &payload.MessageCreatedV1{
+		MessageID: uuid.NewString(),
+		ThreadID:  uuid.NewString(),
+		DomainID:  1,
+		From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
+		To: []payload.Recipient{
+			{ContactID: ownerBotID, MemberID: "ob-mem", IsBot: true}, // event: it IS a bot
+			{ContactID: ctrlBotID, MemberID: "cb-mem", IsBot: true},
+		},
+		BotControllerMemberID: strPtr("cb-mem"),
+	}
+
+	events, err := newHandler(peers).OnMessageCreatedV1(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if targetSet(t, events)[uuid.MustParse(ownerBotID)] {
+		t.Errorf("owner must be filtered using event is_bot even when the enricher says otherwise")
+	}
+}
+
 // The owner bot receives the message when it IS the active controller — a normal
 // thread where the owner is the only/handling bot. It keeps triggering on every
 // new client message for as long as it stays the controller.
@@ -120,7 +153,7 @@ func TestOnMessageCreatedV1_OwnerAsControllerReceives(t *testing.T) {
 		DomainID:  1,
 		From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
 		To: []payload.Recipient{
-			{ContactID: ownerBotID, MemberID: "ob-mem"},
+			{ContactID: ownerBotID, MemberID: "ob-mem", IsBot: true},
 		},
 		BotControllerMemberID: strPtr("ob-mem"),
 	}
@@ -149,7 +182,7 @@ func TestOnMessageCreatedV1_NoControllerWakesNoBot(t *testing.T) {
 		DomainID:  1,
 		From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
 		To: []payload.Recipient{
-			{ContactID: ownerBotID, MemberID: "ob-mem"},
+			{ContactID: ownerBotID, MemberID: "ob-mem", IsBot: true},
 		},
 		BotControllerMemberID: nil,
 	}

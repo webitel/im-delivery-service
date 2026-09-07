@@ -43,15 +43,20 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	if p, ok := peerMap[senderID]; ok {
 		p.MemberID = raw.From.MemberID
 		p.Role = int32(raw.From.Role)
+		p.IsBot = raw.From.IsBot
 	}
 
-	// Overlay for all Recipients
+	// Overlay for all Recipients. IsBot is taken from the event, not the contact enricher:
+	// bot-ness is a per-thread-membership property (the same contact can be a bot in one
+	// thread and a plain participant in another), so the enriched per-contact IsBot may
+	// disagree. The active-controller filter below depends on this being correct.
 	for _, r := range raw.To {
 		rid, err := uuid.Parse(r.ContactID)
 		if err == nil {
 			if p, ok := peerMap[rid]; ok {
 				p.MemberID = r.MemberID
 				p.Role = int32(r.Role)
+				p.IsBot = r.IsBot
 			}
 		}
 	}

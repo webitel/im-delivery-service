@@ -79,39 +79,26 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 		}
 	}
 
-	// Decide whether bot delivery must be restricted to the active controller. This is
-	// needed ONLY when more than one bot participates in the thread: then a message must
-	// reach just the bot at the top of the control stack, never a bot suspended below it
-	// (e.g. the owner bot while another bot holds control). With a single bot there is
-	// nothing to disambiguate — it must always be triggered, both on a plain thread start
-	// and on a new message after the chat was closed and the bot left. We also require the
-	// advertised controller to actually match one of the bot participants, so a stale or
-	// desynced controller id never silences an otherwise valid thread.
+	// A message is delivered to a bot participant ONLY when that bot is the thread's active
+	// controller (bot_controller_member_id). Any other bot is suspended and must not be woken:
+	//   - another bot holds control on top of the stack → only that bot runs, not the owner;
+	//   - control was released (bot_controller_member_id empty), e.g. the conversation was
+	//     handed off to a human agent → NO bot is woken, so an agent's messages do not
+	//     re-trigger the owner bot.
+	// thread-service is the single source of truth here: it keeps bot_controller_id pointed at
+	// the owner while the owner should run, and NULL while an agent handles the thread. Humans
+	// are never filtered.
 	controllerID := ""
 	if raw.BotControllerMemberID != nil {
 		controllerID = *raw.BotControllerMemberID
 	}
 
-	botCount, controllerIsBotParticipant := 0, false
-	for _, id := range participantIDs {
-		if p, ok := peerMap[id]; ok && p.IsBot {
-			botCount++
-			if controllerID != "" && p.MemberID == controllerID {
-				controllerIsBotParticipant = true
-			}
-		}
-	}
-
-	restrictToController := botCount > 1 && controllerIsBotParticipant
-
 	events := make([]event.Eventer, 0, len(targets))
 	for _, targetID := range targets {
 		isEcho := targetID == senderID
 
-		// Skip any bot that is not the active controller (see restrictToController above).
-		// Humans are never filtered.
-		if !isEcho && restrictToController {
-			if p, ok := peerMap[targetID]; ok && p.IsBot && p.MemberID != controllerID {
+		if !isEcho {
+			if p, ok := peerMap[targetID]; ok && p.IsBot && (controllerID == "" || p.MemberID != controllerID) {
 				continue
 			}
 		}

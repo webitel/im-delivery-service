@@ -66,6 +66,35 @@ func targetSet(t *testing.T, events []event.Eventer) map[uuid.UUID]bool {
 	return set
 }
 
+// echoRecipientMemberIDs returns the member_ids in the To of the sender-echo event — the
+// event that is published to RabbitMQ (events[0]) and whose To flow-manager iterates to
+// start bot schemas. This is the list that actually decides which bots get woken.
+func echoRecipientMemberIDs(t *testing.T, events []event.Eventer, senderID uuid.UUID) map[string]bool {
+	t.Helper()
+
+	for _, e := range events {
+		if e.GetUserID() != senderID {
+			continue
+		}
+
+		msg, ok := e.GetPayload().(*model.Message)
+		if !ok {
+			t.Fatalf("echo payload is not *model.Message")
+		}
+
+		ids := make(map[string]bool, len(msg.To))
+		for _, p := range msg.To {
+			ids[p.MemberID] = true
+		}
+
+		return ids
+	}
+
+	t.Fatalf("no echo event for sender %s", senderID)
+
+	return nil
+}
+
 // A customer message on a thread whose control stack has a bot ON TOP of the
 // owner bot must reach only the active controller, never the suspended owner.
 func TestOnMessageCreatedV1_SkipsNonControllerBot(t *testing.T) {
@@ -102,6 +131,16 @@ func TestOnMessageCreatedV1_SkipsNonControllerBot(t *testing.T) {
 	}
 	if set[uuid.MustParse(ownerBotID)] {
 		t.Errorf("suspended owner bot must NOT be triggered by an inbound message")
+	}
+
+	// The event flow-manager actually consumes is the sender echo; its To must not carry the
+	// suspended owner bot (member ob-mem), or flow-manager would start the owner's schema.
+	echo := echoRecipientMemberIDs(t, events, uuid.MustParse(customerID))
+	if echo["ob-mem"] {
+		t.Errorf("echo (RabbitMQ) To must not include the suspended owner bot")
+	}
+	if !echo["cb-mem"] {
+		t.Errorf("echo (RabbitMQ) To must include the active controller bot")
 	}
 }
 

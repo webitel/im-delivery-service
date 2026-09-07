@@ -61,15 +61,39 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 		}
 	}
 
-	// Prepare the full list of recipients (everyone except the sender) for Echo/System context.
+	// A bot participant may only be woken when it is the thread's active controller
+	// (bot_controller_member_id). Any other bot is suspended and must be excluded; when control
+	// is released (empty controller — e.g. handed off to a human agent) no bot is woken at all.
+	// This is the key routing rule: the bot-facing event published to RabbitMQ is events[0]
+	// (the sender echo), whose `to` is allRecipients, and flow-manager starts a schema for
+	// EVERY bot in that list — so a suspended bot (the owner while another bot or an agent
+	// handles the thread) must not appear there. Humans are never filtered.
+	// thread-service is the single source of truth: bot_controller_id points at the owner while
+	// it should run, at the transient bot while it controls, and is NULL while an agent handles.
+	controllerID := ""
+	if raw.BotControllerMemberID != nil {
+		controllerID = *raw.BotControllerMemberID
+	}
+
+	suspendedBot := func(p *model.Peer) bool {
+		return p.IsBot && (controllerID == "" || p.MemberID != controllerID)
+	}
+
+	// Prepare the list of recipients (everyone except the sender) for Echo/System context,
+	// excluding suspended bots so they are neither shown as recipients nor woken by flow.
 	allRecipients := make([]model.Peer, 0)
 
 	for _, id := range participantIDs {
-		if id != senderID {
-			if p, ok := peerMap[id]; ok {
-				allRecipients = append(allRecipients, *p)
-			}
+		if id == senderID {
+			continue
 		}
+
+		p, ok := peerMap[id]
+		if !ok || suspendedBot(p) {
+			continue
+		}
+
+		allRecipients = append(allRecipients, *p)
 	}
 
 	// Initialize the domain message template from the payload.
@@ -84,26 +108,12 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 		}
 	}
 
-	// A message is delivered to a bot participant ONLY when that bot is the thread's active
-	// controller (bot_controller_member_id). Any other bot is suspended and must not be woken:
-	//   - another bot holds control on top of the stack → only that bot runs, not the owner;
-	//   - control was released (bot_controller_member_id empty), e.g. the conversation was
-	//     handed off to a human agent → NO bot is woken, so an agent's messages do not
-	//     re-trigger the owner bot.
-	// thread-service is the single source of truth here: it keeps bot_controller_id pointed at
-	// the owner while the owner should run, and NULL while an agent handles the thread. Humans
-	// are never filtered.
-	controllerID := ""
-	if raw.BotControllerMemberID != nil {
-		controllerID = *raw.BotControllerMemberID
-	}
-
 	events := make([]event.Eventer, 0, len(targets))
 	for _, targetID := range targets {
 		isEcho := targetID == senderID
 
 		if !isEcho {
-			if p, ok := peerMap[targetID]; ok && p.IsBot && (controllerID == "" || p.MemberID != controllerID) {
+			if p, ok := peerMap[targetID]; ok && suspendedBot(p) {
 				continue
 			}
 		}

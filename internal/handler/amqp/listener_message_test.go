@@ -105,12 +105,54 @@ func TestOnMessageCreatedV1_SkipsNonControllerBot(t *testing.T) {
 	}
 }
 
-// When the owner bot IS the active controller (it is alone at the top of the
-// stack), an inbound message must trigger it as before.
-func TestOnMessageCreatedV1_OwnerAsControllerReceives(t *testing.T) {
+// A thread with a single bot must always trigger it, even when the advertised
+// controller id no longer matches that bot — e.g. a new message after the chat
+// was closed and the bot left, leaving a stale bot_controller_member_id. The
+// single-bot case has nothing to disambiguate, so it must never be filtered.
+func TestOnMessageCreatedV1_SingleBotAlwaysReceives(t *testing.T) {
 	peers := []model.Peer{
 		{ID: uuid.MustParse(customerID), IsBot: false},
 		{ID: uuid.MustParse(ownerBotID), IsBot: true},
+	}
+
+	cases := map[string]*string{
+		"controller matches": strPtr("ob-mem"),
+		"controller stale":   strPtr("gone-mem"),
+		"controller absent":  nil,
+	}
+
+	for name, controller := range cases {
+		t.Run(name, func(t *testing.T) {
+			raw := &payload.MessageCreatedV1{
+				MessageID: uuid.NewString(),
+				ThreadID:  uuid.NewString(),
+				DomainID:  1,
+				From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
+				To: []payload.Recipient{
+					{ContactID: ownerBotID, MemberID: "ob-mem"},
+				},
+				BotControllerMemberID: controller,
+			}
+
+			events, err := newHandler(peers).OnMessageCreatedV1(context.Background(), raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !targetSet(t, events)[uuid.MustParse(ownerBotID)] {
+				t.Errorf("the only bot in the thread must receive the message")
+			}
+		})
+	}
+}
+
+// With two bots but a controller that matches neither (desync), the filter must
+// NOT silence the thread — every bot still receives the message.
+func TestOnMessageCreatedV1_StaleControllerDoesNotSilenceMultiBot(t *testing.T) {
+	peers := []model.Peer{
+		{ID: uuid.MustParse(customerID), IsBot: false},
+		{ID: uuid.MustParse(ownerBotID), IsBot: true},
+		{ID: uuid.MustParse(ctrlBotID), IsBot: true},
 	}
 
 	raw := &payload.MessageCreatedV1{
@@ -120,8 +162,9 @@ func TestOnMessageCreatedV1_OwnerAsControllerReceives(t *testing.T) {
 		From:      payload.Peer{ContactID: customerID, MemberID: "c-mem"},
 		To: []payload.Recipient{
 			{ContactID: ownerBotID, MemberID: "ob-mem"},
+			{ContactID: ctrlBotID, MemberID: "cb-mem"},
 		},
-		BotControllerMemberID: strPtr("ob-mem"),
+		BotControllerMemberID: strPtr("gone-mem"),
 	}
 
 	events, err := newHandler(peers).OnMessageCreatedV1(context.Background(), raw)
@@ -129,8 +172,9 @@ func TestOnMessageCreatedV1_OwnerAsControllerReceives(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !targetSet(t, events)[uuid.MustParse(ownerBotID)] {
-		t.Errorf("owner bot acting as controller must receive the message")
+	set := targetSet(t, events)
+	if !set[uuid.MustParse(ownerBotID)] || !set[uuid.MustParse(ctrlBotID)] {
+		t.Errorf("a controller matching no participant must not drop any bot")
 	}
 }
 

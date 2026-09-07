@@ -75,7 +75,18 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 		controllerID = *raw.BotControllerMemberID
 	}
 
+	// System notices (member added/removed, close, ...) carry no bot_controller_member_id, so
+	// the controller check would wrongly suspend every bot and strip them from the recipient
+	// list. Bots must still receive system notices (a running bot reacts to a close and leaves);
+	// flow-manager already refuses to START a bot from a system message, so this cannot wake a
+	// suspended bot. Only regular messages are filtered to the active controller.
+	isSystem := raw.System != nil || raw.Type == "system"
+
 	suspendedBot := func(p *model.Peer) bool {
+		if isSystem {
+			return false
+		}
+
 		return p.IsBot && (controllerID == "" || p.MemberID != controllerID)
 	}
 

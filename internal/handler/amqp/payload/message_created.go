@@ -45,6 +45,12 @@ type MessageCreatedV1 struct {
 	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
 
 	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
+
+	// BotControllerMemberID is the member_id of the bot currently at the top of the
+	// thread's control stack (the active controller). When set, a customer message must
+	// reach only this bot among the bot participants — any other bot (e.g. the owner bot
+	// suspended lower in the stack) must NOT be triggered.
+	BotControllerMemberID *string `json:"bot_controller_member_id,omitempty"`
 }
 
 type ForwardOrigin struct {

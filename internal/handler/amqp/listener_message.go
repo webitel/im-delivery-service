@@ -82,6 +82,18 @@ func (h *MessageHandler) OnMessageCreatedV1(ctx context.Context, raw *payload.Me
 	events := make([]event.Eventer, 0, len(targets))
 	for _, targetID := range targets {
 		isEcho := targetID == senderID
+
+		// A bot participant may only be triggered when it is the thread's active
+		// controller (top of the bot control stack). Skip any other bot — e.g. the owner
+		// bot suspended lower in the stack — so an inbound message does not restart it in
+		// parallel with the active controller. Humans are never filtered. When the event
+		// carries no controller (raw.BotControllerMemberID == nil) behaviour is unchanged.
+		if !isEcho && raw.BotControllerMemberID != nil {
+			if p, ok := peerMap[targetID]; ok && p.IsBot && p.MemberID != *raw.BotControllerMemberID {
+				continue
+			}
+		}
+
 		msg := *template
 
 		if isEcho {

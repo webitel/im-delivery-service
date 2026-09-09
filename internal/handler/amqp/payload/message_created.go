@@ -15,6 +15,7 @@ type Peer struct {
 	MemberID  string `json:"member_id"`
 	Role      int    `json:"role"`
 	Type      int    `json:"type"`
+	IsBot     bool   `json:"is_bot"`
 }
 
 // Recipient represents a target participant in the conversation.
@@ -22,6 +23,7 @@ type Recipient struct {
 	MemberID  string `json:"member_id"`
 	ContactID string `json:"contact_id"`
 	Role      int    `json:"role"`
+	IsBot     bool   `json:"is_bot"`
 }
 
 // MessageCreatedV1 is the top-level structure for the version 1 message event.
@@ -42,6 +44,12 @@ type MessageCreatedV1 struct {
 	Contact     *Contact        `json:"contact,omitempty"`
 	Metadata    map[string]any  `json:"metadata,omitempty"`
 	System      *System         `json:"system,omitempty"`
+
+	// BotControllerMemberID is the member_id of the bot currently at the top of the
+	// thread's control stack (the active controller). When set, a customer message must
+	// reach only this bot among the bot participants — any other bot (e.g. the owner bot
+	// suspended lower in the stack) must NOT be triggered.
+	BotControllerMemberID *string `json:"bot_controller_member_id,omitempty"`
 }
 
 // ToDomain converts the AMQP payload into the internal domain model.

@@ -69,7 +69,7 @@ func (forwardOrigin *ForwardOrigin) AsModel() *model.ForwardOrigin {
 	}
 
 	out := &model.ForwardOrigin{
-		Kind:           forwardOrigin.Kind,
+		Kind:           model.ForwardOriginKind(forwardOrigin.Kind),
 		SenderName:     forwardOrigin.SenderName,
 		OriginalSentAt: forwardOrigin.OriginalSentAt,
 	}

@@ -31,11 +31,41 @@ type Message struct {
 }
 
 type ForwardOrigin struct {
-	Kind            int16      `json:"kind"`
-	SenderID        *uuid.UUID `json:"sender_id,omitempty"`
-	SenderName      string     `json:"sender_name,omitempty"`
-	OriginalSentAt  int64      `json:"original_sent_at,omitempty"`
-	SourceMessageID *uuid.UUID `json:"source_message_id,omitempty"`
+	Kind            ForwardOriginKind `json:"kind"`
+	SenderID        *uuid.UUID        `json:"sender_id,omitempty"`
+	SenderName      string            `json:"sender_name,omitempty"`
+	OriginalSentAt  int64             `json:"original_sent_at,omitempty"`
+	SourceMessageID *uuid.UUID        `json:"source_message_id,omitempty"`
+}
+
+type ForwardOriginKind int16
+
+const (
+	ForwardOriginUnspecified ForwardOriginKind = iota
+	ForwardOriginInternal
+	ForwardOriginExternalUser
+	ForwardOriginExternalHiddenUser
+	ForwardOriginExternalChat
+)
+
+var forwardOriginKindNames = map[ForwardOriginKind]string{
+	ForwardOriginUnspecified:        "FORWARD_ORIGIN_KIND_UNSPECIFIED",
+	ForwardOriginInternal:           "FORWARD_ORIGIN_KIND_INTERNAL",
+	ForwardOriginExternalUser:       "FORWARD_ORIGIN_KIND_EXTERNAL_USER",
+	ForwardOriginExternalHiddenUser: "FORWARD_ORIGIN_KIND_EXTERNAL_HIDDEN_USER",
+	ForwardOriginExternalChat:       "FORWARD_ORIGIN_KIND_EXTERNAL_CHAT",
+}
+
+func (k ForwardOriginKind) String() string {
+	if name, ok := forwardOriginKindNames[k]; ok {
+		return name
+	}
+
+	return forwardOriginKindNames[ForwardOriginUnspecified]
+}
+
+func (k ForwardOriginKind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
 }
 
 type ReplyTo struct {

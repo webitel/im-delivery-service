@@ -168,8 +168,19 @@ func (s *AppConfigService) resolve(ctx context.Context, appID string) (SystemMes
 
 	allowList := app.GetAllowSystemMessages()
 	if allowList == nil {
+		s.logger.Debug("APP_CONFIG_RESOLVED",
+			slog.String("app_id", appID),
+			slog.Bool("restricted", false),
+		)
+
 		return SystemMessagePolicy{}, true
 	}
+
+	s.logger.Debug("APP_CONFIG_RESOLVED",
+		slog.String("app_id", appID),
+		slog.Bool("restricted", true),
+		slog.Any("allowed_types", allowList.GetTypes()),
+	)
 
 	return SystemMessagePolicy{
 		restricted: true,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/domain/util"
+	"github.com/webitel/im-delivery-service/internal/service/markdown"
 )
 
 // Peer represents the sender's data in the incoming payload.
@@ -129,7 +130,7 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		SendID:    d.SendID,
 		ThreadID:  util.SafeParseUUID(d.ThreadID),
 		DomainID:  int64(d.DomainID),
-		Text:      d.Body,
+		Text:      markdown.Render(d.Body, d.entities()),
 		CreatedAt: util.SafeParseRFC3339(d.OccurredAt),
 		Images:    d.mapImages(),
 		Documents: d.mapDocs(),
@@ -160,6 +161,57 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 	}
 
 	return msg
+}
+
+// entities extracts and decodes the `entities` array nested inside d.Metadata, as
+// populated by im-thread-service (mirrors shared.Entity's JSON shape there: {type,
+// offset, length, value} with value=="" -- not null/omitted -- when unused). Returns
+// nil (zero entities) if the key is missing or malformed; markdown.Render treats a
+// nil/empty entities slice as a valid plain-text-only message.
+func (d *MessageCreatedV1) entities() []model.Entity {
+	raw, ok := d.Metadata["entities"]
+	if !ok {
+		return nil
+	}
+
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+
+	var wire []entityWire
+	if err := json.Unmarshal(encoded, &wire); err != nil {
+		return nil
+	}
+
+	out := make([]model.Entity, 0, len(wire))
+	for _, w := range wire {
+		e := model.Entity{
+			Type:   model.EntityType(w.Type),
+			Offset: int32(w.Offset),
+			Length: int32(w.Length),
+		}
+
+		if w.Value != "" {
+			v := w.Value
+			e.Value = &v
+		}
+
+		out = append(out, e)
+	}
+
+	return out
+}
+
+// entityWire is the JSON wire shape of one formatting entity as sent by
+// im-thread-service inside metadata.entities (see im-thread-service's
+// internal/domain/shared.Entity struct: Type/Offset/Length/Value, json tags
+// type/offset/length/value, Value a plain non-pointer string that is "" when unused).
+type entityWire struct {
+	Type   string `json:"type"`
+	Offset int    `json:"offset"`
+	Length int    `json:"length"`
+	Value  string `json:"value"`
 }
 
 // mapImages converts payload image entries into domain model images.

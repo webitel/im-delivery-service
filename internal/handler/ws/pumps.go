@@ -41,6 +41,14 @@ func (h *WSHandler) readPump(conn *websocket.Conn, uid, cid uuid.UUID, domainID 
 			Seq       int64     `json:"seq"`
 		}
 		if err := conn.ReadJSON(&req); err != nil {
+			// TEMP DIAG: surface why the read pump exits (e.g. read limit
+			// exceeded on an oversized JWT frame vs. client-initiated close).
+			h.log.Warn("ws: read pump exit",
+				slog.String("uid", uid.String()),
+				slog.String("cid", cid.String()),
+				slog.Any("err", err),
+			)
+
 			break // Loop breaks immediately if terminate() is called.
 		}
 

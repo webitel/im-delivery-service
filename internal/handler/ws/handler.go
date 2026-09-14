@@ -14,10 +14,13 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+	// maxMessageSize caps inbound frames. Clients push a JWT auth frame into
+	// the socket (well over 512B), so the limit must fit it — otherwise gorilla
+	// answers with a Close (1009) and the whole session is torn down.
+	maxMessageSize = 16 * 1024
 	authTimeout    = 5 * time.Second
 )
 

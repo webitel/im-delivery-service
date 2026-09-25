@@ -42,6 +42,8 @@ func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 		res.Payload = marshalMessageReactionPayload(p)
 	case *model.MessageStatusUpdate:
 		res.Payload = marshalMessageStatusPayload(p)
+	case *model.MemberEvent:
+		res.Payload = marshalMemberChangedPayload(p)
 	case *model.ConnectedPayload:
 		res.Payload = &impb.ServerEvent_ConnectedEvent{ConnectedEvent: &impb.ConnectedEvent{
 			Ok:            p.Ok,

@@ -1,6 +1,8 @@
 package grpcmarshaller
 
 import (
+	"github.com/google/uuid"
+
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -106,6 +108,7 @@ func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_Mes
 			ThreadId:  m.ThreadID.String(),
 			DeletedBy: marshalPeer(&m.DeletedBy),
 			DeletedAt: m.DeletedAt,
+			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -120,6 +123,7 @@ func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_M
 			Removed:   m.Removed,
 			ReactedAt: m.ReactedAt,
 			SendId:    m.SendId,
+			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -150,10 +154,18 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 			Status:        status,
 			Via:           m.Via,
 			OccurredAt:    m.OccurredAt,
-			UpToMessageId: m.UpToMessageID.String(),
+			UpToMessageId: optionalUUIDString(m.UpToMessageID),
 			UpToSeq:       m.UpToSeq,
 		},
 	}
+}
+
+func optionalUUIDString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+
+	return id.String()
 }
 
 // marshalMessageType maps the domain type name onto the wire enum. The enum
@@ -185,11 +197,23 @@ func marshalMessageEditedPayload(m *model.MessageEdited) *impb.ServerEvent_Messa
 			CreatedAt: m.CreatedAt,
 			EditedAt:  m.EditedAt,
 			Version:   m.Version,
+			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
 
 // marshalMessagePayload converts the domain Message model to a gRPC server event.
+func marshalMemberChangedPayload(m *model.MemberEvent) *impb.ServerEvent_MemberChangedEvent {
+	return &impb.ServerEvent_MemberChangedEvent{
+		MemberChangedEvent: &impb.MemberChangedEvent{
+			ThreadId:  m.ThreadID.String(),
+			ContactId: m.ContactID.String(),
+			Action:    m.Action,
+			UpdateSeq: m.UpdateSeq,
+		},
+	}
+}
+
 func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 	// Map the slice of recipients from domain to PB
 	recipients := make([]*impb.Peer, 0, len(m.To))
@@ -226,7 +250,8 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 
 	return &impb.ServerEvent_MessageEvent{
 		MessageEvent: &impb.NewMessageEvent{
-			Message: msg,
+			Message:   msg,
+			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }

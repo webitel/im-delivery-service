@@ -48,7 +48,7 @@ func (d *MessageStatusV1) ToDomain() *model.MessageStatusUpdate {
 		Via:           d.Via,
 		Error:         d.Error,
 		OccurredAt:    util.SafeParseRFC3339(d.OccurredAt),
-		UpToMessageID: util.SafeParseUUID(d.UpToMessageID),
+		UpToMessageID: optionalUUID(d.UpToMessageID),
 		UpToSeq:       d.UpToSeq,
 	}
 }
@@ -80,4 +80,13 @@ func (d *MessageStatusV1) ParticipantIDs() []uuid.UUID {
 	}
 
 	return res
+}
+
+func optionalUUID(raw string) *uuid.UUID {
+	id := util.SafeParseUUID(raw)
+	if id == uuid.Nil {
+		return nil
+	}
+
+	return &id
 }

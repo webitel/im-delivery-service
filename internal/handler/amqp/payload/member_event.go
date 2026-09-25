@@ -11,11 +11,13 @@ type MemberEventSystem struct {
 }
 
 type MemberEventV1 struct {
-	ThreadID   string            `json:"thread_id"`
-	DomainID   int64             `json:"domain_id"`
-	ContactID  string            `json:"contact_id"`
-	OccurredAt string            `json:"occurred_at"`
-	System     MemberEventSystem `json:"system"`
+	ThreadID     string            `json:"thread_id"`
+	DomainID     int64             `json:"domain_id"`
+	ContactID    string            `json:"contact_id"`
+	OccurredAt   string            `json:"occurred_at"`
+	System       MemberEventSystem `json:"system"`
+	UpdateSeq    int64             `json:"update_seq"`
+	Participants []string          `json:"participants,omitempty"`
 }
 
 func (m *MemberEventV1) ToDomain() *model.MemberEvent {
@@ -23,5 +25,6 @@ func (m *MemberEventV1) ToDomain() *model.MemberEvent {
 		ThreadID:  util.SafeParseUUID(m.ThreadID),
 		ContactID: util.SafeParseUUID(m.ContactID),
 		Metadata:  m.System.Metadata,
+		UpdateSeq: m.UpdateSeq,
 	}
 }

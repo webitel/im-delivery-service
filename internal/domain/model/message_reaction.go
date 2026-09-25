@@ -26,6 +26,8 @@ type MessageReaction struct {
 	// applying the (Emoji, Removed) delta. reacted_by_me is derived client-side
 	// from ReactorIDs.
 	Reactions []ReactionAggregate `json:"reactions,omitempty"`
+	// Per-thread update_seq (GetThreadUpdates cursor); clients use it for gap detection.
+	UpdateSeq int64 `json:"update_seq,omitempty"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.
 	To []Peer `json:"-"`

@@ -54,6 +54,9 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 	case *model.DisconnectedPayload:
 		res.Payload[EventDisconnected.String()] = p
 
+	case *model.ResyncPayload:
+		res.Payload[EventResync.String()] = p
+
 	case *model.Thread:
 		res.Payload[EventThreadCreated.String()] = mapThread(p)
 

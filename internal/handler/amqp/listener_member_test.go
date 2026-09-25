@@ -10,7 +10,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/handler/amqp/payload"
 )
 
-// Every participant (not only the joiner) must get the event, or their update_seq gaps.
+// Every participant (not only the joiner) sees the join live.
 func TestOnMemberAdded_FansOutToAllParticipants(t *testing.T) {
 	h := newHandler(nil)
 	joiner := uuid.MustParse(customerID)
@@ -19,7 +19,6 @@ func TestOnMemberAdded_FansOutToAllParticipants(t *testing.T) {
 	events, err := h.OnMemberAddedV1(context.Background(), &payload.MemberEventV1{
 		ThreadID:     uuid.NewString(),
 		ContactID:    joiner.String(),
-		UpdateSeq:    9,
 		Participants: []string{other.String(), joiner.String(), "not-a-uuid"},
 	})
 	if err != nil {
@@ -33,8 +32,8 @@ func TestOnMemberAdded_FansOutToAllParticipants(t *testing.T) {
 
 	for _, e := range events {
 		m, ok := e.GetPayload().(*model.MemberEvent)
-		if !ok || m.UpdateSeq != 9 || m.Action != "joined" {
-			t.Fatalf("payload = %+v, want update_seq 9 action joined", e.GetPayload())
+		if !ok || m.Action != "joined" {
+			t.Fatalf("payload = %+v, want action joined", e.GetPayload())
 		}
 	}
 }

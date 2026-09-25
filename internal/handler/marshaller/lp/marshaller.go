@@ -66,6 +66,8 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 		lp.Type = "system_connected"
 	case *model.DisconnectedPayload:
 		lp.Type = "system_disconnected"
+	case *model.ResyncPayload:
+		lp.Type = "system_resync"
 	case *model.Typing:
 		lp.Type = "typing_event"
 	default:

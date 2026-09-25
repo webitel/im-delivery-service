@@ -10,83 +10,7 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// TestMarshalMessagePayloadUpdateSeq verifies that UpdateSeq is carried
-// from the domain model to the gRPC NewMessageEvent.
-func TestMarshalMessagePayloadUpdateSeq(t *testing.T) {
-	msg := &model.Message{
-		ID:        uuid.New(),
-		ThreadID:  uuid.New(),
-		Text:      "test",
-		CreatedAt: 1000,
-		UpdateSeq: 42,
-		From:      model.Peer{MemberID: "m1", Role: 1},
-	}
-
-	got := marshalMessagePayload(msg)
-
-	if got.MessageEvent.GetUpdateSeq() != 42 {
-		t.Errorf("UpdateSeq = %d, want 42", got.MessageEvent.GetUpdateSeq())
-	}
-}
-
-// TestMarshalMessageEditedPayloadUpdateSeq verifies that UpdateSeq is carried
-// from the domain model to the gRPC MessageEditedEvent.
-func TestMarshalMessageEditedPayloadUpdateSeq(t *testing.T) {
-	msg := &model.MessageEdited{
-		ID:        uuid.New(),
-		ThreadID:  uuid.New(),
-		Text:      "edited",
-		EditedAt:  2000,
-		UpdateSeq: 100,
-		EditedBy:  model.Peer{MemberID: "m1", Role: 1},
-	}
-
-	got := marshalMessageEditedPayload(msg)
-
-	if got.MessageEditedEvent.GetUpdateSeq() != 100 {
-		t.Errorf("UpdateSeq = %d, want 100", got.MessageEditedEvent.GetUpdateSeq())
-	}
-}
-
-// TestMarshalMessageDeletedPayloadUpdateSeq verifies that UpdateSeq is carried
-// from the domain model to the gRPC MessageDeletedEvent.
-func TestMarshalMessageDeletedPayloadUpdateSeq(t *testing.T) {
-	msg := &model.MessageDeleted{
-		ID:        uuid.New(),
-		ThreadID:  uuid.New(),
-		DeletedAt: 3000,
-		UpdateSeq: 50,
-		DeletedBy: model.Peer{MemberID: "m1", Role: 1},
-	}
-
-	got := marshalMessageDeletedPayload(msg)
-
-	if got.MessageDeletedEvent.GetUpdateSeq() != 50 {
-		t.Errorf("UpdateSeq = %d, want 50", got.MessageDeletedEvent.GetUpdateSeq())
-	}
-}
-
-// TestMarshalMessageReactionPayloadUpdateSeq verifies that UpdateSeq is carried
-// from the domain model to the gRPC MessageReactionEvent.
-func TestMarshalMessageReactionPayloadUpdateSeq(t *testing.T) {
-	msg := &model.MessageReaction{
-		ID:        uuid.New(),
-		ThreadID:  uuid.New(),
-		Emoji:     "🔥",
-		ReactedAt: 4000,
-		UpdateSeq: 75,
-		Reactor:   model.Peer{MemberID: "m1", Role: 1},
-	}
-
-	got := marshalMessageReactionPayload(msg)
-
-	if got.MessageReactionEvent.GetUpdateSeq() != 75 {
-		t.Errorf("UpdateSeq = %d, want 75", got.MessageReactionEvent.GetUpdateSeq())
-	}
-}
-
-// TestMarshalMemberChangedPayload verifies that MemberEvent including
-// UpdateSeq and Action are correctly mapped to gRPC MemberChangedEvent.
+// TestMarshalMemberChangedPayload verifies MemberEvent maps onto gRPC MemberChangedEvent.
 func TestMarshalMemberChangedPayload(t *testing.T) {
 	threadID := uuid.New()
 	contactID := uuid.New()
@@ -94,10 +18,9 @@ func TestMarshalMemberChangedPayload(t *testing.T) {
 	tests := []struct {
 		name   string
 		action string
-		seq    int64
 	}{
-		{"member joined", "joined", 42},
-		{"member left", "left", 99},
+		{"member joined", "joined"},
+		{"member left", "left"},
 	}
 
 	for _, tt := range tests {
@@ -106,7 +29,6 @@ func TestMarshalMemberChangedPayload(t *testing.T) {
 				ThreadID:  threadID,
 				ContactID: contactID,
 				Action:    tt.action,
-				UpdateSeq: tt.seq,
 			}
 
 			got := marshalMemberChangedPayload(member)
@@ -121,10 +43,6 @@ func TestMarshalMemberChangedPayload(t *testing.T) {
 
 			if got.MemberChangedEvent.GetAction() != tt.action {
 				t.Errorf("Action = %s, want %s", got.MemberChangedEvent.GetAction(), tt.action)
-			}
-
-			if got.MemberChangedEvent.GetUpdateSeq() != tt.seq {
-				t.Errorf("UpdateSeq = %d, want %d", got.MemberChangedEvent.GetUpdateSeq(), tt.seq)
 			}
 		})
 	}

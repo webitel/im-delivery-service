@@ -108,7 +108,6 @@ func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_Mes
 			ThreadId:  m.ThreadID.String(),
 			DeletedBy: marshalPeer(&m.DeletedBy),
 			DeletedAt: m.DeletedAt,
-			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -123,7 +122,6 @@ func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_M
 			Removed:   m.Removed,
 			ReactedAt: m.ReactedAt,
 			SendId:    m.SendId,
-			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -197,7 +195,6 @@ func marshalMessageEditedPayload(m *model.MessageEdited) *impb.ServerEvent_Messa
 			CreatedAt: m.CreatedAt,
 			EditedAt:  m.EditedAt,
 			Version:   m.Version,
-			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -209,7 +206,6 @@ func marshalMemberChangedPayload(m *model.MemberEvent) *impb.ServerEvent_MemberC
 			ThreadId:  m.ThreadID.String(),
 			ContactId: m.ContactID.String(),
 			Action:    m.Action,
-			UpdateSeq: m.UpdateSeq,
 		},
 	}
 }
@@ -250,8 +246,7 @@ func marshalMessagePayload(m *model.Message) *impb.ServerEvent_MessageEvent {
 
 	return &impb.ServerEvent_MessageEvent{
 		MessageEvent: &impb.NewMessageEvent{
-			Message:   msg,
-			UpdateSeq: m.UpdateSeq,
+			Message: msg,
 		},
 	}
 }

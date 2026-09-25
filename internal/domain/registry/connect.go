@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/webitel/im-delivery-service/internal/domain/event"
+	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
 // Interface guard
@@ -47,7 +48,19 @@ type connect struct {
 	closeOnce       sync.Once // [PROTECTION]
 	lastActivityAt  int64     // [ATOMIC_FIELD]
 	droppedCount    uint64    // [ATOMIC_FIELD]
+	lostUpdates     atomic.Bool
 	systemMsgFilter SystemMessageFilter
+}
+
+// catchUpKinds are the events GetUpdates can replay; losing one makes the client resync.
+var catchUpKinds = map[event.EventKind]struct{}{
+	event.MessageCreated:  {},
+	event.ThreadCreated:   {},
+	event.MemberAdded:     {},
+	event.MemberLeft:      {},
+	event.MessageEdited:   {},
+	event.MessageDeleted:  {},
+	event.MessageReaction: {},
 }
 
 // [POOL] SYNC.POOL FOR OBJECT REUSE (REDUCES GC PRESSURE)
@@ -104,6 +117,10 @@ func (c *connect) SystemMessageAllowed(systemType string) bool {
 // Send attempts to push an event into the channel.
 // If the channel is full, it tries to evict lower priority events to make room.
 func (c *connect) Send(ev event.Eventer, timeout time.Duration) bool {
+	if c.lostUpdates.Load() {
+		c.sendResync()
+	}
+
 	// [FAST_PATH] Non-blocking enqueue. This covers the overwhelming majority of
 	// deliveries — whenever the consumer keeps up there is free buffer space — and
 	// it allocates nothing. The previous implementation built a context.WithTimeout
@@ -166,11 +183,32 @@ func releaseTimer(t *time.Timer) {
 	timerPool.Put(t)
 }
 
+// markLost remembers that a replayable event never reached the client.
+func (c *connect) markLost(ev event.Eventer) {
+	if _, ok := catchUpKinds[ev.GetKind()]; ok {
+		c.lostUpdates.Store(true)
+	}
+}
+
+// sendResync queues the resync hint ahead of the next event once the buffer has room.
+func (c *connect) sendResync() {
+	resync := event.NewSystemEvent(c.userID, event.Resync, &model.ResyncPayload{},
+		event.WithPriority[*model.ResyncPayload](event.PriorityHigh))
+
+	select {
+	case <-c.ctx.Done():
+	case c.sendCh <- resync:
+		c.lostUpdates.Store(false)
+	default:
+	}
+}
+
 // handleBackpressure manages full buffers by dropping low-priority events.
 func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bool {
 	// If the incoming event is low priority, drop it immediately to save buffer for high priority
 	if ev.GetPriority() <= event.PriorityLow {
 		atomic.AddUint64(&c.droppedCount, 1)
+		c.markLost(ev)
 
 		return false
 	}
@@ -181,6 +219,7 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 	case oldEv := <-c.sendCh:
 		if oldEv.GetPriority() < ev.GetPriority() {
 			// Successfully replaced lower priority event with a higher one
+			c.markLost(oldEv)
 			c.sendCh <- ev
 
 			return true
@@ -190,12 +229,14 @@ func (c *connect) handleBackpressure(ev event.Eventer, timeout time.Duration) bo
 		case c.sendCh <- oldEv:
 		default:
 			// If we can't even put it back, it's lost
+			c.markLost(oldEv)
 		}
 	case <-time.After(timeout):
 		// Hard timeout reached
 	}
 
 	atomic.AddUint64(&c.droppedCount, 1)
+	c.markLost(ev)
 
 	return false
 }

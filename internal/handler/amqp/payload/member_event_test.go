@@ -6,9 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestMemberEventV1UpdateSeq verifies that update_seq from the AMQP payload
-// is correctly mapped to the domain model.
-func TestMemberEventV1UpdateSeq(t *testing.T) {
+// TestMemberEventV1ToDomain verifies the AMQP member payload maps onto the domain model.
+func TestMemberEventV1ToDomain(t *testing.T) {
 	threadID := uuid.New()
 	contactID := uuid.New()
 
@@ -21,7 +20,6 @@ func TestMemberEventV1UpdateSeq(t *testing.T) {
 			Type:     "member_joined",
 			Metadata: map[string]any{"reason": "invited"},
 		},
-		UpdateSeq: 42,
 	}
 
 	got := in.ToDomain()
@@ -32,10 +30,6 @@ func TestMemberEventV1UpdateSeq(t *testing.T) {
 
 	if got.ContactID != contactID {
 		t.Errorf("ContactID = %v, want %v", got.ContactID, contactID)
-	}
-
-	if got.UpdateSeq != 42 {
-		t.Errorf("UpdateSeq = %d, want 42", got.UpdateSeq)
 	}
 
 	if got.Metadata["reason"] != "invited" {

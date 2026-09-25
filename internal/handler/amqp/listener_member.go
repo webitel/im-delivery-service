@@ -26,7 +26,7 @@ func (h *MessageHandler) handleMemberEvent(raw *payload.MemberEventV1, kind even
 		return nil, nil
 	}
 
-	// Every member needs the event to keep its update_seq contiguous, not only the subject.
+	// Every member sees the join/leave live, not only the subject.
 	targets := h.computeLocalTargets(m.ContactID, memberEventRecipients(m.ContactID, raw.Participants))
 	if len(targets) == 0 {
 		return nil, nil

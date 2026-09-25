@@ -27,8 +27,6 @@ type MessageEdited struct {
 	Version   int32 `json:"version"`
 	CreatedAt int64 `json:"created_at"`
 	EditedAt  int64 `json:"edited_at"`
-	// Per-thread update_seq (GetThreadUpdates cursor); clients use it for gap detection.
-	UpdateSeq int64 `json:"update_seq,omitempty"`
 }
 
 func (m *MessageEdited) RoutingKey() string {

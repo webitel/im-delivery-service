@@ -44,6 +44,7 @@ type WSMessage struct {
 	ReplyTo     *WSReplyTo        `json:"reply_to,omitempty"`
 
 	ForwardOrigin *model.ForwardOrigin `json:"forward_origin,omitempty"`
+	UpdateSeq     int64                `json:"update_seq,omitempty"`
 }
 
 // WSReplyTo is the quoted message preview with the same nested sender shape as WSMessage.
@@ -120,6 +121,7 @@ func mapMessage(m *model.Message) *WSMessage {
 		ReplyTo:   mapReplyTo(m.ReplyTo),
 
 		ForwardOrigin: m.ForwardOrigin,
+		UpdateSeq:     m.UpdateSeq,
 	}
 
 	if len(m.Images) > 0 {

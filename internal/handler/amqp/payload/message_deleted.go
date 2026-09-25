@@ -68,6 +68,7 @@ type MessageDeletedV1 struct {
 	Type       string      `json:"type"`
 	CreatedAt  string      `json:"created_at"`
 	OccurredAt string      `json:"occurred_at"`
+	UpdateSeq  int64       `json:"update_seq"`
 }
 
 func (d *MessageDeletedV1) ToDomain() *model.MessageDeleted {
@@ -82,6 +83,7 @@ func (d *MessageDeletedV1) ToDomain() *model.MessageDeleted {
 		DomainID:  int64(d.DomainID),
 		CreatedAt: createdAt,
 		DeletedAt: util.SafeParseRFC3339(d.OccurredAt),
+		UpdateSeq: d.UpdateSeq,
 		DeletedBy: d.DeletedBy.ToPeer(),
 	}
 

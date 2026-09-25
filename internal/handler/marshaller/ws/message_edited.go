@@ -14,6 +14,7 @@ type WSMessageEdited struct {
 	CreatedAt int64          `json:"created_at"`
 	EditedAt  int64          `json:"edited_at"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
+	UpdateSeq int64          `json:"update_seq,omitempty"`
 }
 
 func mapMessageEdited(m *model.MessageEdited) *WSMessageEdited {
@@ -27,5 +28,6 @@ func mapMessageEdited(m *model.MessageEdited) *WSMessageEdited {
 		CreatedAt: m.CreatedAt,
 		EditedAt:  m.EditedAt,
 		Metadata:  m.Metadata,
+		UpdateSeq: m.UpdateSeq,
 	}
 }

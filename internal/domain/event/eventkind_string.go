@@ -23,11 +23,12 @@ func _() {
 	_ = x[MessageDeleted-13]
 	_ = x[Typing-14]
 	_ = x[MessageReaction-15]
+	_ = x[Resync-16]
 }
 
-const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeftInteractiveCallbackMessageEditedMessageStatusChangedMessageDeletedTypingMessageReaction"
+const _EventKind_name = "ConnectedDisconnectedEventMessageCreatedThreadCreatedMessageReadVariableSetVariableFlushMemberAddedMemberLeftInteractiveCallbackMessageEditedMessageStatusChangedMessageDeletedTypingMessageReactionResync"
 
-var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109, 128, 141, 161, 175, 181, 196}
+var _EventKind_index = [...]uint8{0, 9, 26, 40, 53, 64, 75, 88, 99, 109, 128, 141, 161, 175, 181, 196, 202}
 
 func (i EventKind) String() string {
 	i -= 1

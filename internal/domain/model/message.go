@@ -28,8 +28,6 @@ type Message struct {
 	ReplyTo     *ReplyTo        `json:"reply_to,omitempty"`
 
 	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
-	// Per-thread update_seq (GetThreadUpdates cursor); clients use it for gap detection.
-	UpdateSeq int64 `json:"update_seq,omitempty"`
 }
 
 type ForwardOrigin struct {

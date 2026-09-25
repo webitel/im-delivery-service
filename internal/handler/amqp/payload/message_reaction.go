@@ -20,7 +20,6 @@ type MessageReactionV1 struct {
 
 	// Reactions is the full per-emoji aggregate on the message after this change.
 	Reactions []model.ReactionAggregate `json:"reactions,omitempty"`
-	UpdateSeq int64                     `json:"update_seq"`
 }
 
 func (r *MessageReactionV1) ToDomain() *model.MessageReaction {
@@ -33,7 +32,6 @@ func (r *MessageReactionV1) ToDomain() *model.MessageReaction {
 		ReactedAt: util.SafeParseRFC3339(r.OccurredAt),
 		SendId:    r.SendId,
 		Reactions: r.Reactions,
-		UpdateSeq: r.UpdateSeq,
 		Reactor: model.Peer{
 			ID:       util.SafeParseUUID(r.Reactor.ContactID),
 			MemberID: r.Reactor.MemberID,

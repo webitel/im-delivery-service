@@ -18,7 +18,6 @@ type WSReaction struct {
 	MessageID string                `json:"message_id"`
 	ThreadID  string                `json:"thread_id"`
 	Reactions []WSReactionAggregate `json:"reactions"`
-	UpdateSeq int64                 `json:"update_seq,omitempty"`
 }
 
 // WSReactionAggregate is one emoji's state on the message as seen by a single
@@ -55,6 +54,5 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *WSReaction {
 		MessageID: m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
 		Reactions: aggs,
-		UpdateSeq: m.UpdateSeq,
 	}
 }

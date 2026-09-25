@@ -10,9 +10,8 @@ import (
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 )
 
-// TestMarshalMemberJoinedWithUpdateSeq verifies that a member joined event
-// with UpdateSeq is correctly marshaled to WebSocket JSON.
-func TestMarshalMemberJoinedWithUpdateSeq(t *testing.T) {
+// TestMarshalMemberJoined verifies a member joined event marshals to WebSocket JSON.
+func TestMarshalMemberJoined(t *testing.T) {
 	threadID := uuid.New()
 	contactID := uuid.New()
 
@@ -20,7 +19,6 @@ func TestMarshalMemberJoinedWithUpdateSeq(t *testing.T) {
 		ThreadID:  threadID,
 		ContactID: contactID,
 		Metadata:  map[string]any{"reason": "invited"},
-		UpdateSeq: 42,
 		Action:    "joined",
 	}
 
@@ -55,15 +53,6 @@ func TestMarshalMemberJoinedWithUpdateSeq(t *testing.T) {
 		t.Fatalf("no member_added_event in payload: %v", payload)
 	}
 
-	// Verify UpdateSeq is present and correct
-	updateSeq, ok := memberAdded["update_seq"]
-	if !ok {
-		t.Errorf("no update_seq field in member_added_event: %v", memberAdded)
-	}
-
-	if updateSeq != float64(42) { // JSON numbers are float64
-		t.Errorf("update_seq = %v, want 42", updateSeq)
-	}
 
 	// Verify action field
 	action, ok := memberAdded["action"]
@@ -76,9 +65,8 @@ func TestMarshalMemberJoinedWithUpdateSeq(t *testing.T) {
 	}
 }
 
-// TestMarshalMemberLeftWithUpdateSeq verifies that a member left event
-// with UpdateSeq is correctly marshaled to WebSocket JSON.
-func TestMarshalMemberLeftWithUpdateSeq(t *testing.T) {
+// TestMarshalMemberLeft verifies a member left event marshals to WebSocket JSON.
+func TestMarshalMemberLeft(t *testing.T) {
 	threadID := uuid.New()
 	contactID := uuid.New()
 
@@ -86,7 +74,6 @@ func TestMarshalMemberLeftWithUpdateSeq(t *testing.T) {
 		ThreadID:  threadID,
 		ContactID: contactID,
 		Metadata:  map[string]any{},
-		UpdateSeq: 99,
 		Action:    "left",
 	}
 
@@ -118,15 +105,6 @@ func TestMarshalMemberLeftWithUpdateSeq(t *testing.T) {
 		t.Fatalf("no member_left_event in payload: %v", payload)
 	}
 
-	// Verify UpdateSeq is present and correct
-	updateSeq, ok := memberLeft["update_seq"]
-	if !ok {
-		t.Errorf("no update_seq field in member_left_event: %v", memberLeft)
-	}
-
-	if updateSeq != float64(99) {
-		t.Errorf("update_seq = %v, want 99", updateSeq)
-	}
 
 	// Verify action field
 	action, ok := memberLeft["action"]

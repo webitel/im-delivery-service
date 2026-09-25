@@ -17,8 +17,6 @@ type MessageDeleted struct {
 	DeletedBy Peer      `json:"deleted_by"`
 	CreatedAt int64     `json:"created_at"`
 	DeletedAt int64     `json:"deleted_at"`
-	// Per-thread update_seq (GetThreadUpdates cursor); clients use it for gap detection.
-	UpdateSeq int64 `json:"update_seq,omitempty"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.
 	To []Peer `json:"-"`

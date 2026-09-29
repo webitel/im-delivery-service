@@ -26,7 +26,7 @@ type MessageReaction struct {
 	// applying the (Emoji, Removed) delta. reacted_by_me is derived client-side
 	// from ReactorIDs.
 	Reactions []ReactionAggregate `json:"reactions,omitempty"`
-	// UpdatesCursor is the GetUpdates position just before this change (set by im-thread-service).
+	// UpdatesCursor is the recipient's GetUpdates cursor after this change (set by im-thread-service).
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.

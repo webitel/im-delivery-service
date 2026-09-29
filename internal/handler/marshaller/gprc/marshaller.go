@@ -49,6 +49,7 @@ func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 			Ok:            p.Ok,
 			ConnectionId:  p.ConnectionID,
 			ServerVersion: model.ServerVersion,
+			UpdatesCursor: p.UpdatesCursor,
 		}}
 	case *model.DisconnectedPayload:
 		res.Payload = &impb.ServerEvent_DisconnectedEvent{DisconnectedEvent: &impb.DisconnectedEvent{Reason: p.Reason}}

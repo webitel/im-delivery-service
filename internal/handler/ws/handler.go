@@ -31,6 +31,7 @@ type WSHandler struct {
 	presenceManager service.PresenceManager
 	auther          service.Auther
 	marshaller      marshaller.EventMarshaller
+	cursors         service.UpdatesCursors
 	upgrader        websocket.Upgrader
 }
 
@@ -41,6 +42,7 @@ func NewWSHandler(
 	presence service.PresenceManager,
 	auther service.Auther,
 	marshaller marshaller.EventMarshaller,
+	cursors service.UpdatesCursors,
 ) *WSHandler {
 	return &WSHandler{
 		log:             log.With("component", "ws_handler"),
@@ -49,6 +51,7 @@ func NewWSHandler(
 		presenceManager: presence,
 		auther:          auther,
 		marshaller:      marshaller,
+		cursors:         cursors,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,

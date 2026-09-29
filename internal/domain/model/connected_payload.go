@@ -6,4 +6,6 @@ type ConnectedPayload struct {
 	Ok            bool   `json:"ok"`
 	ConnectionID  string `json:"connection_id"`
 	ServerVersion string `json:"server_version"`
+	// UpdatesCursor is the user's GetUpdates cursor now: equal to the saved one means nothing was missed.
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }

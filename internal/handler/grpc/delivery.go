@@ -23,6 +23,7 @@ type DeliveryHandler struct {
 	logger         *slog.Logger
 	sessionManager service.SessionManager
 	marshaller     marshaller.EventMarshaller
+	cursors        service.UpdatesCursors
 	impb.UnimplementedDeliveryServer
 }
 
@@ -30,11 +31,13 @@ func NewDeliveryHandler(
 	logger *slog.Logger,
 	sessionManager service.SessionManager,
 	marshaller *grpcmarshaller.Marshaller,
+	cursors service.UpdatesCursors,
 ) *DeliveryHandler {
 	return &DeliveryHandler{
 		logger:         logger,
 		sessionManager: sessionManager,
 		marshaller:     marshaller,
+		cursors:        cursors,
 	}
 }
 
@@ -97,6 +100,7 @@ func (d *DeliveryHandler) Stream(req *impb.StreamRequest, stream impb.Delivery_S
 			Ok:            true,
 			ConnectionID:  conn.GetID().String(),
 			ServerVersion: model.ServerVersion,
+			UpdatesCursor: service.ConnectedUpdatesCursor(stream.Context(), d.cursors, userID.String(), l),
 		},
 		event.WithPriority[*model.ConnectedPayload](event.PriorityNormal),
 	)

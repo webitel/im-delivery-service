@@ -80,6 +80,7 @@ var Module = fx.Module(
 			func(c *imthread.Client) service.ThreadStatusClient { return c },
 			fx.As(new(service.ThreadStatusClient)),
 		),
+		func(c *imthread.Client) service.UpdatesCursors { return c },
 
 		// 3. Delivery confirmations funnel (WS ACKs via Orchestrator, pushes via PushHandler).
 		fx.Annotate(

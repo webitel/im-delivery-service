@@ -13,6 +13,7 @@ import (
 
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/service"
 )
 
 // [WAIT_AUTH_FRAME] Now waits 5s if only client_id was provided in headers.
@@ -103,8 +104,9 @@ func (h *WSHandler) initSession(c *websocket.Conn, auth *model.AuthContact) {
 
 	log.Info("ws: session established")
 	h.sendSystem(c, uid, event.Connected, &model.ConnectedPayload{
-		Ok:           true,
-		ConnectionID: cid.String(),
+		Ok:            true,
+		ConnectionID:  cid.String(),
+		UpdatesCursor: service.ConnectedUpdatesCursor(sessionCtx, h.cursors, uid.String(), log),
 	})
 
 	go h.readPump(c, uid, cid, auth.DC)

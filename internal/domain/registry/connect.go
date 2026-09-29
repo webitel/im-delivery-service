@@ -49,6 +49,8 @@ type connect struct {
 	lastActivityAt  int64     // [ATOMIC_FIELD]
 	droppedCount    uint64    // [ATOMIC_FIELD]
 	lostUpdates     atomic.Bool
+	lostMu          sync.Mutex
+	lostCursor      string // position before the first dropped change; guarded by lostMu
 	systemMsgFilter SystemMessageFilter
 }
 
@@ -183,22 +185,39 @@ func releaseTimer(t *time.Timer) {
 	timerPool.Put(t)
 }
 
-// markLost remembers that a replayable event never reached the client.
+// markLost remembers that a replayable event never reached the client, keeping the cursor
+// of the first loss so the resync replays from before it.
 func (c *connect) markLost(ev event.Eventer) {
-	if _, ok := catchUpKinds[ev.GetKind()]; ok {
+	if _, ok := catchUpKinds[ev.GetKind()]; !ok {
+		return
+	}
+
+	c.lostMu.Lock()
+	defer c.lostMu.Unlock()
+
+	if !c.lostUpdates.Load() {
+		c.lostCursor = model.UpdatesCursorOf(ev.GetPayload())
 		c.lostUpdates.Store(true)
 	}
 }
 
 // sendResync queues the resync hint ahead of the next event once the buffer has room.
 func (c *connect) sendResync() {
-	resync := event.NewSystemEvent(c.userID, event.Resync, &model.ResyncPayload{},
+	c.lostMu.Lock()
+	defer c.lostMu.Unlock()
+
+	if !c.lostUpdates.Load() {
+		return
+	}
+
+	resync := event.NewSystemEvent(c.userID, event.Resync, &model.ResyncPayload{Cursor: c.lostCursor},
 		event.WithPriority[*model.ResyncPayload](event.PriorityHigh))
 
 	select {
 	case <-c.ctx.Done():
 	case c.sendCh <- resync:
 		c.lostUpdates.Store(false)
+		c.lostCursor = ""
 	default:
 	}
 }

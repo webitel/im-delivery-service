@@ -53,7 +53,7 @@ func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 	case *model.DisconnectedPayload:
 		res.Payload = &impb.ServerEvent_DisconnectedEvent{DisconnectedEvent: &impb.DisconnectedEvent{Reason: p.Reason}}
 	case *model.ResyncPayload:
-		res.Payload = &impb.ServerEvent_ResyncEvent{ResyncEvent: &impb.ResyncEvent{}}
+		res.Payload = &impb.ServerEvent_ResyncEvent{ResyncEvent: &impb.ResyncEvent{Cursor: p.Cursor}}
 	case *model.Typing:
 		// member is the enriched typing participant, marshalled with the SAME
 		// helper as a message sender (marshalPeer) — identical shape to a

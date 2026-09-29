@@ -14,6 +14,8 @@ type lpReaction struct {
 	MessageID string                `json:"message_id"`
 	ThreadID  string                `json:"thread_id"`
 	Reactions []lpReactionAggregate `json:"reactions"`
+
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 // lpReactionAggregate is one emoji's state on the message for this recipient,
@@ -47,5 +49,7 @@ func mapReaction(m *model.MessageReaction, viewer uuid.UUID) *lpReaction {
 		MessageID: m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
 		Reactions: aggs,
+
+		UpdatesCursor: m.UpdatesCursor,
 	}
 }

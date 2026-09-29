@@ -30,7 +30,7 @@ type Message struct {
 	ForwardOrigin *ForwardOrigin `json:"forward_origin,omitempty"`
 	// Seq is the per-thread message seq read_up_to_seq / delivered_up_to_seq compare against.
 	Seq int64 `json:"seq,omitempty"`
-	// UpdatesCursor is the GetUpdates position just before this change (set by im-thread-service).
+	// UpdatesCursor is the recipient's GetUpdates cursor after this change (set by im-thread-service).
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 

@@ -17,7 +17,7 @@ type MessageDeleted struct {
 	DeletedBy Peer      `json:"deleted_by"`
 	CreatedAt int64     `json:"created_at"`
 	DeletedAt int64     `json:"deleted_at"`
-	// UpdatesCursor is the GetUpdates position just before this change (set by im-thread-service).
+	// UpdatesCursor is the recipient's GetUpdates cursor after this change (set by im-thread-service).
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.

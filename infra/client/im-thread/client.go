@@ -23,6 +23,8 @@ type Client struct {
 	logger *slog.Logger
 	// [GENERIC_RPC] Holds the go-kit RPC client for the thread status service
 	rpc *rpc.Client[threadv1.MessageStatusClient]
+	// cursors reads a contact's GetUpdates cursor for the connected event.
+	cursors *rpc.Client[threadv1.UpdatesCursorClient]
 }
 
 func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infratls.Config) (*Client, error) {
@@ -37,9 +39,19 @@ func New(logger *slog.Logger, discovery discovery.DiscoveryProvider, tls *infrat
 		return nil, fmt.Errorf("[im-thread-client] initialization failed: %w", err)
 	}
 
+	cursorFactory := func(conn *grpc.ClientConn) threadv1.UpdatesCursorClient {
+		return threadv1.NewUpdatesCursorClient(conn)
+	}
+
+	cursors, err := webitel.New(logger, discovery, ServiceName, tls, cursorFactory, true)
+	if err != nil {
+		return nil, fmt.Errorf("[im-thread-client] updates cursor initialization failed: %w", err)
+	}
+
 	return &Client{
-		logger: logger,
-		rpc:    c,
+		logger:  logger,
+		rpc:     c,
+		cursors: cursors,
 	}, nil
 }
 
@@ -75,8 +87,26 @@ func (c *Client) MarkRead(ctx context.Context, req *threadv1.MarkReadRequest) (*
 	return resp, err
 }
 
+// UpdatesCursor is the contact's GetUpdates cursor now.
+func (c *Client) UpdatesCursor(ctx context.Context, contactID string) (string, error) {
+	var cursor string
+
+	err := c.cursors.Execute(ctx, func(api threadv1.UpdatesCursorClient) error {
+		resp, err := api.Get(ctx, &threadv1.GetUpdatesCursorRequest{CallerId: contactID})
+		cursor = resp.GetCursor()
+
+		return err
+	})
+
+	return cursor, err
+}
+
 // Close gracefully shuts down the underlying gRPC connection pool.
 func (c *Client) Close() error {
+	if c.cursors != nil {
+		_ = c.cursors.Close()
+	}
+
 	if c.rpc != nil {
 		return c.rpc.Close()
 	}

@@ -31,3 +31,16 @@ func TestMarshal_ResyncCursor(t *testing.T) {
 		t.Fatalf("resync cursor = %q, want 5.6", c)
 	}
 }
+
+func TestMarshal_ConnectedCursor(t *testing.T) {
+	ev := event.NewSystemEvent(uuid.New(), event.Connected, &model.ConnectedPayload{Ok: true, UpdatesCursor: "94770179"})
+
+	got, err := New().Marshal(ev, uuid.Nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if c := got.(*impb.ServerEvent).GetConnectedEvent().GetUpdatesCursor(); c != "94770179" {
+		t.Fatalf("connected cursor = %q, want 94770179", c)
+	}
+}

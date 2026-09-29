@@ -84,3 +84,24 @@ func TestSend_DroppedTypingDoesNotResync(t *testing.T) {
 		t.Fatal("dropped typing must not ask for resync")
 	}
 }
+
+func statusEvent(status string) event.Eventer {
+	return event.NewSystemEvent(uuid.New(), event.MessageStatusChanged, &model.MessageStatusUpdate{Status: status, UpdatesCursor: "7"},
+		event.WithPriority[*model.MessageStatusUpdate](event.PriorityLow))
+}
+
+// A lost read is replayable (journaled), a lost delivered receipt is not.
+func TestSend_LostReadResyncs(t *testing.T) {
+	for status, want := range map[string]bool{"read": true, "delivered": false} {
+		c := NewConnector(context.Background(), uuid.New(), 1, nil)
+
+		c.Send(highEvent(event.MessageCreated), time.Millisecond)
+		c.Send(statusEvent(status), time.Millisecond)
+
+		if got := c.(*connect).lostUpdates.Load(); got != want {
+			t.Errorf("%s dropped: resync = %v, want %v", status, got, want)
+		}
+
+		c.Close()
+	}
+}

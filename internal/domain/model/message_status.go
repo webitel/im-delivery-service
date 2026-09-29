@@ -27,6 +27,8 @@ type MessageStatusUpdate struct {
 	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
 	// (preferred watermark; supercedes UpToMessageID).
 	UpToSeq int64 `json:"up_to_seq,omitempty"`
+	// UpdatesCursor is the recipient's GetUpdates cursor after this change; reads only.
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 // EventMessageRef is the message context of a fan-out event envelope, kept

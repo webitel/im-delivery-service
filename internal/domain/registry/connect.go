@@ -185,10 +185,22 @@ func releaseTimer(t *time.Timer) {
 	timerPool.Put(t)
 }
 
+// replayable reports whether GetUpdates can bring the event back: reads are journaled,
+// delivered/failed statuses are not.
+func replayable(ev event.Eventer) bool {
+	if s, ok := ev.GetPayload().(*model.MessageStatusUpdate); ok {
+		return s.Status == "read"
+	}
+
+	_, ok := catchUpKinds[ev.GetKind()]
+
+	return ok
+}
+
 // markLost remembers that a replayable event never reached the client, keeping the cursor
 // of the first loss so the resync replays from before it.
 func (c *connect) markLost(ev event.Eventer) {
-	if _, ok := catchUpKinds[ev.GetKind()]; !ok {
+	if !replayable(ev) {
 		return
 	}
 

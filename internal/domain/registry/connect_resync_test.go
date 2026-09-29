@@ -48,6 +48,30 @@ func TestSend_DroppedMessageQueuesResync(t *testing.T) {
 	}
 }
 
+func messageEvent(cursor string) event.Eventer {
+	return event.NewSystemEvent(uuid.New(), event.MessageCreated, &model.Message{UpdatesCursor: cursor},
+		event.WithPriority[*model.Message](event.PriorityHigh))
+}
+
+// The resync replays from before the first loss, not from a later one.
+func TestSend_ResyncCarriesFirstLostCursor(t *testing.T) {
+	c := NewConnector(context.Background(), uuid.New(), 1, nil)
+	defer c.Close()
+
+	c.Send(messageEvent("10.1"), time.Millisecond)
+	c.Send(messageEvent("20.2"), time.Millisecond)
+	c.Send(messageEvent("30.3"), time.Millisecond)
+
+	<-c.Recv()
+
+	c.Send(messageEvent("40.4"), time.Millisecond)
+
+	resync, ok := (<-c.Recv()).GetPayload().(*model.ResyncPayload)
+	if !ok || resync.Cursor != "20.2" {
+		t.Fatalf("resync = %+v, want cursor of the first dropped event 20.2", resync)
+	}
+}
+
 // Losing an ephemeral event (typing) is not worth a catch-up.
 func TestSend_DroppedTypingDoesNotResync(t *testing.T) {
 	c := NewConnector(context.Background(), uuid.New(), 1, nil)

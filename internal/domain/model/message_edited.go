@@ -27,6 +27,8 @@ type MessageEdited struct {
 	Version   int32 `json:"version"`
 	CreatedAt int64 `json:"created_at"`
 	EditedAt  int64 `json:"edited_at"`
+	// UpdatesCursor is the GetUpdates position just before this change (set by im-thread-service).
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 func (m *MessageEdited) RoutingKey() string {

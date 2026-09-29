@@ -53,7 +53,6 @@ func TestMarshalMemberJoined(t *testing.T) {
 		t.Fatalf("no member_added_event in payload: %v", payload)
 	}
 
-
 	// Verify action field
 	action, ok := memberAdded["action"]
 	if !ok {
@@ -104,7 +103,6 @@ func TestMarshalMemberLeft(t *testing.T) {
 	if !ok {
 		t.Fatalf("no member_left_event in payload: %v", payload)
 	}
-
 
 	// Verify action field
 	action, ok := memberLeft["action"]

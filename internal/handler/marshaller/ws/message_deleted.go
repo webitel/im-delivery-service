@@ -12,6 +12,8 @@ type WSMessageDeleted struct {
 	DeletedBy *WSPeer `json:"deleted_by"`
 	CreatedAt int64   `json:"created_at"`
 	DeletedAt int64   `json:"deleted_at"`
+
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 func mapMessageDeleted(m *model.MessageDeleted) *WSMessageDeleted {
@@ -21,5 +23,7 @@ func mapMessageDeleted(m *model.MessageDeleted) *WSMessageDeleted {
 		DeletedBy: mapPeer(&m.DeletedBy),
 		CreatedAt: m.CreatedAt,
 		DeletedAt: m.DeletedAt,
+
+		UpdatesCursor: m.UpdatesCursor,
 	}
 }

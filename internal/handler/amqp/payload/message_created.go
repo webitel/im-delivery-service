@@ -54,6 +54,9 @@ type MessageCreatedV1 struct {
 	// reach only this bot among the bot participants — any other bot (e.g. the owner bot
 	// suspended lower in the stack) must NOT be triggered.
 	BotControllerMemberID *string `json:"bot_controller_member_id,omitempty"`
+
+	Seq           int64  `json:"seq"`
+	UpdatesCursor string `json:"updates_cursor"`
 }
 
 type ForwardOrigin struct {
@@ -136,6 +139,9 @@ func (d *MessageCreatedV1) ToDomain() *model.Message {
 		Documents: d.mapDocs(),
 		Metadata:  d.Metadata,
 		Type:      d.Type,
+
+		Seq:           d.Seq,
+		UpdatesCursor: d.UpdatesCursor,
 		// Populate the sender with provided contact/member details.
 		From: model.Peer{
 			ID:       util.SafeParseUUID(d.From.ContactID),

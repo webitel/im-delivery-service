@@ -17,6 +17,8 @@ type MessageEditedV1 struct {
 	CreatedAt  string         `json:"created_at"`
 	OccurredAt string         `json:"occurred_at"`
 	Metadata   map[string]any `json:"metadata,omitempty"`
+
+	UpdatesCursor string `json:"updates_cursor"`
 }
 
 func (d *MessageEditedV1) ToDomain() *model.MessageEdited {
@@ -37,6 +39,8 @@ func (d *MessageEditedV1) ToDomain() *model.MessageEdited {
 		Version:   d.Version,
 		CreatedAt: createdAt,
 		EditedAt:  editedAt,
+
+		UpdatesCursor: d.UpdatesCursor,
 		EditedBy: model.Peer{
 			ID:       util.SafeParseUUID(d.EditedBy.ContactID),
 			MemberID: d.EditedBy.MemberID,

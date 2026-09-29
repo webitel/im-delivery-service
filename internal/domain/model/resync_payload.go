@@ -19,6 +19,8 @@ func UpdatesCursorOf(payload any) string {
 		return p.UpdatesCursor
 	case *MemberEvent:
 		return p.UpdatesCursor
+	case *MessageStatusUpdate:
+		return p.UpdatesCursor
 	}
 
 	return ""

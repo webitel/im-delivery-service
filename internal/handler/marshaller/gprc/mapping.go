@@ -158,6 +158,7 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 			OccurredAt:    m.OccurredAt,
 			UpToMessageId: optionalUUIDString(m.UpToMessageID),
 			UpToSeq:       m.UpToSeq,
+			UpdatesCursor: m.UpdatesCursor,
 		},
 	}
 }

@@ -29,6 +29,8 @@ type MessageStatusV1 struct {
 	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
 	// (preferred watermark; supercedes UpToMessageID).
 	UpToSeq int64 `json:"up_to_seq,omitempty"`
+
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 // ToDomain converts the AMQP payload into the internal domain model.
@@ -50,6 +52,7 @@ func (d *MessageStatusV1) ToDomain() *model.MessageStatusUpdate {
 		OccurredAt:    util.SafeParseRFC3339(d.OccurredAt),
 		UpToMessageID: optionalUUID(d.UpToMessageID),
 		UpToSeq:       d.UpToSeq,
+		UpdatesCursor: d.UpdatesCursor,
 	}
 }
 

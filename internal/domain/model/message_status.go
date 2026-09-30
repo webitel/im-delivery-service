@@ -60,3 +60,13 @@ func errorText(details map[string]any, key string) string {
 
 	return ""
 }
+
+// FailedMessageID is the message a failure is about; empty for delivered/read, which move a
+// horizon (up_to_seq) instead of naming messages.
+func (m *MessageStatusUpdate) FailedMessageID() string {
+	if m.Status != "failed" || len(m.MessageIDs) == 0 {
+		return ""
+	}
+
+	return m.MessageIDs[0].String()
+}

@@ -52,3 +52,14 @@ func TestMarshalMessageStatusPayload_Cursor(t *testing.T) {
 		t.Fatalf("status event = %+v", got)
 	}
 }
+
+func TestMarshalMessageStatusPayload_MemberAndError(t *testing.T) {
+	got := marshalMessageStatusPayload(&model.MessageStatusUpdate{
+		Status: "failed", Member: &model.Peer{Type: model.PeerUser, Sub: "3", Issuer: "webitel", Name: "Admin"},
+		Error: map[string]any{"code": "131047", "message": "re-engagement window expired"},
+	}).MessageStatusEvent
+
+	if got.GetMember().GetUserId() != "3" || got.GetError().GetCode() != "131047" || got.GetError().GetMessage() != "re-engagement window expired" {
+		t.Fatalf("status event = %+v", got)
+	}
+}

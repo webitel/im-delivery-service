@@ -185,11 +185,11 @@ func releaseTimer(t *time.Timer) {
 	timerPool.Put(t)
 }
 
-// replayable reports whether GetUpdates can bring the event back: reads are journaled,
-// delivered/failed statuses are not.
+// replayable reports whether GetUpdates can bring the event back: every journaled change,
+// including delivered/read/failed statuses.
 func replayable(ev event.Eventer) bool {
-	if s, ok := ev.GetPayload().(*model.MessageStatusUpdate); ok {
-		return s.Status == "read"
+	if _, ok := ev.GetPayload().(*model.MessageStatusUpdate); ok {
+		return true
 	}
 
 	_, ok := catchUpKinds[ev.GetKind()]

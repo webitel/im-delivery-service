@@ -151,7 +151,7 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 	return &impb.ServerEvent_MessageStatusEvent{
 		MessageStatusEvent: &impb.MessageStatusEvent{
 			ThreadId:      m.ThreadID.String(),
-			MemberId:      m.MemberID.String(),
+			Member:        marshalPeer(m.Member),
 			MessageIds:    messageIDs,
 			Status:        status,
 			Via:           m.Via,
@@ -159,8 +159,19 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 			UpToMessageId: optionalUUIDString(m.UpToMessageID),
 			UpToSeq:       m.UpToSeq,
 			UpdatesCursor: m.UpdatesCursor,
+			Error:         marshalStatusError(m),
 		},
 	}
+}
+
+// marshalStatusError turns a provider failure into {code, message}; nil when nothing failed.
+func marshalStatusError(m *model.MessageStatusUpdate) *impb.MessageStatusError {
+	code, message, ok := m.Failure()
+	if !ok {
+		return nil
+	}
+
+	return &impb.MessageStatusError{Code: code, Message: message}
 }
 
 func optionalUUIDString(id *uuid.UUID) string {

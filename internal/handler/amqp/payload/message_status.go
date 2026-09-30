@@ -11,9 +11,11 @@ import (
 // published by im-thread-service when per-recipient delivery statuses
 // actually change (delivered/read/failed).
 type MessageStatusV1 struct {
-	ThreadID   string         `json:"thread_id"`
-	DomainID   int32          `json:"domain_id"`
-	MemberID   string         `json:"member_id"`
+	ThreadID string `json:"thread_id"`
+	DomainID int32  `json:"domain_id"`
+	MemberID string `json:"member_id"`
+	// Member is the recipient's membership (member row id, role); the contact is enriched here.
+	Member     *Peer          `json:"member,omitempty"`
 	MessageIDs []string       `json:"message_ids"`
 	Status     string         `json:"status"`
 	Via        string         `json:"via,omitempty"`

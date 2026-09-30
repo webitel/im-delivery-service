@@ -21,6 +21,12 @@ type EventHandler interface {
 	Handle(ctx context.Context, ev event.Eventer)
 }
 
+// BroadcastPreparer runs before an event reaches the sockets, for state a client reply
+// needs right away (a live ACK can arrive before the async handlers run).
+type BroadcastPreparer interface {
+	PrepareBroadcast(ctx context.Context, ev event.Eventer)
+}
+
 // [DISMISS_HANDLER] Optional interface for handlers capable of revoking notifications.
 type DismissHandler interface {
 	HandleDismiss(ctx context.Context, ev event.Eventer)
@@ -96,6 +102,12 @@ func NewEventOrchestrator(p OrchestratorParams) *EventOrchestrator {
 func (o *EventOrchestrator) Notify(ctx context.Context, ev event.Eventer) {
 	if ev == nil {
 		return
+	}
+
+	for _, h := range o.handlers {
+		if p, ok := h.(BroadcastPreparer); ok {
+			p.PrepareBroadcast(ctx, ev)
+		}
 	}
 
 	// [HOT_PATH] Direct WebSocket broadcast.

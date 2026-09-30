@@ -1,8 +1,6 @@
 package grpcmarshaller
 
 import (
-	"github.com/google/uuid"
-
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -132,11 +130,6 @@ func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_M
 
 // marshalMessageStatusPayload converts the domain MessageStatusUpdate to a gRPC MessageStatusEvent.
 func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent_MessageStatusEvent {
-	messageIDs := make([]string, 0, len(m.MessageIDs))
-	for _, id := range m.MessageIDs {
-		messageIDs = append(messageIDs, id.String())
-	}
-
 	statusMap := map[string]impb.MessageDeliveryStatus{
 		"delivered": impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_DELIVERED,
 		"read":      impb.MessageDeliveryStatus_MESSAGE_DELIVERY_STATUS_READ,
@@ -152,11 +145,10 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 		MessageStatusEvent: &impb.MessageStatusEvent{
 			ThreadId:      m.ThreadID.String(),
 			Member:        marshalPeer(m.Member),
-			MessageIds:    messageIDs,
+			MessageId:     m.FailedMessageID(),
 			Status:        status,
 			Via:           m.Via,
 			OccurredAt:    m.OccurredAt,
-			UpToMessageId: optionalUUIDString(m.UpToMessageID),
 			UpToSeq:       m.UpToSeq,
 			UpdatesCursor: m.UpdatesCursor,
 			Error:         marshalStatusError(m),
@@ -172,14 +164,6 @@ func marshalStatusError(m *model.MessageStatusUpdate) *impb.MessageStatusError {
 	}
 
 	return &impb.MessageStatusError{Code: code, Message: message}
-}
-
-func optionalUUIDString(id *uuid.UUID) string {
-	if id == nil {
-		return ""
-	}
-
-	return id.String()
 }
 
 // marshalMessageType maps the domain type name onto the wire enum. The enum

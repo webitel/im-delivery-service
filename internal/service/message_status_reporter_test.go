@@ -14,6 +14,7 @@ import (
 	threadv1 "github.com/webitel/im-delivery-service/gen/go/thread/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
+	"github.com/webitel/im-delivery-service/internal/domain/registry"
 )
 
 type fakeRefTracker struct {
@@ -125,7 +126,7 @@ func TestHandle_RemembersMessageEnvelopeContext(t *testing.T) {
 	member := uuid.New()
 	ev := testMessageEvent(member)
 
-	r.Handle(context.Background(), ev)
+	r.PrepareBroadcast(context.Background(), ev)
 
 	eid := uuid.MustParse(ev.GetID())
 	ref, _ := refs.GetRef(context.Background(), eid)
@@ -162,10 +163,10 @@ func TestHandle_SkipsNonTrackableEvents(t *testing.T) {
 		Kind: event.MessageCreated,
 	}
 
-	r.Handle(context.Background(), echo)
-	r.Handle(context.Background(), wrongKind)
-	r.Handle(context.Background(), nilPayload)
-	r.Handle(context.Background(), nil)
+	r.PrepareBroadcast(context.Background(), echo)
+	r.PrepareBroadcast(context.Background(), wrongKind)
+	r.PrepareBroadcast(context.Background(), nilPayload)
+	r.PrepareBroadcast(context.Background(), nil)
 
 	refs.mu.Lock()
 	defer refs.mu.Unlock()
@@ -196,7 +197,7 @@ func TestConfirmDelivered_FlushesFullBatchImmediately(t *testing.T) {
 
 	for range statusFlushBatch {
 		ev := testMessageEvent(uuid.New())
-		r.Handle(context.Background(), ev)
+		r.PrepareBroadcast(context.Background(), ev)
 		r.ConfirmDelivered(context.Background(), uuid.MustParse(ev.GetID()), viaWebSocket)
 	}
 
@@ -218,7 +219,7 @@ func TestConfirmDelivered_TickerFlushesPartialBatch(t *testing.T) {
 	r, _, thread := newTestReporter(t)
 
 	ev := testMessageEvent(uuid.New())
-	r.Handle(context.Background(), ev)
+	r.PrepareBroadcast(context.Background(), ev)
 	r.ConfirmDelivered(context.Background(), uuid.MustParse(ev.GetID()), viaPush)
 
 	req := thread.wait(t, 3*statusFlushInterval)
@@ -234,7 +235,7 @@ func TestHandleDismiss_ReadFrameReportsMarkRead(t *testing.T) {
 
 	// A delivered message envelope must be remembered first.
 	ev := testMessageEvent(member)
-	r.Handle(context.Background(), ev)
+	r.PrepareBroadcast(context.Background(), ev)
 	eid := uuid.MustParse(ev.GetID())
 	msg := ev.GetPayload().(*model.Message)
 
@@ -277,7 +278,7 @@ func TestFlushDelivered_RetriesOnTransientFailure(t *testing.T) {
 	t.Cleanup(func() { _ = r.Close() })
 
 	ev := testMessageEvent(uuid.New())
-	r.Handle(context.Background(), ev)
+	r.PrepareBroadcast(context.Background(), ev)
 	r.ConfirmDelivered(context.Background(), uuid.MustParse(ev.GetID()), viaWebSocket)
 
 	// Ticker flush (~300ms) + one backoff (~200ms); allow generous slack.
@@ -295,7 +296,7 @@ func TestClose_DrainsPendingReceipts(t *testing.T) {
 
 	for range 3 {
 		ev := testMessageEvent(uuid.New())
-		r.Handle(context.Background(), ev)
+		r.PrepareBroadcast(context.Background(), ev)
 		r.ConfirmDelivered(context.Background(), uuid.MustParse(ev.GetID()), viaWebSocket)
 	}
 
@@ -373,3 +374,32 @@ func TestConfirmReadDirectWithContext_ReportsWithFullContext(t *testing.T) {
 		t.Errorf("read receipt mismatch: %+v", got)
 	}
 }
+
+// The envelope ref must exist before the event reaches a socket: a live client can ACK at once.
+func TestOrchestratorNotify_PreparesBeforeBroadcast(t *testing.T) {
+	order := make([]string, 0, 2)
+	prep := &orderPreparer{order: &order}
+	o := &EventOrchestrator{hub: orderHub{order: &order}, handlers: []EventHandler{prep}, queue: make(chan task, 1)}
+
+	o.Notify(context.Background(), event.NewSystemEvent(uuid.New(), event.MessageCreated, "x"))
+
+	if len(order) != 2 || order[0] != "prepare" || order[1] != "broadcast" {
+		t.Fatalf("order = %v, want prepare before broadcast", order)
+	}
+}
+
+type orderPreparer struct{ order *[]string }
+
+func (p *orderPreparer) Handle(context.Context, event.Eventer) {}
+
+func (p *orderPreparer) PrepareBroadcast(context.Context, event.Eventer) {
+	*p.order = append(*p.order, "prepare")
+}
+
+type orderHub struct{ order *[]string }
+
+func (h orderHub) Broadcast(event.Eventer)       { *h.order = append(*h.order, "broadcast") }
+func (orderHub) Register(registry.Connector)     {}
+func (orderHub) Unregister(uuid.UUID, uuid.UUID) {}
+func (orderHub) Connected(uuid.UUID) bool        { return false }
+func (orderHub) Shutdown()                       {}

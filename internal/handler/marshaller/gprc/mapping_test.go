@@ -1,8 +1,6 @@
 package grpcmarshaller
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -48,20 +46,17 @@ func TestMarshalMemberChangedPayload(t *testing.T) {
 	}
 }
 
-// thread-service sends only up_to_seq; a missing message id must stay empty, not zeros.
-func TestMarshalMessageStatusPayload_OmitsMissingUpToMessageID(t *testing.T) {
-	got := marshalMessageStatusPayload(&model.MessageStatusUpdate{Status: "read", UpToSeq: 1}).MessageStatusEvent
+// Delivered/read carry only the horizon; failed names the message it is about.
+func TestMarshalMessageStatusPayload_MessageIDOnlyForFailures(t *testing.T) {
+	msg := uuid.New()
 
-	if got.GetUpToMessageId() != "" || got.GetUpToSeq() != 1 {
-		t.Fatalf("up_to_message_id=%q up_to_seq=%d, want empty and 1", got.GetUpToMessageId(), got.GetUpToSeq())
+	read := marshalMessageStatusPayload(&model.MessageStatusUpdate{Status: "read", UpToSeq: 1, MessageIDs: []uuid.UUID{msg}}).MessageStatusEvent
+	if read.GetMessageId() != "" || read.GetUpToSeq() != 1 {
+		t.Fatalf("read: message_id=%q up_to_seq=%d, want empty and 1", read.GetMessageId(), read.GetUpToSeq())
 	}
 
-	raw, err := json.Marshal(&model.MessageStatusUpdate{Status: "read", UpToSeq: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if strings.Contains(string(raw), "up_to_message_id") {
-		t.Fatalf("JSON must omit up_to_message_id: %s", raw)
+	failed := marshalMessageStatusPayload(&model.MessageStatusUpdate{Status: "failed", MessageIDs: []uuid.UUID{msg}}).MessageStatusEvent
+	if failed.GetMessageId() != msg.String() {
+		t.Fatalf("failed: message_id=%q, want %s", failed.GetMessageId(), msg)
 	}
 }

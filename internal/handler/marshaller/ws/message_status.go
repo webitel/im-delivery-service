@@ -3,11 +3,12 @@ package wsmarshaller
 import "github.com/webitel/im-delivery-service/internal/domain/model"
 
 // WSMessageStatus is a delivered/read/failed change; member has the same shape as a message sender.
+// Delivered/read move the horizon to up_to_seq; failed names its message_id.
 type WSMessageStatus struct {
 	ThreadID      string         `json:"thread_id"`
 	Status        string         `json:"status"`
 	Member        *WSPeer        `json:"member"`
-	MessageIDs    []string       `json:"message_ids"`
+	MessageID     string         `json:"message_id,omitempty"`
 	UpToSeq       int64          `json:"up_to_seq,omitempty"`
 	Via           string         `json:"via,omitempty"`
 	Error         *WSStatusError `json:"error,omitempty"`
@@ -22,16 +23,11 @@ type WSStatusError struct {
 }
 
 func mapMessageStatus(m *model.MessageStatusUpdate) *WSMessageStatus {
-	ids := make([]string, 0, len(m.MessageIDs))
-	for _, id := range m.MessageIDs {
-		ids = append(ids, id.String())
-	}
-
 	return &WSMessageStatus{
 		ThreadID:      m.ThreadID.String(),
 		Status:        m.Status,
 		Member:        mapPeer(m.Member),
-		MessageIDs:    ids,
+		MessageID:     m.FailedMessageID(),
 		UpToSeq:       m.UpToSeq,
 		Via:           m.Via,
 		Error:         mapStatusError(m),

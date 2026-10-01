@@ -2,7 +2,9 @@ package httpsrv
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 
 	"go.uber.org/fx"
@@ -12,21 +14,33 @@ import (
 
 var Module = fx.Module("http-server",
 	fx.Provide(http.NewServeMux), // [ROUTER] Provides central *http.ServeMux
-	fx.Invoke(Start),             // [LIFECYCLE] Starts the listener
+	fx.Provide(New),              // [LISTENER] Binds the HTTP/WS port
+	fx.Invoke(func(*Server) {}),  // [LIFECYCLE] Starts the listener
 )
 
-func Start(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Config) {
+type Server struct {
+	*http.Server
+
+	listener net.Listener
+}
+
+func New(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Config) (*Server, error) {
 	srv := &http.Server{
 		Addr:    cfg.Service.HTTPAddr,
 		Handler: mux,
 	}
 
+	l, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("listen http %s: %w", srv.Addr, err)
+	}
+
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(context.Context) error {
 			log.Info("HTTP_SERVER_STARTED", slog.String("addr", srv.Addr))
 			// [IO] Run in background to not block app startup
 			go func() {
-				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				if err := srv.Serve(l); err != nil && err != http.ErrServerClosed {
 					log.Error("HTTP_SERVER_CRASHED", slog.Any("err", err))
 				}
 			}()
@@ -39,4 +53,10 @@ func Start(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Co
 			return srv.Shutdown(ctx)
 		},
 	})
+
+	return &Server{Server: srv, listener: l}, nil
+}
+
+func (s *Server) Listener() net.Listener {
+	return s.listener
 }

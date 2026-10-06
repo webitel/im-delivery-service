@@ -10,6 +10,7 @@ type WSMessageStatus struct {
 	Member        *WSPeer        `json:"member"`
 	MessageID     string         `json:"message_id,omitempty"`
 	UpToSeq       int64          `json:"up_to_seq,omitempty"`
+	UnreadCount   *int64         `json:"unread_count,omitempty"`
 	Via           string         `json:"via,omitempty"`
 	Error         *WSStatusError `json:"error,omitempty"`
 	OccurredAt    int64          `json:"occurred_at"`
@@ -29,6 +30,7 @@ func mapMessageStatus(m *model.MessageStatusUpdate) *WSMessageStatus {
 		Member:        mapPeer(m.Member),
 		MessageID:     m.FailedMessageID(),
 		UpToSeq:       m.UpToSeq,
+		UnreadCount:   m.UnreadCount,
 		Via:           m.Via,
 		Error:         mapStatusError(m),
 		OccurredAt:    m.OccurredAt,

@@ -29,6 +29,8 @@ type MessageStatusUpdate struct {
 	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
 	// (preferred watermark; supercedes UpToMessageID).
 	UpToSeq int64 `json:"up_to_seq,omitempty"`
+	// UnreadCount is the reader's unread messages in the thread after a read; nil otherwise.
+	UnreadCount *int64 `json:"unread_count,omitempty"`
 	// UpdatesCursor is the recipient's GetUpdates cursor after this change; reads only.
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }

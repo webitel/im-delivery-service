@@ -150,6 +150,7 @@ func marshalMessageStatusPayload(m *model.MessageStatusUpdate) *impb.ServerEvent
 			Via:           m.Via,
 			OccurredAt:    m.OccurredAt,
 			UpToSeq:       m.UpToSeq,
+			UnreadCount:   m.UnreadCount,
 			UpdatesCursor: m.UpdatesCursor,
 			Error:         marshalStatusError(m),
 		},

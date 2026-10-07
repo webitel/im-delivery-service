@@ -31,3 +31,38 @@ func TestOnMessageStatus_EnrichesMember(t *testing.T) {
 		t.Fatalf("member = %+v, want enriched contact with membership", got)
 	}
 }
+
+// The reader's unread count reaches only the reader; other participants get the status without it.
+func TestOnMessageStatus_UnreadCountOnlyForReader(t *testing.T) {
+	reader := uuid.MustParse(customerID)
+	other := uuid.New()
+	h := newHandler(nil)
+
+	unread := int64(6)
+	events, err := h.OnMessageStatusV1(context.Background(), &payload.MessageStatusV1{
+		ThreadID:     uuid.NewString(),
+		MemberID:     reader.String(),
+		Status:       "read",
+		UnreadCount:  &unread,
+		Participants: []string{reader.String(), other.String()},
+	})
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events = %d, err = %v", len(events), err)
+	}
+
+	for _, ev := range events {
+		got := ev.GetPayload().(*model.MessageStatusUpdate).UnreadCount
+		switch ev.GetUserID() {
+		case reader:
+			if got == nil || *got != unread {
+				t.Fatalf("reader unread_count = %v, want %d", got, unread)
+			}
+		case other:
+			if got != nil {
+				t.Fatalf("participant unread_count = %d, want nil", *got)
+			}
+		default:
+			t.Fatalf("unexpected target %s", ev.GetUserID())
+		}
+	}
+}

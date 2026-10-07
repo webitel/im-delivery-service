@@ -28,9 +28,18 @@ func (h *MessageHandler) OnMessageStatusV1(ctx context.Context, raw *payload.Mes
 	update := raw.ToDomain()
 	update.Member = h.statusMember(ctx, raw, update.MemberID)
 
+	// UnreadCount is the reader's own badge; the other participants get the status without it.
+	peerView := *update
+	peerView.UnreadCount = nil
+
 	events := make([]event.Eventer, 0, len(targets))
 	for _, targetID := range targets {
-		events = append(events, event.NewMessageStatusEvent(update, targetID, int64(raw.DomainID)))
+		view := &peerView
+		if targetID == update.MemberID {
+			view = update
+		}
+
+		events = append(events, event.NewMessageStatusEvent(view, targetID, int64(raw.DomainID)))
 	}
 
 	return events, nil

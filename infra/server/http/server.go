@@ -14,7 +14,7 @@ import (
 
 var Module = fx.Module("http-server",
 	fx.Provide(http.NewServeMux), // [ROUTER] Provides central *http.ServeMux
-	fx.Provide(New),              // [LISTENER] Binds the HTTP/WS port
+	fx.Provide(New),              // [LISTENER] Binds the HTTP/WS port on start
 	fx.Invoke(func(*Server) {}),  // [LIFECYCLE] Starts the listener
 )
 
@@ -24,19 +24,24 @@ type Server struct {
 	listener net.Listener
 }
 
-func New(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Config) (*Server, error) {
-	srv := &http.Server{
+func New(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Config) *Server {
+	s := &Server{Server: &http.Server{
 		Addr:    cfg.Service.HTTPAddr,
 		Handler: mux,
-	}
-
-	l, err := net.Listen("tcp", srv.Addr)
-	if err != nil {
-		return nil, fmt.Errorf("listen http %s: %w", srv.Addr, err)
-	}
+	}}
+	srv := s.Server
 
 	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
+		OnStart: func(ctx context.Context) error {
+			var lcfg net.ListenConfig
+
+			l, err := lcfg.Listen(ctx, "tcp", srv.Addr)
+			if err != nil {
+				return fmt.Errorf("listen http %s: %w", srv.Addr, err)
+			}
+
+			s.listener = l
+
 			log.Info("HTTP_SERVER_STARTED", slog.String("addr", srv.Addr))
 			// [IO] Run in background to not block app startup
 			go func() {
@@ -54,7 +59,7 @@ func New(lc fx.Lifecycle, mux *http.ServeMux, log *slog.Logger, cfg *config.Conf
 		},
 	})
 
-	return &Server{Server: srv, listener: l}, nil
+	return s
 }
 
 func (s *Server) Listener() net.Listener {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/fx"
 
 	"github.com/webitel/webitel-go-kit/infra/health"
 	healthhttp "github.com/webitel/webitel-go-kit/infra/health/http"
@@ -15,6 +16,7 @@ import (
 )
 
 func registerHealth(
+	lc fx.Lifecycle,
 	log *slog.Logger,
 	h *health.Registry,
 	grpcServer *grpcsrv.Server,
@@ -26,7 +28,9 @@ func registerHealth(
 	mux.Handle("/readyz", healthhttp.ReadinessHandler(h, healthhttp.WithLogger(log)))
 	mux.Handle("/healthz", healthhttp.HealthHandler(h, healthhttp.WithLogger(log)))
 
-	h.Critical("grpc", health.ListenerCheck(grpcServer.Listener()))
-	h.Critical("http", health.ListenerCheck(httpServer.Listener()))
-	h.Informational("redis", func(ctx context.Context) error { return rdb.Ping(ctx).Err() })
+	lc.Append(fx.StartHook(func() {
+		h.Critical("grpc", health.ListenerCheck(grpcServer.Listener()))
+		h.Critical("http", health.ListenerCheck(httpServer.Listener()))
+		h.Informational("redis", func(ctx context.Context) error { return rdb.Ping(ctx).Err() })
+	}))
 }

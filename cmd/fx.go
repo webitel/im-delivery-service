@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/webitel/webitel-go-kit/infra/discovery"
+	healthfx "github.com/webitel/webitel-go-kit/infra/health/fx"
 	"github.com/webitel/webitel-go-kit/infra/profiler"
 
 	"github.com/webitel/im-delivery-service/config"
@@ -34,6 +35,8 @@ func NewApp(cfg *config.Config) *fx.App {
 			ProvideRedis,
 			ProvideProfiler,
 		),
+
+		healthfx.Module(healthfx.Config{}),
 
 		// [INIT] Global service discovery orchestration
 		fx.Invoke(func(discovery discovery.DiscoveryProvider) error { return nil }),
@@ -67,5 +70,8 @@ func NewApp(cfg *config.Config) *fx.App {
 
 		// Fetch metrics from profiler
 		profiler.Module,
+
+		fx.Invoke(registerHealth),
+		healthfx.Shutdown(),
 	)
 }

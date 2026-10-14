@@ -11,7 +11,9 @@ import (
 type MessageStatusUpdate struct {
 	ThreadID uuid.UUID `json:"thread_id"`
 	// MemberID is the recipient contact id whose statuses changed.
-	MemberID   uuid.UUID   `json:"member_id"`
+	MemberID uuid.UUID `json:"-"`
+	// Member is that recipient in the same shape as a message sender.
+	Member     *Peer       `json:"member,omitempty"`
 	MessageIDs []uuid.UUID `json:"message_ids"`
 	// Status is the new delivery state: delivered|read|failed.
 	Status string `json:"status"`
@@ -27,6 +29,8 @@ type MessageStatusUpdate struct {
 	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
 	// (preferred watermark; supercedes UpToMessageID).
 	UpToSeq int64 `json:"up_to_seq,omitempty"`
+	// UnreadCount is the reader's unread messages in the thread after a read; nil otherwise.
+	UnreadCount *int64 `json:"unread_count,omitempty"`
 	// UpdatesCursor is the recipient's GetUpdates cursor after this change; reads only.
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
@@ -40,4 +44,31 @@ type EventMessageRef struct {
 	// MemberID is the recipient contact id the envelope was addressed to.
 	MemberID uuid.UUID `json:"member_id"`
 	DomainID int64     `json:"domain_id"`
+}
+
+// Failure is the provider's reason as {code, message}; ok is false when nothing failed.
+func (m *MessageStatusUpdate) Failure() (code, message string, ok bool) {
+	if len(m.Error) == 0 {
+		return "", "", false
+	}
+
+	return errorText(m.Error, "code"), errorText(m.Error, "message"), true
+}
+
+func errorText(details map[string]any, key string) string {
+	if v, ok := details[key].(string); ok {
+		return v
+	}
+
+	return ""
+}
+
+// FailedMessageID is the message a failure is about; empty for delivered/read, which move a
+// horizon (up_to_seq) instead of naming messages.
+func (m *MessageStatusUpdate) FailedMessageID() string {
+	if m.Status != "failed" || len(m.MessageIDs) == 0 {
+		return ""
+	}
+
+	return m.MessageIDs[0].String()
 }

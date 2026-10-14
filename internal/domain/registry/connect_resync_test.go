@@ -90,9 +90,9 @@ func statusEvent(status string) event.Eventer {
 		event.WithPriority[*model.MessageStatusUpdate](event.PriorityLow))
 }
 
-// A lost read is replayable (journaled), a lost delivered receipt is not.
-func TestSend_LostReadResyncs(t *testing.T) {
-	for status, want := range map[string]bool{"read": true, "delivered": false} {
+// Every status is journaled, so losing any of them asks for a resync.
+func TestSend_LostStatusResyncs(t *testing.T) {
+	for status, want := range map[string]bool{"read": true, "delivered": true, "failed": true} {
 		c := NewConnector(context.Background(), uuid.New(), 1, nil)
 
 		c.Send(highEvent(event.MessageCreated), time.Millisecond)

@@ -11,9 +11,11 @@ import (
 // published by im-thread-service when per-recipient delivery statuses
 // actually change (delivered/read/failed).
 type MessageStatusV1 struct {
-	ThreadID   string         `json:"thread_id"`
-	DomainID   int32          `json:"domain_id"`
-	MemberID   string         `json:"member_id"`
+	ThreadID string `json:"thread_id"`
+	DomainID int32  `json:"domain_id"`
+	MemberID string `json:"member_id"`
+	// Member is the recipient's membership (member row id, role); the contact is enriched here.
+	Member     *Peer          `json:"member,omitempty"`
 	MessageIDs []string       `json:"message_ids"`
 	Status     string         `json:"status"`
 	Via        string         `json:"via,omitempty"`
@@ -29,6 +31,8 @@ type MessageStatusV1 struct {
 	// UpToSeq is the per-thread sequence number of the delivered/read-up-to boundary
 	// (preferred watermark; supercedes UpToMessageID).
 	UpToSeq int64 `json:"up_to_seq,omitempty"`
+	// UnreadCount is the reader's unread messages after a read; nil for delivered/failed.
+	UnreadCount *int64 `json:"unread_count,omitempty"`
 
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
@@ -52,6 +56,7 @@ func (d *MessageStatusV1) ToDomain() *model.MessageStatusUpdate {
 		OccurredAt:    util.SafeParseRFC3339(d.OccurredAt),
 		UpToMessageID: optionalUUID(d.UpToMessageID),
 		UpToSeq:       d.UpToSeq,
+		UnreadCount:   d.UnreadCount,
 		UpdatesCursor: d.UpdatesCursor,
 	}
 }

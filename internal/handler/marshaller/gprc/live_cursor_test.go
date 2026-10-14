@@ -52,3 +52,28 @@ func TestMarshalMessageStatusPayload_Cursor(t *testing.T) {
 		t.Fatalf("status event = %+v", got)
 	}
 }
+
+func TestMarshalMessageStatusPayload_MemberAndError(t *testing.T) {
+	got := marshalMessageStatusPayload(&model.MessageStatusUpdate{
+		Status: "failed", Member: &model.Peer{Type: model.PeerUser, Sub: "3", Issuer: "webitel", Name: "Admin"},
+		Error: map[string]any{"code": "131047", "message": "re-engagement window expired"},
+	}).MessageStatusEvent
+
+	if got.GetMember().GetUserId() != "3" || got.GetError().GetCode() != "131047" || got.GetError().GetMessage() != "re-engagement window expired" {
+		t.Fatalf("status event = %+v", got)
+	}
+}
+
+func TestMarshalMessageStatusPayload_UnreadCount(t *testing.T) {
+	two := int64(2)
+
+	read := marshalMessageStatusPayload(&model.MessageStatusUpdate{Status: "read", UnreadCount: &two}).MessageStatusEvent
+	if read.UnreadCount == nil || read.GetUnreadCount() != 2 {
+		t.Fatalf("read unread_count = %v (set %v), want 2", read.GetUnreadCount(), read.UnreadCount != nil)
+	}
+
+	delivered := marshalMessageStatusPayload(&model.MessageStatusUpdate{Status: "delivered"}).MessageStatusEvent
+	if delivered.UnreadCount != nil {
+		t.Fatal("delivered must not carry unread_count")
+	}
+}

@@ -4,6 +4,7 @@ How a client connected to the **im-delivery-service** WebSocket/stream reports a
 receives message delivery/read state. Statuses are **watermark-based**: a client
 acknowledges *"delivered/read up to here"* rather than acking each message.
 
+
 ## Model in one minute
 
 - Every message has a per-thread **`seq`** — a small monotonic integer (1, 2, 3, …)
@@ -37,7 +38,6 @@ Open the delivery stream. On reconnect, pass the last event id you durably
 processed so the server can replay anything you missed:
 
 ```jsonc
-// StreamRequest
 { "last_event_id": "01920a1c-....-...." }   // omit/empty on a fresh connect
 ```
 
@@ -46,7 +46,6 @@ processed so the server can replay anything you missed:
 Each pushed item is a `ServerEvent` with an envelope **`id`** and a payload:
 
 ```jsonc
-// ServerEvent (payload = message_event)
 {
   "id": "0192abcd-1111-7aaa-...",     // ENVELOPE id — use this to ACK a live message
   "created_at": 1765000000000,
@@ -75,10 +74,8 @@ Send a small JSON frame up the socket. Two watermarks, two frame types.
 ### Live (you just received the push): ack by envelope `event_id`
 
 ```jsonc
-// "I received up to this envelope"
 { "type": "ack",  "event_id": "0192abcd-1111-7aaa-..." }
 
-// "I read up to this envelope" (user opened the chat)
 { "type": "read", "event_id": "0192abcd-1111-7aaa-..." }
 ```
 

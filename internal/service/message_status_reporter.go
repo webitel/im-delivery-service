@@ -76,6 +76,7 @@ var (
 	_ EventHandler      = (*MessageStatusReporter)(nil)
 	_ DismissHandler    = (*MessageStatusReporter)(nil)
 	_ DeliveryConfirmer = (*MessageStatusReporter)(nil)
+	_ BroadcastPreparer = (*MessageStatusReporter)(nil)
 )
 
 // MessageStatusReporter ties client ACKs, successful pushes, and client
@@ -125,10 +126,12 @@ func NewMessageStatusReporter(
 	return r
 }
 
-// [HANDLE] Observes fan-out events: message envelopes addressed to a
-// recipient (not the sender echo) are remembered so a later ACK or read
-// frame can be resolved into a status report.
-func (r *MessageStatusReporter) Handle(ctx context.Context, ev event.Eventer) {
+// Handle has nothing to do asynchronously: the envelope ref is saved before broadcast.
+func (r *MessageStatusReporter) Handle(context.Context, event.Eventer) {}
+
+// PrepareBroadcast remembers a recipient's message envelope before it reaches the socket, so
+// an ACK or read frame that comes straight back resolves into a status report.
+func (r *MessageStatusReporter) PrepareBroadcast(ctx context.Context, ev event.Eventer) {
 	if ev == nil || ev.IsEcho() || ev.GetKind() != event.MessageCreated {
 		return
 	}
@@ -177,6 +180,8 @@ func (r *MessageStatusReporter) HandleDismiss(ctx context.Context, ev event.Even
 func (r *MessageStatusReporter) ConfirmDelivered(ctx context.Context, eid uuid.UUID, via string) {
 	ref := r.lookup(ctx, eid)
 	if ref == nil {
+		r.log.Warn("ACK_WITHOUT_MESSAGE_REF", slog.String("eid", eid.String()))
+
 		return
 	}
 

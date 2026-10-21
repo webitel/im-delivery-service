@@ -24,7 +24,8 @@ func NewEnvelopeForKind(kind EventKind) Eventer {
 		return &Envelope[*model.MessageReadPayload]{}
 
 	case Connected, DisconnectedEvent, VariableSet, VariableFlush, MemberAdded,
-		MemberLeft, InteractiveCallback, MessageStatusChanged, MessageDeleted, Typing, MessageReaction:
+		MemberLeft, InteractiveCallback, MessageStatusChanged, MessageDeleted, Typing, MessageReaction,
+		ThreadTagsChanged:
 		// [FALLBACK] Use generic any-envelope for transient or unmarshaled events.
 		return &Envelope[any]{}
 

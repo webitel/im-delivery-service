@@ -21,4 +21,5 @@ const (
 	Typing                                    // [BUSINESS] ephemeral, real-time only
 	MessageReaction                           // [BUSINESS]
 	Resync                                    // [SYSTEM] events for the connection were dropped
+	ThreadTagsChanged                         // [BUSINESS] private to the tag owner
 )

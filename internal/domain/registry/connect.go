@@ -56,13 +56,14 @@ type connect struct {
 
 // catchUpKinds are the events GetUpdates can replay; losing one makes the client resync.
 var catchUpKinds = map[event.EventKind]struct{}{
-	event.MessageCreated:  {},
-	event.ThreadCreated:   {},
-	event.MemberAdded:     {},
-	event.MemberLeft:      {},
-	event.MessageEdited:   {},
-	event.MessageDeleted:  {},
-	event.MessageReaction: {},
+	event.MessageCreated:    {},
+	event.ThreadCreated:     {},
+	event.MemberAdded:       {},
+	event.MemberLeft:        {},
+	event.MessageEdited:     {},
+	event.MessageDeleted:    {},
+	event.MessageReaction:   {},
+	event.ThreadTagsChanged: {},
 }
 
 // [POOL] SYNC.POOL FOR OBJECT REUSE (REDUCES GC PRESSURE)

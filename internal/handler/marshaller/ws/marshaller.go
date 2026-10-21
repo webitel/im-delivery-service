@@ -88,6 +88,9 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 	case *model.Typing:
 		res.Payload["typing_event"] = mapTyping(p)
 
+	case *model.ThreadTagsChanged:
+		res.Payload[EventThreadTagsChanged.String()] = p
+
 	default:
 		// [FALLBACK] Use the event kind name for unknown types.
 		res.Payload[ev.GetKind().String()] = p

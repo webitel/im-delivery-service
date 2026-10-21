@@ -44,6 +44,12 @@ func (m *Marshaller) Marshal(ev event.Eventer, _ uuid.UUID) (any, error) {
 		res.Payload = marshalMessageStatusPayload(p)
 	case *model.MemberEvent:
 		res.Payload = marshalMemberChangedPayload(p)
+	case *model.ThreadTagsChanged:
+		res.Payload = &impb.ServerEvent_ThreadTagsChangedEvent{ThreadTagsChangedEvent: &impb.ThreadTagsChangedEvent{
+			ThreadId:      p.ThreadID.String(),
+			Tags:          p.Tags,
+			UpdatesCursor: p.UpdatesCursor,
+		}}
 	case *model.ConnectedPayload:
 		res.Payload = &impb.ServerEvent_ConnectedEvent{ConnectedEvent: &impb.ConnectedEvent{
 			Ok:            p.Ok,

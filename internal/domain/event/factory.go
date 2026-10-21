@@ -171,6 +171,19 @@ func NewMessageStatusEvent(
 	}
 }
 
+// [NEW_THREAD_TAGS_CHANGED_EVENT] Factory for a tag owner's own tag change. Not pushable.
+func NewThreadTagsChangedEvent(t *model.ThreadTagsChanged, targetID uuid.UUID, domainID int64) Eventer {
+	return &Envelope[*model.ThreadTagsChanged]{
+		ID:         uuid.New(),
+		Payload:    t,
+		UserID:     targetID,
+		DomainID:   domainID,
+		Kind:       ThreadTagsChanged,
+		Priority:   PriorityNormal,
+		OccurredAt: time.Now().UnixMilli(),
+	}
+}
+
 // [NEW_MEMBER_EVENT] Factory for member lifecycle events (added/left).
 func NewMemberEvent(m *model.MemberEvent, targetID uuid.UUID, kind EventKind) Eventer {
 	return &Envelope[*model.MemberEvent]{

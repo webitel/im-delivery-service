@@ -1,8 +1,18 @@
 asyncapi: 3.0.0
 info:
   title: Webitel IM Delivery Service
-  version: 1.0.0
-  description: WebSocket API for real-time chat delivery.
+  version: 1.1.0
+  description: |
+    WebSocket API for real-time chat delivery.
+
+    Every server frame is a `ServerEvent` envelope. Its `payload` object carries
+    exactly one key that names the event (e.g. `message_event`); the value is
+    that event's body. Clients switch on the key and ignore unknown keys.
+
+    Events that carry `updates_cursor` advance the recipient's GetUpdates
+    position: persist it, and on reconnect compare it with the cursor from
+    `connected_event`. A `resync_event` means live events were dropped and the
+    client must catch up via GetUpdates.
 
 channels:
   ws:
@@ -10,6 +20,10 @@ channels:
     messages:
       ServerEvent:
         $ref: '#/components/messages/ServerEvent'
+      AuthRequest:
+        $ref: '#/components/messages/AuthRequest'
+      ClientCommand:
+        $ref: '#/components/messages/ClientCommand'
 
 operations:
   receiveEvents:
@@ -19,12 +33,42 @@ operations:
     messages:
       - $ref: '#/channels/ws/messages/ServerEvent'
 
+  authenticate:
+    action: send
+    channel:
+      $ref: '#/channels/ws'
+    summary: Late-binding auth frame.
+    description: |
+      Sent as the first frame when the token was not supplied on the upgrade
+      request. Must arrive within 5s, otherwise the server closes the socket
+      with `401_unauthorized`.
+    messages:
+      - $ref: '#/channels/ws/messages/AuthRequest'
+
+  sendCommands:
+    action: send
+    channel:
+      $ref: '#/channels/ws'
+    summary: Delivery acknowledgements and read receipts.
+    messages:
+      - $ref: '#/channels/ws/messages/ClientCommand'
+
 components:
   messages:
     ServerEvent:
       name: ServerEvent
       payload:
         $ref: '#/components/schemas/ServerEventPayload'
+
+    AuthRequest:
+      name: AuthRequest
+      payload:
+        $ref: '#/components/schemas/AuthRequestPayload'
+
+    ClientCommand:
+      name: ClientCommand
+      payload:
+        $ref: '#/components/schemas/ClientCommandPayload'
 
   schemas:
     # --- ENVELOPE ---
@@ -34,9 +78,11 @@ components:
         id:
           type: string
           format: uuid
+          description: "Envelope id; a live client acks by this value"
         created_at:
           type: integer
           format: int64
+          description: "Event time, Unix ms"
         priority:
           $ref: '#/components/schemas/EventPriority'
         payload:
@@ -47,7 +93,7 @@ components:
       enum: [0, 1, 2, 3]
       x-enumNames: ["unspecified", "high", "normal", "low"]
 
-    # --- POLYMORPHIC PAYLOAD ---
+    # --- POLYMORPHIC PAYLOAD (exactly one key is set) ---
     EventPayload:
       type: object
       properties:
@@ -55,10 +101,34 @@ components:
           $ref: '#/components/schemas/ConnectedPayload'
         disconnected_event:
           $ref: '#/components/schemas/DisconnectedPayload'
+        resync_event:
+          $ref: '#/components/schemas/ResyncPayload'
         message_event:
           $ref: '#/components/schemas/WSMessage'
+        message_edited_event:
+          $ref: '#/components/schemas/WSMessageEdited'
+        message_deleted_event:
+          $ref: '#/components/schemas/WSMessageDeleted'
+        message_status_event:
+          $ref: '#/components/schemas/WSMessageStatus'
+        message_reaction_event:
+          $ref: '#/components/schemas/WSReaction'
+        typing_event:
+          $ref: '#/components/schemas/WSTyping'
         thread_created_event:
           $ref: '#/components/schemas/WSThread'
+        thread_tags_changed_event:
+          $ref: '#/components/schemas/ThreadTagsChangedPayload'
+        member_added_event:
+          $ref: '#/components/schemas/MemberEventPayload'
+        member_left_event:
+          $ref: '#/components/schemas/MemberEventPayload'
+        interactive_callback:
+          $ref: '#/components/schemas/InteractiveCallbackPayload'
+        variable_set_event:
+          $ref: '#/components/schemas/WSVariables'
+        variable_flush_event:
+          $ref: '#/components/schemas/WSVariables'
         ack_event:
           $ref: '#/components/schemas/AckPayload'
         error_event:
@@ -66,29 +136,50 @@ components:
         ping_event:
           $ref: '#/components/schemas/PingPayload'
 
-    # --- PAYLOAD DETAILS ---
+    # --- CONNECTION LIFECYCLE ---
     ConnectedPayload:
       type: object
       properties:
         ok: { type: boolean }
         connection_id: { type: string }
         server_version: { type: string }
+        updates_cursor:
+          type: string
+          description: "User's GetUpdates cursor now; equal to the saved one means nothing was missed"
 
     DisconnectedPayload:
       type: object
+      description: "Sent right before the server closes the stream"
       properties:
-        reason: { type: string }
-        code: { type: integer }
-        status: { type: string }
+        reason:
+          type: string
+          description: "Human-readable reason"
+        code:
+          type: integer
+          description: "HTTP-like code: 401, 408, 429, 503"
+        status:
+          type: string
+          title: DisconnectStatus
+          enum: ["SHUTDOWN", "EVICTED", "TIMEOUT", "UNAUTHORIZED"]
+
+    ResyncPayload:
+      type: object
+      description: "Live events for this connection were dropped; catch up via GetUpdates"
+      properties:
+        cursor:
+          type: string
+          description: "Cursor to resume from; empty means use the client's saved cursor"
 
     AckPayload:
       type: object
+      description: "Reserved; not emitted by the current server"
       properties:
         id: { type: string }
         status: { type: string }
 
     ErrorPayload:
       type: object
+      description: "Reserved; not emitted by the current server"
       properties:
         code: { type: integer }
         message: { type: string }
@@ -96,83 +187,173 @@ components:
 
     PingPayload:
       type: object
+      description: "Reserved; liveness uses WebSocket ping/pong control frames"
       properties:
         timestamp: { type: integer, format: int64 }
 
-    # --- DATA MODELS (Updated to match Go structs) ---
-    
+    # --- SHARED DATA MODELS ---
     WSContact:
       type: object
       required: [sub, type]
       properties:
-        sub: 
+        sub:
           type: string
           description: "Subject identifier"
-        iss: 
+        iss:
           type: string
           description: "Issuer"
-        name: 
+        name:
           type: string
-        username: 
+        username:
           type: string
-        type: 
+        type:
           type: string
           description: "Normalized type (e.g. user, bot, agent)"
-        is_bot: 
+        is_bot:
           type: boolean
 
     WSPeer:
       type: object
+      description: "Thread participant; same shape for sender, edited_by, deleted_by, member and from"
       properties:
-        id: 
+        id:
           type: string
           description: "Member identifier"
         contact:
           $ref: '#/components/schemas/WSContact'
-        role: 
+        role:
           type: string
           description: "Role (e.g. member, admin)"
 
+    MessageType:
+      type: string
+      enum: ["text", "image", "document", "system", "interactive", "location", "contact"]
+
+    # --- MESSAGES ---
     WSMessage:
       type: object
       properties:
-        id: 
+        id:
           type: string
           format: uuid
-        send_id: 
+        send_id:
           type: string
-        thread_id: 
+        thread_id:
           type: string
           format: uuid
-        sender: 
+        sender:
           $ref: '#/components/schemas/WSPeer'
-        to: 
+        to:
           type: array
           items:
             $ref: '#/components/schemas/WSPeer'
-        created_at: 
+        created_at:
           type: integer
           format: int64
-        edited_at: 
+        edited_at:
           type: integer
           format: int64
-        body: 
+        body:
           type: string
-        type: 
-          type: string
-          enum: ["text", "image", "document"]
+        type:
+          $ref: '#/components/schemas/MessageType'
         images:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/WSImage'
         documents:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/WSDocument'
+        interactive:
+          type: object
+          additionalProperties: true
+          description: "Raw interactive (buttons/keyboard) payload, passed through as-is"
+        contact:
+          $ref: '#/components/schemas/WSSharedContact'
+        location:
+          $ref: '#/components/schemas/WSLocation'
+        system:
+          $ref: '#/components/schemas/WSSystem'
+        metadata:
+          type: object
+          additionalProperties: true
         reply_to:
           $ref: '#/components/schemas/WSReplyTo'
+        forward_origin:
+          $ref: '#/components/schemas/WSForwardOrigin'
+        seq:
+          type: integer
+          format: int64
+          description: "Per-thread sequence number; used to ack/read by (thread_id, seq)"
+        updates_cursor:
+          type: string
+
+    WSImage:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mime: { type: string }
+        url: { type: string }
+
+    WSDocument:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mime: { type: string }
+        size: { type: integer, format: int64 }
+        url: { type: string }
+
+    WSSharedContact:
+      type: object
+      description: "Contact card shared in a message"
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string }
+
+    WSLocation:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        address: { type: string }
+        name: { type: string }
+
+    WSSystem:
+      type: object
+      properties:
+        type: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    WSForwardOrigin:
+      type: object
+      properties:
+        kind:
+          type: string
+          title: ForwardOriginKind
+          enum:
+            - FORWARD_ORIGIN_KIND_UNSPECIFIED
+            - FORWARD_ORIGIN_KIND_INTERNAL
+            - FORWARD_ORIGIN_KIND_EXTERNAL_USER
+            - FORWARD_ORIGIN_KIND_EXTERNAL_HIDDEN_USER
+            - FORWARD_ORIGIN_KIND_EXTERNAL_CHAT
+        sender_id:
+          type: string
+          format: uuid
+        sender_name:
+          type: string
+        original_sent_at:
+          type: integer
+          format: int64
+        source_message_id:
+          type: string
+          format: uuid
 
     WSReplyTo:
       type: object
@@ -181,12 +362,13 @@ components:
         message_id:
           type: string
           format: uuid
+        sender:
+          $ref: '#/components/schemas/WSPeer'
         sender_id:
           type: string
           format: uuid
         type:
-          type: string
-          enum: ["text", "image", "document", "system", "interactive", "location", "contact"]
+          $ref: '#/components/schemas/MessageType'
         body:
           type: string
           description: "Body snippet, max 256 chars"
@@ -195,12 +377,133 @@ components:
           format: int64
         attachment_kind:
           type: string
+          title: AttachmentKind
           enum: ["document", "image"]
         attachment_name:
           type: string
         attachment_mime:
           type: string
+        attachment_address:
+          type: string
+        is_deleted:
+          type: boolean
+          description: "The quoted message was deleted after the reply was sent"
 
+    WSMessageEdited:
+      type: object
+      description: "Match the message by id and replace its content"
+      properties:
+        id: { type: string, format: uuid }
+        thread_id: { type: string, format: uuid }
+        edited_by:
+          $ref: '#/components/schemas/WSPeer'
+        body: { type: string }
+        type:
+          $ref: '#/components/schemas/MessageType'
+        version:
+          type: integer
+          format: int32
+          description: "Edit version; ignore an event older than the one applied"
+        created_at: { type: integer, format: int64 }
+        edited_at: { type: integer, format: int64 }
+        metadata:
+          type: object
+          additionalProperties: true
+        updates_cursor: { type: string }
+
+    WSMessageDeleted:
+      type: object
+      description: "Match the message by id and remove it"
+      properties:
+        id: { type: string, format: uuid }
+        thread_id: { type: string, format: uuid }
+        deleted_by:
+          $ref: '#/components/schemas/WSPeer'
+        created_at: { type: integer, format: int64 }
+        deleted_at: { type: integer, format: int64 }
+        updates_cursor: { type: string }
+
+    WSMessageStatus:
+      type: object
+      description: |
+        Per-recipient delivery status change. delivered/read move the member's
+        horizon up to `up_to_seq`; failed names the single `message_id`.
+      properties:
+        thread_id: { type: string, format: uuid }
+        status:
+          type: string
+          title: DeliveryStatus
+          enum: ["delivered", "read", "failed"]
+        member:
+          $ref: '#/components/schemas/WSPeer'
+        message_id:
+          type: string
+          format: uuid
+          description: "Failed message; set only when status is failed"
+        up_to_seq:
+          type: integer
+          format: int64
+        unread_count:
+          type: integer
+          format: int64
+          description: "Reader's unread count after a read; absent otherwise"
+        via:
+          type: string
+          title: StatusVia
+          enum: ["ws", "push", "provider", "bot"]
+        error:
+          $ref: '#/components/schemas/WSStatusError'
+        occurred_at: { type: integer, format: int64 }
+        updates_cursor: { type: string }
+
+    WSStatusError:
+      type: object
+      description: "Why the message did not reach the member"
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+    WSReaction:
+      type: object
+      description: |
+        Authoritative reaction state of a message after the change; replace the
+        whole reaction bar. An empty `reactions` array means no reactions left.
+      required: [message_id, thread_id, reactions]
+      properties:
+        message_id: { type: string, format: uuid }
+        thread_id: { type: string, format: uuid }
+        reactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/WSReactionAggregate'
+        updates_cursor: { type: string }
+
+    WSReactionAggregate:
+      type: object
+      properties:
+        emoji: { type: string }
+        count: { type: integer, format: int32 }
+        reacted_by_me:
+          type: boolean
+          description: "Resolved per recipient"
+        reactor_ids:
+          type: array
+          items: { type: string }
+        last_reacted_at:
+          type: string
+          description: "Unix ms encoded as a string (protojson int64)"
+
+    WSTyping:
+      type: object
+      description: "Ephemeral typing indicator; hide it after timeout_ms"
+      properties:
+        thread_id: { type: string, format: uuid }
+        timeout_ms: { type: integer, format: int32 }
+        from:
+          $ref: '#/components/schemas/WSPeer'
+        preview_text: { type: string }
+
+    # --- THREADS & MEMBERS ---
     WSThread:
       type: object
       properties:
@@ -213,3 +516,119 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WSPeer'
+
+    ThreadTagsChangedPayload:
+      type: object
+      description: "Recipient's own current tags on the thread (full replacement)"
+      required: [thread_id, tags]
+      properties:
+        thread_id: { type: string, format: uuid }
+        tags:
+          type: array
+          items: { type: string }
+        updates_cursor: { type: string }
+
+    MemberEventPayload:
+      type: object
+      description: "Body of member_added_event and member_left_event"
+      properties:
+        thread_id: { type: string, format: uuid }
+        contact_id: { type: string, format: uuid }
+        metadata:
+          type: object
+          additionalProperties: true
+        updates_cursor: { type: string }
+        action:
+          type: string
+          title: MemberAction
+          enum: ["joined", "left"]
+
+    # --- INTERACTIVE & VARIABLES ---
+    InteractiveCallbackPayload:
+      type: object
+      description: "A participant pressed an interactive button"
+      properties:
+        reacted_by:
+          $ref: '#/components/schemas/RawPeer'
+        in_reply_to: { type: string }
+        button_code: { type: string }
+        callback_data: { type: string }
+        reacted_at: { type: string }
+        domain_id: { type: integer }
+        thread_id: { type: string }
+        receiver:
+          $ref: '#/components/schemas/RawPeer'
+
+    RawPeer:
+      type: object
+      description: "Internal peer shape (used only by interactive_callback)"
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: integer
+          title: PeerKind
+          enum: [1, 2, 3]
+          x-enumNames: ["user", "group", "channel"]
+        sub: { type: string }
+        issuer: { type: string }
+        name: { type: string }
+        username: { type: string }
+        is_bot: { type: boolean }
+        member_id: { type: string }
+        role: { type: integer, format: int32 }
+        domain_id: { type: integer }
+
+    WSVariables:
+      type: object
+      description: "Body of variable_set_event and variable_flush_event"
+      properties:
+        variables:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/VariableEntry'
+        action:
+          type: string
+          title: VariableAction
+          enum: ["set", "flush"]
+
+    VariableEntry:
+      type: object
+      properties:
+        value:
+          description: "Any JSON value"
+        set_by: { type: string }
+        set_at: { type: string }
+
+    # --- CLIENT -> SERVER ---
+    AuthRequestPayload:
+      type: object
+      required: ["x-webitel-access"]
+      properties:
+        x-webitel-access:
+          type: string
+          description: "Access token"
+        x-webitel-client:
+          type: string
+          description: "Optional client identifier"
+
+    ClientCommandPayload:
+      type: object
+      description: |
+        `ack` confirms delivery, `read` marks as read. A live client sends
+        `event_id` (the envelope id); a reconnecting client sends
+        `thread_id` + `seq` from history instead.
+      required: [type]
+      properties:
+        type:
+          type: string
+          title: ClientCommandType
+          enum: ["ack", "read"]
+        event_id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64

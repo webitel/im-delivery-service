@@ -1,20 +1,20 @@
-import WsThread from './WsThread';
-class ThreadPayload {
-  private _thread?: WsThread;
+
+class ResyncPayload {
+  private _cursor?: string;
   private _additionalProperties?: Map<string, any>;
 
   constructor(input: {
-    thread?: WsThread,
+    cursor?: string,
     additionalProperties?: Map<string, any>,
   }) {
-    this._thread = input.thread;
+    this._cursor = input.cursor;
     this._additionalProperties = input.additionalProperties;
   }
 
-  get thread(): WsThread | undefined { return this._thread; }
-  set thread(thread: WsThread | undefined) { this._thread = thread; }
+  get cursor(): string | undefined { return this._cursor; }
+  set cursor(cursor: string | undefined) { this._cursor = cursor; }
 
   get additionalProperties(): Map<string, any> | undefined { return this._additionalProperties; }
   set additionalProperties(additionalProperties: Map<string, any> | undefined) { this._additionalProperties = additionalProperties; }
 }
-export default ThreadPayload;
+export default ResyncPayload;

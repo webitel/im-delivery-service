@@ -1,14 +1,14 @@
-
+import DisconnectStatus from './DisconnectStatus';
 class DisconnectedPayload {
   private _reason?: string;
   private _code?: number;
-  private _reservedStatus?: string;
+  private _reservedStatus?: DisconnectStatus;
   private _additionalProperties?: Map<string, any>;
 
   constructor(input: {
     reason?: string,
     code?: number,
-    reservedStatus?: string,
+    reservedStatus?: DisconnectStatus,
     additionalProperties?: Map<string, any>,
   }) {
     this._reason = input.reason;
@@ -23,8 +23,8 @@ class DisconnectedPayload {
   get code(): number | undefined { return this._code; }
   set code(code: number | undefined) { this._code = code; }
 
-  get reservedStatus(): string | undefined { return this._reservedStatus; }
-  set reservedStatus(reservedStatus: string | undefined) { this._reservedStatus = reservedStatus; }
+  get reservedStatus(): DisconnectStatus | undefined { return this._reservedStatus; }
+  set reservedStatus(reservedStatus: DisconnectStatus | undefined) { this._reservedStatus = reservedStatus; }
 
   get additionalProperties(): Map<string, any> | undefined { return this._additionalProperties; }
   set additionalProperties(additionalProperties: Map<string, any> | undefined) { this._additionalProperties = additionalProperties; }

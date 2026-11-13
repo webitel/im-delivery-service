@@ -1,6 +1,8 @@
 package grpcmarshaller
 
 import (
+	"github.com/google/uuid"
+
 	impb "github.com/webitel/im-delivery-service/gen/go/delivery/v1"
 	"github.com/webitel/im-delivery-service/internal/domain/event"
 	"github.com/webitel/im-delivery-service/internal/domain/model"
@@ -108,8 +110,17 @@ func marshalMessageDeletedPayload(m *model.MessageDeleted) *impb.ServerEvent_Mes
 			DeletedAt: m.DeletedAt,
 
 			UpdatesCursor: m.UpdatesCursor,
+			ReplacedBy:    uuidOrEmpty(m.ReplacedBy),
 		},
 	}
+}
+
+func uuidOrEmpty(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+
+	return id.String()
 }
 
 func marshalMessageReactionPayload(m *model.MessageReaction) *impb.ServerEvent_MessageReactionEvent {

@@ -14,10 +14,11 @@ type WSMessageDeleted struct {
 	DeletedAt int64   `json:"deleted_at"`
 
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
+	ReplacedBy    string `json:"replaced_by,omitempty"`
 }
 
 func mapMessageDeleted(m *model.MessageDeleted) *WSMessageDeleted {
-	return &WSMessageDeleted{
+	out := &WSMessageDeleted{
 		ID:        m.ID.String(),
 		ThreadID:  m.ThreadID.String(),
 		DeletedBy: mapPeer(&m.DeletedBy),
@@ -26,4 +27,10 @@ func mapMessageDeleted(m *model.MessageDeleted) *WSMessageDeleted {
 
 		UpdatesCursor: m.UpdatesCursor,
 	}
+
+	if m.ReplacedBy != nil {
+		out.ReplacedBy = m.ReplacedBy.String()
+	}
+
+	return out
 }

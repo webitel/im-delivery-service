@@ -19,6 +19,9 @@ type MessageDeleted struct {
 	DeletedAt int64     `json:"deleted_at"`
 	// UpdatesCursor is the recipient's GetUpdates cursor after this change (set by im-thread-service).
 	UpdatesCursor string `json:"updates_cursor,omitempty"`
+	// ReplacedBy is the retry that replaced this failed message; clients drop
+	// the bubble instead of showing a "deleted" tombstone. Nil for a plain delete.
+	ReplacedBy *uuid.UUID `json:"replaced_by,omitempty"`
 
 	// To is the recipient set used for fan-out only; it never reaches clients.
 	To []Peer `json:"-"`

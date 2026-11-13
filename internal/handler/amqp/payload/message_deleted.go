@@ -1,6 +1,8 @@
 package payload
 
 import (
+	"github.com/google/uuid"
+
 	"github.com/webitel/im-delivery-service/internal/domain/model"
 	"github.com/webitel/im-delivery-service/internal/domain/util"
 )
@@ -70,6 +72,7 @@ type MessageDeletedV1 struct {
 	OccurredAt string      `json:"occurred_at"`
 
 	UpdatesCursor string `json:"updates_cursor"`
+	ReplacedBy    string `json:"replaced_by,omitempty"`
 }
 
 func (d *MessageDeletedV1) ToDomain() *model.MessageDeleted {
@@ -87,6 +90,10 @@ func (d *MessageDeletedV1) ToDomain() *model.MessageDeleted {
 
 		UpdatesCursor: d.UpdatesCursor,
 		DeletedBy:     d.DeletedBy.ToPeer(),
+	}
+
+	if replacedBy := util.SafeParseUUID(d.ReplacedBy); replacedBy != uuid.Nil {
+		msg.ReplacedBy = &replacedBy
 	}
 
 	msg.To = make([]model.Peer, 0, len(d.To))

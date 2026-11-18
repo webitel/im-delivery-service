@@ -20,11 +20,11 @@ func (h *MessageHandler) OnInteractiveCallbackReactedV1(ctx context.Context, raw
 
 	for _, peer := range peers {
 		if peer.ID == domainModel.ReactedBy.ID {
-			domainModel.ReactedBy = peer
+			domainModel.ReactedBy = domainModel.ReactedBy.CopyMembership(peer)
 		}
 
 		if peer.ID == domainModel.Receiver.ID {
-			domainModel.Receiver = peer
+			domainModel.Receiver = domainModel.Receiver.CopyMembership(peer)
 		}
 	}
 

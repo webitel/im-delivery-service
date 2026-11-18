@@ -128,7 +128,7 @@
                       },
                       "sender": {
                         "type": "object",
-                        "description": "Thread participant; same shape for sender, edited_by, deleted_by, member and from",
+                        "description": "Thread participant; same shape for sender, edited_by, deleted_by, member, from, reacted_by and receiver",
                         "properties": {
                           "id": {
                             "type": "string",
@@ -784,97 +784,42 @@
                     "x-parser-schema-id": "MemberEventPayload"
                   },
                   "member_left_event": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.member_added_event",
-                  "interactive_callback": {
+                  "interactive_callback_event": {
                     "type": "object",
                     "description": "A participant pressed an interactive button",
                     "properties": {
-                      "reacted_by": {
-                        "type": "object",
-                        "description": "Internal peer shape (used only by interactive_callback)",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "x-parser-schema-id": "<anonymous-schema-115>"
-                          },
-                          "type": {
-                            "type": "integer",
-                            "title": "PeerKind",
-                            "enum": [
-                              1,
-                              2,
-                              3
-                            ],
-                            "x-enumNames": [
-                              "user",
-                              "group",
-                              "channel"
-                            ],
-                            "x-parser-schema-id": "<anonymous-schema-116>"
-                          },
-                          "sub": {
-                            "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-117>"
-                          },
-                          "issuer": {
-                            "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-118>"
-                          },
-                          "name": {
-                            "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-119>"
-                          },
-                          "username": {
-                            "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-120>"
-                          },
-                          "is_bot": {
-                            "type": "boolean",
-                            "x-parser-schema-id": "<anonymous-schema-121>"
-                          },
-                          "member_id": {
-                            "type": "string",
-                            "x-parser-schema-id": "<anonymous-schema-122>"
-                          },
-                          "role": {
-                            "type": "integer",
-                            "format": "int32",
-                            "x-parser-schema-id": "<anonymous-schema-123>"
-                          },
-                          "domain_id": {
-                            "type": "integer",
-                            "x-parser-schema-id": "<anonymous-schema-124>"
-                          }
-                        },
-                        "x-parser-schema-id": "RawPeer"
-                      },
-                      "in_reply_to": {
+                      "thread_id": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-125>"
+                        "format": "uuid",
+                        "x-parser-schema-id": "<anonymous-schema-115>"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Message that carries the pressed button",
+                        "x-parser-schema-id": "<anonymous-schema-116>"
                       },
                       "button_code": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-126>"
+                        "x-parser-schema-id": "<anonymous-schema-117>"
                       },
                       "callback_data": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-127>"
+                        "x-parser-schema-id": "<anonymous-schema-118>"
                       },
                       "reacted_at": {
-                        "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-128>"
-                      },
-                      "domain_id": {
                         "type": "integer",
-                        "x-parser-schema-id": "<anonymous-schema-129>"
+                        "format": "int64",
+                        "x-parser-schema-id": "<anonymous-schema-119>"
                       },
-                      "thread_id": {
+                      "reacted_by": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
+                      "receiver": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.message_event.properties.sender",
+                      "updates_cursor": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-130>"
-                      },
-                      "receiver": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.interactive_callback.properties.reacted_by"
+                        "x-parser-schema-id": "<anonymous-schema-120>"
+                      }
                     },
-                    "x-parser-schema-id": "InteractiveCallbackPayload"
+                    "x-parser-schema-id": "WSInteractiveCallback"
                   },
                   "variable_set_event": {
                     "type": "object",
@@ -887,20 +832,20 @@
                           "properties": {
                             "value": {
                               "description": "Any JSON value",
-                              "x-parser-schema-id": "<anonymous-schema-132>"
+                              "x-parser-schema-id": "<anonymous-schema-122>"
                             },
                             "set_by": {
                               "type": "string",
-                              "x-parser-schema-id": "<anonymous-schema-133>"
+                              "x-parser-schema-id": "<anonymous-schema-123>"
                             },
                             "set_at": {
                               "type": "string",
-                              "x-parser-schema-id": "<anonymous-schema-134>"
+                              "x-parser-schema-id": "<anonymous-schema-124>"
                             }
                           },
                           "x-parser-schema-id": "VariableEntry"
                         },
-                        "x-parser-schema-id": "<anonymous-schema-131>"
+                        "x-parser-schema-id": "<anonymous-schema-121>"
                       },
                       "action": {
                         "type": "string",
@@ -909,7 +854,7 @@
                           "set",
                           "flush"
                         ],
-                        "x-parser-schema-id": "<anonymous-schema-135>"
+                        "x-parser-schema-id": "<anonymous-schema-125>"
                       }
                     },
                     "x-parser-schema-id": "WSVariables"
@@ -921,11 +866,11 @@
                     "properties": {
                       "id": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-136>"
+                        "x-parser-schema-id": "<anonymous-schema-126>"
                       },
                       "status": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-137>"
+                        "x-parser-schema-id": "<anonymous-schema-127>"
                       }
                     },
                     "x-parser-schema-id": "AckPayload"
@@ -936,16 +881,16 @@
                     "properties": {
                       "code": {
                         "type": "integer",
-                        "x-parser-schema-id": "<anonymous-schema-138>"
+                        "x-parser-schema-id": "<anonymous-schema-128>"
                       },
                       "message": {
                         "type": "string",
-                        "x-parser-schema-id": "<anonymous-schema-139>"
+                        "x-parser-schema-id": "<anonymous-schema-129>"
                       },
                       "details": {
                         "type": "object",
                         "additionalProperties": true,
-                        "x-parser-schema-id": "<anonymous-schema-140>"
+                        "x-parser-schema-id": "<anonymous-schema-130>"
                       }
                     },
                     "x-parser-schema-id": "ErrorPayload"
@@ -957,7 +902,7 @@
                       "timestamp": {
                         "type": "integer",
                         "format": "int64",
-                        "x-parser-schema-id": "<anonymous-schema-141>"
+                        "x-parser-schema-id": "<anonymous-schema-131>"
                       }
                     },
                     "x-parser-schema-id": "PingPayload"
@@ -981,12 +926,12 @@
               "x-webitel-access": {
                 "type": "string",
                 "description": "Access token",
-                "x-parser-schema-id": "<anonymous-schema-142>"
+                "x-parser-schema-id": "<anonymous-schema-132>"
               },
               "x-webitel-client": {
                 "type": "string",
                 "description": "Optional client identifier",
-                "x-parser-schema-id": "<anonymous-schema-143>"
+                "x-parser-schema-id": "<anonymous-schema-133>"
               }
             },
             "x-parser-schema-id": "AuthRequestPayload"
@@ -1009,22 +954,22 @@
                   "ack",
                   "read"
                 ],
-                "x-parser-schema-id": "<anonymous-schema-144>"
+                "x-parser-schema-id": "<anonymous-schema-134>"
               },
               "event_id": {
                 "type": "string",
                 "format": "uuid",
-                "x-parser-schema-id": "<anonymous-schema-145>"
+                "x-parser-schema-id": "<anonymous-schema-135>"
               },
               "thread_id": {
                 "type": "string",
                 "format": "uuid",
-                "x-parser-schema-id": "<anonymous-schema-146>"
+                "x-parser-schema-id": "<anonymous-schema-136>"
               },
               "seq": {
                 "type": "integer",
                 "format": "int64",
-                "x-parser-schema-id": "<anonymous-schema-147>"
+                "x-parser-schema-id": "<anonymous-schema-137>"
               }
             },
             "x-parser-schema-id": "ClientCommandPayload"
@@ -1101,8 +1046,7 @@
       "WSThread": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.thread_created_event",
       "ThreadTagsChangedPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.thread_tags_changed_event",
       "MemberEventPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.member_added_event",
-      "InteractiveCallbackPayload": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.interactive_callback",
-      "RawPeer": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.interactive_callback.properties.reacted_by",
+      "WSInteractiveCallback": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.interactive_callback_event",
       "WSVariables": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.variable_set_event",
       "VariableEntry": "$ref:$.channels.ws.messages.ServerEvent.payload.properties.payload.properties.variable_set_event.properties.variables.additionalProperties",
       "AuthRequestPayload": "$ref:$.channels.ws.messages.AuthRequest.payload",

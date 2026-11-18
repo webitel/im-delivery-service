@@ -72,6 +72,20 @@ func NewPeer(id uuid.UUID, pType PeerType, opts ...PeerOption) Peer {
 	return p
 }
 
+// CopyMembership returns enriched with the thread membership (member id and
+// role) of p, which contact enrichment does not know about. Bot-ness is
+// per-membership, so a known membership also overrides the contact's is_bot.
+func (p Peer) CopyMembership(enriched Peer) Peer {
+	enriched.MemberID = p.MemberID
+	enriched.Role = p.Role
+
+	if p.MemberID != "" {
+		enriched.IsBot = p.IsBot
+	}
+
+	return enriched
+}
+
 // IsEnriched determines if the peer has verified identity metadata.
 func (p Peer) IsEnriched() bool {
 	return p.Sub != ""

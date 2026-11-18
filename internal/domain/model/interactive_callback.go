@@ -11,6 +11,10 @@ type InteractiveCallback struct {
 	DomainID     int    `json:"domain_id"`
 	ThreadID     string `json:"thread_id"`
 	Receiver     Peer   `json:"receiver"`
+
+	// UpdatesCursor is the recipient's GetUpdates cursor after this callback
+	// (set by im-thread-service once the callback is journaled).
+	UpdatesCursor string `json:"updates_cursor,omitempty"`
 }
 
 func (c *InteractiveCallback) RoutingKey() string {

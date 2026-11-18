@@ -73,8 +73,9 @@ func (m *Marshaller) Marshal(ev event.Eventer, viewer uuid.UUID) (any, error) {
 		} else {
 			res.Payload[EventMemberAdded.String()] = p
 		}
+
 	case *model.InteractiveCallback:
-		res.Payload[EventInteractiveCallback.String()] = p
+		res.Payload[EventInteractiveCallback.String()] = mapInteractiveCallback(p)
 
 	case *model.MessageStatusUpdate:
 		res.Payload[EventMessageStatus.String()] = mapMessageStatus(p)

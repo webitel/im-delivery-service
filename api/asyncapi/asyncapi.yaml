@@ -123,8 +123,8 @@ components:
           $ref: '#/components/schemas/MemberEventPayload'
         member_left_event:
           $ref: '#/components/schemas/MemberEventPayload'
-        interactive_callback:
-          $ref: '#/components/schemas/InteractiveCallbackPayload'
+        interactive_callback_event:
+          $ref: '#/components/schemas/WSInteractiveCallback'
         variable_set_event:
           $ref: '#/components/schemas/WSVariables'
         variable_flush_event:
@@ -214,7 +214,7 @@ components:
 
     WSPeer:
       type: object
-      description: "Thread participant; same shape for sender, edited_by, deleted_by, member and from"
+      description: "Thread participant; same shape for sender, edited_by, deleted_by, member, from, reacted_by and receiver"
       properties:
         id:
           type: string
@@ -544,39 +544,23 @@ components:
           enum: ["joined", "left"]
 
     # --- INTERACTIVE & VARIABLES ---
-    InteractiveCallbackPayload:
+    WSInteractiveCallback:
       type: object
       description: "A participant pressed an interactive button"
       properties:
-        reacted_by:
-          $ref: '#/components/schemas/RawPeer'
-        in_reply_to: { type: string }
+        thread_id: { type: string, format: uuid }
+        message_id:
+          type: string
+          format: uuid
+          description: "Message that carries the pressed button"
         button_code: { type: string }
         callback_data: { type: string }
-        reacted_at: { type: string }
-        domain_id: { type: integer }
-        thread_id: { type: string }
+        reacted_at: { type: integer, format: int64 }
+        reacted_by:
+          $ref: '#/components/schemas/WSPeer'
         receiver:
-          $ref: '#/components/schemas/RawPeer'
-
-    RawPeer:
-      type: object
-      description: "Internal peer shape (used only by interactive_callback)"
-      properties:
-        id: { type: string, format: uuid }
-        type:
-          type: integer
-          title: PeerKind
-          enum: [1, 2, 3]
-          x-enumNames: ["user", "group", "channel"]
-        sub: { type: string }
-        issuer: { type: string }
-        name: { type: string }
-        username: { type: string }
-        is_bot: { type: boolean }
-        member_id: { type: string }
-        role: { type: integer, format: int32 }
-        domain_id: { type: integer }
+          $ref: '#/components/schemas/WSPeer'
+        updates_cursor: { type: string }
 
     WSVariables:
       type: object

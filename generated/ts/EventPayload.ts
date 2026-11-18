@@ -10,7 +10,7 @@ import WsTyping from './WsTyping';
 import WsThread from './WsThread';
 import ThreadTagsChangedPayload from './ThreadTagsChangedPayload';
 import MemberEventPayload from './MemberEventPayload';
-import InteractiveCallbackPayload from './InteractiveCallbackPayload';
+import WsInteractiveCallback from './WsInteractiveCallback';
 import WsVariables from './WsVariables';
 import AckPayload from './AckPayload';
 import ErrorPayload from './ErrorPayload';
@@ -29,7 +29,7 @@ class EventPayload {
   private _threadTagsChangedEvent?: ThreadTagsChangedPayload;
   private _memberAddedEvent?: MemberEventPayload;
   private _memberLeftEvent?: MemberEventPayload;
-  private _interactiveCallback?: InteractiveCallbackPayload;
+  private _interactiveCallbackEvent?: WsInteractiveCallback;
   private _variableSetEvent?: WsVariables;
   private _variableFlushEvent?: WsVariables;
   private _ackEvent?: AckPayload;
@@ -51,7 +51,7 @@ class EventPayload {
     threadTagsChangedEvent?: ThreadTagsChangedPayload,
     memberAddedEvent?: MemberEventPayload,
     memberLeftEvent?: MemberEventPayload,
-    interactiveCallback?: InteractiveCallbackPayload,
+    interactiveCallbackEvent?: WsInteractiveCallback,
     variableSetEvent?: WsVariables,
     variableFlushEvent?: WsVariables,
     ackEvent?: AckPayload,
@@ -72,7 +72,7 @@ class EventPayload {
     this._threadTagsChangedEvent = input.threadTagsChangedEvent;
     this._memberAddedEvent = input.memberAddedEvent;
     this._memberLeftEvent = input.memberLeftEvent;
-    this._interactiveCallback = input.interactiveCallback;
+    this._interactiveCallbackEvent = input.interactiveCallbackEvent;
     this._variableSetEvent = input.variableSetEvent;
     this._variableFlushEvent = input.variableFlushEvent;
     this._ackEvent = input.ackEvent;
@@ -120,8 +120,8 @@ class EventPayload {
   get memberLeftEvent(): MemberEventPayload | undefined { return this._memberLeftEvent; }
   set memberLeftEvent(memberLeftEvent: MemberEventPayload | undefined) { this._memberLeftEvent = memberLeftEvent; }
 
-  get interactiveCallback(): InteractiveCallbackPayload | undefined { return this._interactiveCallback; }
-  set interactiveCallback(interactiveCallback: InteractiveCallbackPayload | undefined) { this._interactiveCallback = interactiveCallback; }
+  get interactiveCallbackEvent(): WsInteractiveCallback | undefined { return this._interactiveCallbackEvent; }
+  set interactiveCallbackEvent(interactiveCallbackEvent: WsInteractiveCallback | undefined) { this._interactiveCallbackEvent = interactiveCallbackEvent; }
 
   get variableSetEvent(): WsVariables | undefined { return this._variableSetEvent; }
   set variableSetEvent(variableSetEvent: WsVariables | undefined) { this._variableSetEvent = variableSetEvent; }
